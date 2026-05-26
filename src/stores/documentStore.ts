@@ -1,0 +1,228 @@
+import { create } from "zustand";
+import type { PdfDocument } from "@/lib/pdf/pdfEngine";
+import type { PdfMetadata, SidebarTab, ViewMode, ZoomMode } from "@shared/types";
+import { DEFAULT_ZOOM, ZOOM_MAX, ZOOM_MIN } from "@/lib/constants";
+import { v4 as uuidv4 } from "uuid";
+
+export type PageRotation = 0 | 90 | 180 | 270;
+
+interface DocumentStore {
+  documentId: string | null;
+  filePath: string | null;
+  fileName: string;
+  pdfDoc: PdfDocument | null;
+  pdfBytes: Uint8Array | null;
+  savedPdfBytes: Uint8Array | null;
+  basePdfBytes: Uint8Array | null;
+  metadata: PdfMetadata | null;
+  isDirty: boolean;
+  isLoading: boolean;
+  loadError: string | null;
+  currentPage: number;
+  scrollToPage: number | null;
+  zoom: number;
+  zoomMode: ZoomMode;
+  viewMode: ViewMode;
+  rotation: PageRotation;
+  showSidebar: boolean;
+  sidebarTab: SidebarTab;
+  presentationMode: boolean;
+  setLoading: (loading: boolean) => void;
+  setLoadError: (error: string | null) => void;
+  setDocument: (args: {
+    filePath: string;
+    fileName: string;
+    pdfDoc: PdfDocument;
+    pdfBytes: Uint8Array;
+    metadata: PdfMetadata;
+  }) => void;
+  clearDocument: () => void;
+  setDirty: (dirty: boolean) => void;
+  setCurrentPage: (page: number, options?: { scroll?: boolean }) => void;
+  clearScrollRequest: () => void;
+  setZoom: (zoom: number) => void;
+  setZoomMode: (mode: ZoomMode) => void;
+  setViewMode: (mode: ViewMode) => void;
+  rotateClockwise: () => void;
+  rotateCounterClockwise: () => void;
+  toggleSidebar: () => void;
+  setSidebarTab: (tab: SidebarTab) => void;
+  togglePresentationMode: () => void;
+  updatePdfBytes: (bytes: Uint8Array) => void;
+  applySavedDocument: (args: {
+    filePath: string;
+    pdfDoc: PdfDocument;
+    pdfBytes: Uint8Array;
+  }) => void;
+  applyPdfStructureChange: (args: {
+    pdfDoc: PdfDocument;
+    pdfBytes: Uint8Array;
+    pageCount: number;
+  }) => void;
+  markSaved: (filePath: string) => void;
+  setStatusMessage: (message: string | null) => void;
+  statusMessage: string | null;
+  isPasswordProtected: boolean;
+  documentPassword: string | null;
+  pendingSavePassword: string | null;
+  removePasswordOnSave: boolean;
+  setPasswordProtected: (value: boolean) => void;
+  setDocumentPassword: (password: string | null) => void;
+  setPendingSavePassword: (password: string | null) => void;
+  setRemovePasswordOnSave: (value: boolean) => void;
+  clearSecuritySaveFlags: () => void;
+}
+
+export const useDocumentStore = create<DocumentStore>((set, get) => ({
+  documentId: null,
+  filePath: null,
+  fileName: "Untitled",
+  pdfDoc: null,
+  pdfBytes: null,
+  savedPdfBytes: null,
+  basePdfBytes: null,
+  metadata: null,
+  isDirty: false,
+  isLoading: false,
+  loadError: null,
+  currentPage: 1,
+  scrollToPage: null,
+  zoom: DEFAULT_ZOOM,
+  zoomMode: "custom",
+  viewMode: "continuous",
+  rotation: 0,
+  showSidebar: true,
+  sidebarTab: "pages",
+  presentationMode: false,
+  statusMessage: null,
+  isPasswordProtected: false,
+  documentPassword: null,
+  pendingSavePassword: null,
+  removePasswordOnSave: false,
+
+  setLoading: (isLoading) => set({ isLoading }),
+  setLoadError: (loadError) => set({ loadError }),
+  setDocument: ({ filePath, fileName, pdfDoc, pdfBytes, metadata }) =>
+    set({
+      documentId: uuidv4(),
+      filePath,
+      fileName,
+      pdfDoc,
+      pdfBytes,
+      savedPdfBytes: pdfBytes.slice(),
+      basePdfBytes: pdfBytes.slice(),
+      metadata,
+      isDirty: false,
+      isLoading: false,
+      loadError: null,
+      currentPage: 1,
+      scrollToPage: 1,
+      rotation: 0,
+      isPasswordProtected: !!metadata.isPasswordProtected,
+      documentPassword: null,
+      pendingSavePassword: null,
+      removePasswordOnSave: false,
+    }),
+  clearDocument: () =>
+    set({
+      documentId: null,
+      filePath: null,
+      fileName: "Untitled",
+      pdfDoc: null,
+      pdfBytes: null,
+      savedPdfBytes: null,
+      basePdfBytes: null,
+      metadata: null,
+      isDirty: false,
+      loadError: null,
+      currentPage: 1,
+      scrollToPage: null,
+      rotation: 0,
+      presentationMode: false,
+      isPasswordProtected: false,
+      documentPassword: null,
+      pendingSavePassword: null,
+      removePasswordOnSave: false,
+    }),
+  setDirty: (isDirty) => set({ isDirty }),
+  setCurrentPage: (page, options) => {
+    const total = get().metadata?.pageCount ?? 1;
+    const currentPage = Math.min(Math.max(1, page), total);
+    set({
+      currentPage,
+      scrollToPage: options?.scroll ? currentPage : get().scrollToPage,
+    });
+  },
+  clearScrollRequest: () => set({ scrollToPage: null }),
+  setZoom: (zoom) =>
+    set({
+      zoom: Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom)),
+      zoomMode: "custom",
+    }),
+  setZoomMode: (zoomMode) => set({ zoomMode }),
+  setViewMode: (viewMode) => set({ viewMode }),
+  rotateClockwise: () =>
+    set((s) => ({
+      rotation: ((s.rotation + 90) % 360) as PageRotation,
+      zoomMode: "custom",
+    })),
+  rotateCounterClockwise: () =>
+    set((s) => ({
+      rotation: ((s.rotation + 270) % 360) as PageRotation,
+      zoomMode: "custom",
+    })),
+  toggleSidebar: () => set((s) => ({ showSidebar: !s.showSidebar })),
+  setSidebarTab: (sidebarTab) => set({ sidebarTab, showSidebar: true }),
+  togglePresentationMode: () =>
+    set((s) => ({ presentationMode: !s.presentationMode })),
+  updatePdfBytes: (pdfBytes) => set({ pdfBytes }),
+  applySavedDocument: ({ filePath, pdfDoc, pdfBytes }) => {
+    const currentPage = get().currentPage;
+    set({
+      filePath,
+      fileName: filePath.split(/[/\\]/).pop() ?? get().fileName,
+      pdfDoc,
+      pdfBytes,
+      savedPdfBytes: pdfBytes.slice(),
+      isDirty: false,
+      statusMessage: "Saved",
+      currentPage,
+    });
+  },
+  applyPdfStructureChange: ({ pdfDoc, pdfBytes, pageCount }) => {
+    const currentPage = Math.min(get().currentPage, pageCount);
+    set((s) => ({
+      pdfDoc,
+      pdfBytes,
+      basePdfBytes: pdfBytes.slice(),
+      metadata: s.metadata
+        ? { ...s.metadata, pageCount, fileSize: pdfBytes.byteLength }
+        : { pageCount, fileSize: pdfBytes.byteLength },
+      isDirty: true,
+      currentPage,
+      scrollToPage: currentPage,
+      rotation: 0,
+    }));
+  },
+  markSaved: (filePath) => {
+    const pdfBytes = get().pdfBytes;
+    set({
+      filePath,
+      fileName: filePath.split(/[/\\]/).pop() ?? get().fileName,
+      isDirty: false,
+      savedPdfBytes: pdfBytes ? pdfBytes.slice() : null,
+      statusMessage: "Saved",
+    });
+  },
+  setStatusMessage: (statusMessage) => set({ statusMessage }),
+  setPasswordProtected: (isPasswordProtected) =>
+    set((s) => ({
+      isPasswordProtected,
+      metadata: s.metadata ? { ...s.metadata, isPasswordProtected } : s.metadata,
+    })),
+  setDocumentPassword: (documentPassword) => set({ documentPassword }),
+  setPendingSavePassword: (pendingSavePassword) => set({ pendingSavePassword }),
+  setRemovePasswordOnSave: (removePasswordOnSave) => set({ removePasswordOnSave }),
+  clearSecuritySaveFlags: () =>
+    set({ pendingSavePassword: null, removePasswordOnSave: false }),
+}));

@@ -1,0 +1,5 @@
+document the steps needed to build an adobe acrobat clone that encompasses 90% of the common users' functionality.  
+Create a roadmap.txt file and document the phases needed to create this app from the beginning.
+The phases must have items underneath them, with check boxes next to them.
+It must be created with typescript, and tauri framework.  
+It must be a production level app with full tests and logging. 

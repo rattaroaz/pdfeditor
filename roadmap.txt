@@ -1,0 +1,335 @@
+PDF Editor — Adobe Acrobat Clone Roadmap
+==========================================
+Target: ~90% of common Acrobat functionality
+Stack: TypeScript, Tauri 2, React, Rust backend
+Quality bar: Production-ready, full test coverage, structured logging
+
+Legend: [ ] = not started   [x] = complete
+
+
+================================================================================
+PHASE 0 — PROJECT FOUNDATION & REPOSITORY SETUP
+================================================================================
+Establish the monorepo, tooling, and conventions before any feature work.
+
+[x] Initialize Tauri 2 app with TypeScript frontend (Vite + React)
+[x] Initialize Rust workspace for Tauri commands and native PDF operations
+[x] Configure ESLint, Prettier, and strict TypeScript (strict: true)
+[x] Set up path aliases, env handling (.env.example), and secrets policy
+[x] Choose and integrate UI component library (e.g. Radix + Tailwind or shadcn/ui)
+[x] Define folder structure: src/ (frontend), src-tauri/ (Rust), shared/ (types)
+[ ] Add conventional commits, PR template, and CODEOWNERS
+[x] Set up GitHub Actions (or equivalent CI): lint, typecheck, test, build
+[x] Document local dev setup in README.md (prerequisites, npm run tauri dev)
+[x] Add LICENSE and CONTRIBUTING.md
+
+
+================================================================================
+PHASE 1 — LOGGING, ERROR HANDLING & OBSERVABILITY (FOUNDATION)
+================================================================================
+Logging and error infrastructure must exist from day one — not bolted on later.
+
+[x] Frontend: integrate structured logger (e.g. pino or winston) with log levels
+[x] Rust: integrate tracing + tracing-subscriber with JSON/text formatters
+[x] Define log context fields: sessionId, documentId, userAction, durationMs
+[x] Implement log rotation and max file size for desktop log files
+[x] Add Tauri command wrapper that logs invoke start/end/errors uniformly
+[x] Global error boundary (React) + unhandled rejection / panic handlers (Rust)
+[x] User-facing error toast/dialog with copyable error ID for support
+[ ] Optional: crash report hook (Sentry or similar) behind feature flag
+[ ] Dev-only log viewer panel in app settings
+
+
+================================================================================
+PHASE 2 — TEST INFRASTRUCTURE
+================================================================================
+Test harness and patterns established before core features land.
+
+[x] Frontend unit tests: Vitest + Testing Library
+[x] Rust unit/integration tests: cargo test with test fixtures directory
+[ ] E2E tests: Playwright or WebDriver targeting Tauri webview
+[ ] Snapshot tests for PDF rendering output (pixel diff tolerance config)
+[x] Mock Tauri invoke layer for frontend tests
+[x] CI: run all test suites on every PR; publish coverage report (target ≥80%)
+[x] Document testing conventions in docs/testing.md
+
+
+================================================================================
+PHASE 3 — PDF RENDERING ENGINE (CORE VIEWER)
+================================================================================
+The heart of the app: fast, accurate PDF display.
+
+[x] Evaluate and select PDF library:
+      Option A: pdf.js (Mozilla) in frontend for rendering
+      Option B: pdfium (Rust) rendered to canvas via Tauri
+      Option C: Hybrid — pdf.js view + Rust for mutations
+[x] Implement page renderer: canvas or WebGL, DPI-aware scaling
+[x] Zoom: fit page, fit width, actual size, custom % (25–6400%)
+[x] Pan/scroll with momentum; middle-mouse and space+drag pan
+[x] Continuous scroll vs single-page vs two-page spread modes
+[ ] Page cache and prefetch (N pages ahead/behind)
+[x] Thumbnail sidebar with lazy generation
+[x] Loading states, progress for large files, cancel in-flight render
+[ ] Render tests: compare output against reference images per zoom level
+
+
+================================================================================
+PHASE 4 — FILE OPERATIONS & DOCUMENT MANAGEMENT
+================================================================================
+Open, save, recent files, and multi-tab document workflow.
+
+[x] Open PDF via native file dialog (Tauri dialog plugin)
+[x] Drag-and-drop PDF onto window
+[x] Recent files list (persisted in app data dir)
+[x] Save / Save As with overwrite confirmation
+[x] Unsaved changes indicator and close-tab confirmation
+[x] File metadata panel: title, author, subject, keywords, dates
+[x] Revert to last saved
+[x] Open password-protected PDFs (prompt for password)
+[x] Associate .pdf file extension with app (platform installers)
+[ ] Tests: open/save round-trip, corrupt file handling, permission denied
+
+
+================================================================================
+PHASE 5 — NAVIGATION, OUTLINE & VIEW CONTROLS
+================================================================================
+How users move through and orient within a document.
+
+[x] Page number input and prev/next buttons
+[x] Bookmark/outline panel (TOC tree from PDF outline)
+[x] Named destinations and internal link navigation
+[x] External link open in system browser
+[x] Full-screen / presentation mode
+[x] Rotate view (90° increments, per-page or document)
+[x] Breadcrumb or status bar: page X of Y, zoom %, file size
+[x] Keyboard shortcuts (PgUp/PgDn, Ctrl+G go-to-page, Ctrl+0/+/−)
+
+
+================================================================================
+PHASE 6 — TEXT SELECTION, SEARCH & COPY
+================================================================================
+Essential reading and find workflows.
+
+[x] Text layer overlay aligned with rendered page (if using pdf.js)
+[x] Select text across lines and pages; copy to clipboard
+[x] Find in document: highlight all, next/previous match
+[x] Case-sensitive and whole-word search options
+[x] Search in comments/annotations (Phase 8 dependency)
+[ ] Copy with formatting option (plain text vs rich)
+[x] Select All on current page
+[ ] Tests: search accuracy, Unicode/CJK text, empty results
+
+
+================================================================================
+PHASE 7 — ANNOTATIONS & MARKUP TOOLS
+================================================================================
+Covers the most common "mark up a PDF" use cases (~30% of daily usage).
+
+[x] Annotation data model (store in memory, serialize to PDF standard)
+[x] Tool palette: highlight, underline, strikethrough, squiggly
+[x] Sticky note / comment with author and timestamp
+[x] Freehand draw / pencil with color and stroke width
+[x] Shape tools: rectangle, ellipse, line, arrow
+[x] Text box / callout with font size and color
+[x] Stamps: predefined (Approved, Draft) + custom image stamp
+[x] Select, move, resize, delete annotations
+[x] Annotation list panel with filter by type/author/page
+[ ] Pop-up comment threads (reply to annotation)
+[ ] Export/import annotations (XFDF or FDF)
+[x] Flatten annotations into page content (optional on save)
+[x] Undo/redo stack for annotation edits
+[ ] Tests: round-trip save/reopen preserves annotations per PDF spec
+
+
+================================================================================
+PHASE 8 — PAGE MANIPULATION
+================================================================================
+Organize pages without full desktop publishing features.
+
+[x] Page thumbnails grid with multi-select
+[x] Insert pages: blank, from file, from scanner (Phase 16)
+[x] Delete, extract, reorder pages (drag-and-drop)
+[x] Rotate pages (90/180/270) permanently
+[ ] Crop pages with visual crop box
+[ ] Page labels and logical page numbers
+[ ] Insert page numbers (header/footer wizard)
+[ ] Bates numbering for legal workflows
+[x] Tests: page count integrity, rotation metadata, crop box persistence
+
+
+================================================================================
+PHASE 9 — CONTENT EDITING (TEXT & IMAGES)
+================================================================================
+True edit mode — the feature users pay Acrobat Pro for.
+
+[x] Edit text in existing paragraphs (font matching heuristics)
+[x] Add new text blocks with font family, size, color
+[ ] Edit images: replace, resize, move, delete
+[x] Add images from file or clipboard
+[x] Content stream editing via Rust PDF library (lopdf, pdfium, or qpdf bindings)
+[ ] Automatic font embedding on save
+[x] Reflow warnings when edits break layout
+[x] Edit mode vs read mode toggle (prevent accidental edits)
+[x] Tests: edit save reopen, font embedding, no corruption on save
+
+
+================================================================================
+PHASE 10 — FORMS (FILL & CREATE)
+================================================================================
+Forms are critical for contracts, tax, and HR documents.
+
+[x] Detect and render AcroForm fields (text, checkbox, radio, dropdown, list)
+[x] Tab order navigation between fields
+[x] Fill and save field values (incremental save)
+[x] Highlight required fields and validation errors
+[x] Create form fields: draw field rectangles on page
+[x] Field properties dialog: name, default, read-only, required
+[x] Export form data to CSV/FDF/XFDF
+[x] Import form data from CSV/FDF/XFDF
+[x] Flatten form to static content
+[x] Tests: all field types, save/reload values, XFA fallback message if unsupported
+
+
+================================================================================
+PHASE 11 — MERGE, SPLIT, CONVERT & EXPORT
+================================================================================
+Document assembly and format conversion.
+
+[x] Merge multiple PDFs with reorder UI
+[x] Split by page range, bookmarks, or every N pages
+[x] Export pages to PNG/JPEG/TIFF (dpi setting)
+[ ] Export to HTML (basic layout preservation)
+[ ] Create PDF from images (drag folder → single PDF)
+[ ] Create PDF from Office docs (LibreOffice headless or cloud API — document choice)
+[ ] Print to PDF (system print dialog)
+[ ] Reduce file size / optimize (compress images, remove unused objects)
+
+
+================================================================================
+PHASE 12 — SECURITY, REDACTION & PERMISSIONS
+================================================================================
+Protect documents and remove sensitive content.
+
+[ ] Password open (user + owner password)
+[ ] Permission flags: print, copy, modify, annotate
+[ ] AES-256 encryption on save
+[ ] Remove password / change password
+[ ] Redaction tool: mark regions, apply redaction (burn in black boxes)
+[ ] Search and redact (pattern-based: SSN, email regex)
+[ ] Sanitize document: remove metadata, hidden layers, JavaScript
+[ ] Certificate-based encryption (optional advanced)
+[ ] Security audit panel listing embedded files, scripts, URLs
+[ ] Tests: open encrypted PDFs, permissions enforced, redaction not recoverable
+
+
+================================================================================
+PHASE 13 — SCANNER & IMPORT INTEGRATION
+================================================================================
+[ ] TWAIN/WIA scanner support on Windows (Rust or sidecar)
+[ ] SANE support on Linux
+[ ] ICA support on macOS
+[ ] Scan to PDF multipage workflow
+[ ] Scan settings: DPI, color/grayscale, duplex
+
+
+================================================================================
+PHASE 14 — UI/UX, ACCESSIBILITY & INTERNATIONALIZATION
+================================================================================
+Production polish for real users worldwide.
+
+[x] Application menu: File, Edit, View, Document, Tools, Help
+[ ] Context menus on page, selection, and annotations
+[ ] Light/dark/system theme
+[ ] Responsive layout for small laptop screens
+[ ] WCAG 2.1 AA: keyboard navigation, focus rings, ARIA labels
+[ ] Screen reader announcements for page changes and errors
+[ ] High-contrast mode
+[ ] i18n framework (e.g. i18next): extract strings, locale files
+[ ] Initial locales: en-US; structure for es, de, fr, ja, zh
+[ ] Onboarding: first-run tour for key tools
+[ ] In-app help and keyboard shortcut reference
+[ ] Undo/redo global history across tools
+
+================================================================================
+PHASE 15 — PACKAGING, UPDATES & RELEASE
+================================================================================
+Ship installable artifacts to users.
+
+[ ] App icons, splash, and branded installer (WiX/NSIS Windows, DMG macOS, AppImage/deb Linux)
+[ ] Code signing: Windows Authenticode, Apple notarization
+[ ] Tauri updater plugin with staged rollout channel (beta/stable)
+[ ] Version numbering semver; changelog from conventional commits
+[ ] Privacy policy and telemetry opt-in (if any analytics)
+[ ] Smoke test suite on clean VM per platform before release
+[ ] Microsoft Store / Mac App Store packages (optional)
+
+
+================================================================================
+PHASE 16 — DOCUMENTATION & MAINTENANCE
+================================================================================
+[ ] User guide: core workflows (view, annotate, fill forms, sign, merge)
+[ ] Developer architecture doc: render pipeline, save pipeline, annotation model
+[ ] API doc for Tauri commands (Rust → TS bindings via tauri-specta or similar)
+[ ] Runbook: common support issues, log locations, reset app data
+[ ] Security disclosure policy
+[ ] Dependency update cadence (Renovate/Dependabot) and MSRV policy for Rust
+
+
+================================================================================
+RECOMMENDED BUILD ORDER (DEPENDENCY GRAPH)
+================================================================================
+  Phase 0 → 1 → 2 (parallel foundation)
+       ↓
+  Phase 3 (viewer) → 4 (files) → 5 (navigation) → 6 (search)
+       ↓
+  Phase 7 (annotations) → 8 (pages) → 9 (edit) → 10 (forms)
+
+Logging (Phase 1) and tests (Phase 2) run continuously — add tests for each
+feature before marking its phase items complete.
+
+
+================================================================================
+KEY TECHNOLOGY DECISIONS (TO RESOLVE IN PHASE 0)
+================================================================================
+| Concern              | Recommended starting point                          |
+|----------------------|-----------------------------------------------------|
+| UI framework         | React 18 + TypeScript + Vite                        |
+| Desktop shell        | Tauri 2                                             |
+| PDF render           | pdf.js (fast path) + Rust lopdf/qpdf for mutations  |
+| PDF write/edit       | lopdf or pdfium-rs in src-tauri                     |
+| OCR                  | Tesseract (tesseract-rs)                            |
+| State management     | Zustand or Jotai                                    |
+| Frontend tests       | Vitest + Testing Library + Playwright               |
+| Rust tests           | cargo test + cargo-fuzz                             |
+| Logging (TS)         | pino with file transport                            |
+| Logging (Rust)       | tracing + tracing-appender                          |
+| CI                   | GitHub Actions                                        |
+
+
+================================================================================
+MVP MILESTONE (SHIP A USEFUL v0.1)
+================================================================================
+Minimum slice for early release
+
+[x] Open, view, zoom, navigate PDFs
+[x] Search text
+[x] Copy text selection
+[x] Highlight, comment, draw
+[x] Stamps
+[x] Save annotated PDF
+[x] Basic logging and error reporting
+[x] Unit tests for core flows
+[ ] E2E tests for above flows
+[x] Windows installer
+
+
+================================================================================
+OUT OF SCOPE (EXPLICIT NON-GOALS FOR v1)
+================================================================================
+- Real-time collaborative editing (Google Docs-style)
+- Full PDF/X preflight and print production
+- Complete JavaScript Acrobat API compatibility
+- XFA dynamic forms (legacy; show "unsupported" message)
+- 3D PDF and CAD viewer
+- DRM / RMS enterprise rights management
+- Mobile iOS/Android native apps (desktop Tauri only for v1)
