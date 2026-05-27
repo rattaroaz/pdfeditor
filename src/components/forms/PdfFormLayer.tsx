@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { getFormWidgetsForPage } from "@/lib/pdf/pdfEngine";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useFormStore } from "@/stores/formStore";
+import { recordHistory } from "@/stores/historyStore";
 import { useUiStore } from "@/stores/uiStore";
 import { useAnnotationStore } from "@/stores/annotationStore";
 import type { FormFieldDefinition, FormFieldKind, Tool } from "@shared/types";
@@ -118,6 +119,7 @@ export function PdfFormLayer({ pageNumber, scale, canvasRef }: PdfFormLayerProps
         const dx = e.clientX - pending.startClientX;
         const dy = e.clientY - pending.startClientY;
         if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+        recordHistory();
         setMoving({
           id: pending.id,
           offsetX: pending.offsetX,
@@ -323,6 +325,7 @@ export function PdfFormLayer({ pageNumber, scale, canvasRef }: PdfFormLayerProps
               className={`absolute ${borderClass} bg-white [color-scheme:light]`}
               style={commonStyle}
               onChange={(e) => {
+                recordHistory();
                 setFieldValue(widget.name, e.target.checked ? "Yes" : "Off", "checkbox");
                 useDocumentStore.getState().setDirty(true);
               }}
@@ -342,6 +345,7 @@ export function PdfFormLayer({ pageNumber, scale, canvasRef }: PdfFormLayerProps
               className={`${FORM_FIELD_CLASS} ${borderClass}`}
               style={commonStyle}
               onChange={(e) => {
+                recordHistory();
                 setFieldValue(widget.name, e.target.value, "dropdown");
                 useDocumentStore.getState().setDirty(true);
               }}
@@ -371,7 +375,10 @@ export function PdfFormLayer({ pageNumber, scale, canvasRef }: PdfFormLayerProps
               setFieldValue(widget.name, e.target.value, "text");
               useDocumentStore.getState().setDirty(true);
             }}
-            onFocus={() => useFormStore.getState().setActiveField(widget.name)}
+            onFocus={() => {
+              recordHistory();
+              useFormStore.getState().setActiveField(widget.name);
+            }}
           />
         );
       })}

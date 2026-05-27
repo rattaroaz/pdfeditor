@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { ImageContentEdit, TextContentEdit } from "@shared/types";
+import { recordHistory } from "@/stores/historyStore";
 import { v4 as uuidv4 } from "uuid";
 
 interface ContentEditStore {
@@ -27,6 +28,7 @@ export const useContentEditStore = create<ContentEditStore>((set, get) => ({
   reflowWarnings: [],
 
   addTextEdit: (partial) => {
+    recordHistory();
     const id = uuidv4();
     const warnings: string[] = [];
     if (partial.oldText && partial.newText.length > partial.oldText.length * 1.5) {
@@ -41,21 +43,29 @@ export const useContentEditStore = create<ContentEditStore>((set, get) => ({
     return id;
   },
 
-  updateTextEdit: (id, patch) =>
+  updateTextEdit: (id, patch) => {
+    recordHistory();
     set((s) => ({
       textEdits: s.textEdits.map((e) => (e.id === id ? { ...e, ...patch } : e)),
-    })),
+    }));
+  },
 
-  addImageEdit: (partial) =>
+  addImageEdit: (partial) => {
+    recordHistory();
     set((s) => ({
       imageEdits: [...s.imageEdits, { ...partial, id: uuidv4() }],
-    })),
+    }));
+  },
 
-  removeTextEdit: (id) =>
-    set((s) => ({ textEdits: s.textEdits.filter((e) => e.id !== id) })),
+  removeTextEdit: (id) => {
+    recordHistory();
+    set((s) => ({ textEdits: s.textEdits.filter((e) => e.id !== id) }));
+  },
 
-  removeImageEdit: (id) =>
-    set((s) => ({ imageEdits: s.imageEdits.filter((e) => e.id !== id) })),
+  removeImageEdit: (id) => {
+    recordHistory();
+    set((s) => ({ imageEdits: s.imageEdits.filter((e) => e.id !== id) }));
+  },
 
   updateTextEditPosition: (id, x, y) =>
     set((s) => ({

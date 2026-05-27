@@ -18,6 +18,11 @@ pub struct PdfBytesResult {
 pub struct SecurityInfoResult {
   pub is_encrypted: bool,
   pub requires_password: bool,
+  pub allow_form_filling: bool,
+  pub allow_annotations: bool,
+  pub allow_modification: bool,
+  pub permissions_bits: Option<i64>,
+  pub has_doc_mdp: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -63,19 +68,72 @@ pub fn inspect_pdf_security(bytes: &[u8]) -> SecurityInfoResult {
     return SecurityInfoResult {
       is_encrypted: false,
       requires_password: false,
+      allow_form_filling: true,
+      allow_annotations: true,
+      allow_modification: true,
+      permissions_bits: None,
+      has_doc_mdp: false,
     };
   }
 
   match Document::load_mem(bytes) {
-    Ok(doc) => SecurityInfoResult {
-      is_encrypted: doc.is_encrypted() || doc.was_encrypted(),
-      requires_password: false,
-    },
+    Ok(doc) => security_info_from_doc(&doc, false),
     Err(_) => SecurityInfoResult {
       is_encrypted: true,
       requires_password: true,
+      allow_form_filling: false,
+      allow_annotations: false,
+      allow_modification: false,
+      permissions_bits: None,
+      has_doc_mdp: false,
     },
   }
+}
+
+fn security_info_from_doc(doc: &Document, requires_password: bool) -> SecurityInfoResult {
+  let permissions_bits = doc
+    .trailer
+    .get(b"Encrypt")
+    .ok()
+    .and_then(|obj| match obj {
+      Object::Reference(id) => doc.get_dictionary(*id).ok(),
+      Object::Dictionary(dict) => Some(dict),
+      _ => None,
+    })
+    .and_then(|dict| dict.get(b"P").ok())
+    .and_then(|p| p.as_i64().ok());
+
+  let permissions = permissions_bits
+    .map(|bits| Permissions::from_bits_retain(bits as u64))
+    .unwrap_or_else(Permissions::all);
+
+  SecurityInfoResult {
+    is_encrypted: doc.is_encrypted() || doc.was_encrypted(),
+    requires_password,
+    allow_form_filling: permissions.contains(Permissions::FILLABLE),
+    allow_annotations: permissions.contains(Permissions::ANNOTABLE),
+    allow_modification: permissions.contains(Permissions::MODIFIABLE),
+    permissions_bits,
+    has_doc_mdp: catalog_has_doc_mdp(doc),
+  }
+}
+
+fn catalog_has_doc_mdp(doc: &Document) -> bool {
+  let Ok(root_id) = doc.trailer.get(b"Root").and_then(Object::as_reference) else {
+    return false;
+  };
+  let Ok(catalog) = doc.get_dictionary(root_id) else {
+    return false;
+  };
+  let Ok(perms) = catalog.get(b"Perms") else {
+    return false;
+  };
+  let perms_dict = match perms {
+    Object::Reference(id) => doc.get_dictionary(*id).ok(),
+    Object::Dictionary(dict) => Some(dict),
+    _ => None,
+  };
+  perms_dict.map(|dict| dict.has(b"DocMDP")).unwrap_or(false)
 }
 
 fn ensure_file_id(doc: &mut Document) {

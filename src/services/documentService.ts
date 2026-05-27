@@ -8,6 +8,7 @@ import { useAnnotationStore } from "@/stores/annotationStore";
 import { useUiStore } from "@/stores/uiStore";
 import { useContentEditStore } from "@/stores/contentEditStore";
 import { useFormStore } from "@/stores/formStore";
+import { clearHistory } from "@/stores/historyStore";
 import { log } from "@/lib/logging";
 import type { Annotation, PdfMetadata, ReadFileResult } from "@shared/types";
 import { applyContentEdits } from "@/services/contentEditService";
@@ -166,6 +167,7 @@ export async function openPdfFromPath(filePath: string): Promise<void> {
 
     useContentEditStore.getState().clearEdits();
     useFormStore.getState().clearFormState();
+    clearHistory();
     try {
       await inspectDocumentForms(baseBytes);
       await loadFormFieldsFromPdf(pdfDoc);
@@ -370,6 +372,7 @@ export async function revertToSaved(): Promise<void> {
 
     useContentEditStore.getState().clearEdits();
     useFormStore.getState().clearFormState();
+    clearHistory();
     try {
       const bytes = useDocumentStore.getState().savedPdfBytes ?? savedPdfBytes;
       if (bytes) {

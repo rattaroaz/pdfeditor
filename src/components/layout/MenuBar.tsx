@@ -19,9 +19,9 @@ import { useDocumentStore } from "@/stores/documentStore";
 
 import { useUiStore } from "@/stores/uiStore";
 
-import { useAnnotationStore } from "@/stores/annotationStore";
+import { useHistoryStore } from "@/stores/historyStore";
 
-import { persistAnnotations } from "@/services/documentService";
+import { undoEdit, redoEdit } from "@/services/historyService";
 import {
   protectDocumentOnNextSave,
   removeDocumentPasswordProtection,
@@ -45,8 +45,8 @@ export function MenuBar() {
   const toggleSearch = useUiStore((s) => s.toggleSearch);
   const toggleLogViewer = useUiStore((s) => s.toggleLogViewer);
 
-  const pastLength = useAnnotationStore((s) => s.past.length);
-  const futureLength = useAnnotationStore((s) => s.future.length);
+  const pastLength = useHistoryStore((s) => s.past.length);
+  const futureLength = useHistoryStore((s) => s.future.length);
 
 
 
@@ -193,17 +193,7 @@ export function MenuBar() {
 
           disabled={pastLength === 0}
 
-          onClick={() =>
-
-            run(() => {
-
-              useAnnotationStore.getState().undo();
-
-              void persistAnnotations();
-
-            })
-
-          }
+          onClick={() => run(() => undoEdit())}
 
         >
 
@@ -215,17 +205,7 @@ export function MenuBar() {
 
           disabled={futureLength === 0}
 
-          onClick={() =>
-
-            run(() => {
-
-              useAnnotationStore.getState().redo();
-
-              void persistAnnotations();
-
-            })
-
-          }
+          onClick={() => run(() => redoEdit())}
 
         >
 

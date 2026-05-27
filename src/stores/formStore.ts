@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { FormFieldDefinition, FormFieldValue, FormInfo } from "@shared/types";
+import { recordHistory } from "@/stores/historyStore";
 import { v4 as uuidv4 } from "uuid";
 
 interface FormStore {
@@ -37,18 +38,22 @@ export const useFormStore = create<FormStore>((set, get) => ({
       validationErrors: { ...s.validationErrors, [name]: "" },
     })),
 
-  addNewField: (partial) =>
+  addNewField: (partial) => {
+    recordHistory();
     set((s) => ({
       newFields: [...s.newFields, { ...partial, id: uuidv4() }],
-    })),
+    }));
+  },
 
   updateNewFieldPosition: (id, x, y) =>
     set((s) => ({
       newFields: s.newFields.map((f) => (f.id === id ? { ...f, x, y } : f)),
     })),
 
-  removeNewField: (id) =>
-    set((s) => ({ newFields: s.newFields.filter((f) => f.id !== id) })),
+  removeNewField: (id) => {
+    recordHistory();
+    set((s) => ({ newFields: s.newFields.filter((f) => f.id !== id) }));
+  },
 
   setActiveField: (activeFieldName) => set({ activeFieldName }),
 

@@ -123,23 +123,53 @@ fn page_height(doc: &Document, page_id: ObjectId) -> f64 {
 }
 
 fn add_annot_to_page(doc: &mut Document, page_id: ObjectId, annot_id: ObjectId) {
-  let Ok(Object::Dictionary(page)) = doc.get_object_mut(page_id) else {
-    return;
+  // Page `/Annots` is frequently stored as an indirect reference to an array
+  // object. We must mutate that array in place — wrapping the reference in a
+  // new array would replace every existing annotation with a single bogus
+  // entry that points at the array object itself.
+  enum Target {
+    Inline,
+    Indirect(ObjectId),
+    Missing,
+  }
+
+  let target = match doc.get_object(page_id) {
+    Ok(Object::Dictionary(page)) => match page.get(b"Annots") {
+      Ok(Object::Array(_)) => Target::Inline,
+      Ok(Object::Reference(id)) => Target::Indirect(*id),
+      _ => Target::Missing,
+    },
+    _ => return,
   };
 
-  let next = match page.get(b"Annots").ok() {
-    Some(Object::Array(arr)) => {
-      let mut updated = arr.clone();
-      updated.push(Object::Reference(annot_id));
-      Object::Array(updated)
+  match target {
+    Target::Inline => {
+      if let Ok(Object::Dictionary(page)) = doc.get_object_mut(page_id) {
+        if let Some(arr) = page.get_mut(b"Annots").ok().and_then(|o| o.as_array_mut().ok()) {
+          arr.push(Object::Reference(annot_id));
+        }
+      }
     }
-    Some(Object::Reference(existing)) => Object::Array(vec![
-      Object::Reference(*existing),
-      Object::Reference(annot_id),
-    ]),
-    _ => Object::Array(vec![Object::Reference(annot_id)]),
-  };
-  page.set(b"Annots", next);
+    Target::Indirect(arr_id) => {
+      let pushed = match doc.objects.get_mut(&arr_id) {
+        Some(Object::Array(arr)) => {
+          arr.push(Object::Reference(annot_id));
+          true
+        }
+        _ => false,
+      };
+      if !pushed {
+        if let Ok(Object::Dictionary(page)) = doc.get_object_mut(page_id) {
+          page.set(b"Annots", Object::Array(vec![Object::Reference(annot_id)]));
+        }
+      }
+    }
+    Target::Missing => {
+      if let Ok(Object::Dictionary(page)) = doc.get_object_mut(page_id) {
+        page.set(b"Annots", Object::Array(vec![Object::Reference(annot_id)]));
+      }
+    }
+  }
 }
 
 fn base_annot_dict(
@@ -476,12 +506,25 @@ pub fn strip_annotations_from_pdf(pdf_bytes: &[u8]) -> Result<Vec<u8>, AppError>
   let mut doc = Document::load_mem(pdf_bytes).map_err(|e| AppError::Pdf(e.to_string()))?;
   let page_ids: Vec<ObjectId> = doc.get_pages().values().copied().collect();
   for page_id in page_ids {
-    let annot_objects: Option<Vec<Object>> = doc
-      .get_dictionary(page_id)
-      .ok()
-      .and_then(|page| page.get(b"Annots").ok())
-      .and_then(|annots| annots.as_array().ok())
-      .map(|annots| annots.clone());
+    // Resolve `/Annots` whether it's an inline array or an indirect reference
+    // to an array object. Both forms are valid per the PDF spec and most PDF
+    // producers (including the DMV sample shipped with the app) use the
+    // indirect form.
+    let annot_objects: Option<Vec<Object>> = {
+      let page = match doc.get_dictionary(page_id) {
+        Ok(p) => p,
+        Err(_) => continue,
+      };
+      match page.get(b"Annots") {
+        Ok(Object::Array(arr)) => Some(arr.clone()),
+        Ok(Object::Reference(id)) => doc
+          .get_object(*id)
+          .ok()
+          .and_then(|o| o.as_array().ok())
+          .map(|arr| arr.clone()),
+        _ => None,
+      }
+    };
 
     let Some(annots) = annot_objects else {
       continue;

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { openPdfFromDialog, savePdf, persistAnnotations } from "@/services/documentService";
+import { undoEdit, redoEdit } from "@/services/historyService";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useUiStore } from "@/stores/uiStore";
 import { useAnnotationStore } from "@/stores/annotationStore";
@@ -14,8 +15,6 @@ export function useKeyboardShortcuts() {
   const presentationMode = useDocumentStore((s) => s.presentationMode);
   const togglePresentationMode = useDocumentStore((s) => s.togglePresentationMode);
   const toggleSearch = useUiStore((s) => s.toggleSearch);
-  const undo = useAnnotationStore((s) => s.undo);
-  const redo = useAnnotationStore((s) => s.redo);
   const removeAnnotation = useAnnotationStore((s) => s.removeAnnotation);
   const selectedId = useAnnotationStore((s) => s.selectedId);
 
@@ -46,14 +45,12 @@ export function useKeyboardShortcuts() {
       }
       if (mod && e.key === "z" && !e.shiftKey) {
         e.preventDefault();
-        undo();
-        void persistAnnotations();
+        undoEdit();
         return;
       }
       if (mod && (e.key === "y" || (e.key === "z" && e.shiftKey))) {
         e.preventDefault();
-        redo();
-        void persistAnnotations();
+        redoEdit();
         return;
       }
       if (mod && e.key === "c" && !typing) {
@@ -132,8 +129,6 @@ export function useKeyboardShortcuts() {
     setCurrentPage,
     toggleSearch,
     togglePresentationMode,
-    undo,
-    redo,
     removeAnnotation,
   ]);
 }

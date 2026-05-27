@@ -1,6 +1,8 @@
 import { ZOOM_MAX, ZOOM_MIN, ZOOM_STEP } from "@/lib/constants";
 import { openPdfFromDialog, savePdf } from "@/services/documentService";
+import { undoEdit, redoEdit } from "@/services/historyService";
 import { useDocumentStore } from "@/stores/documentStore";
+import { useHistoryStore } from "@/stores/historyStore";
 
 export function Toolbar() {
   const zoom = useDocumentStore((s) => s.zoom);
@@ -10,6 +12,8 @@ export function Toolbar() {
   const setCurrentPage = useDocumentStore((s) => s.setCurrentPage);
   const metadata = useDocumentStore((s) => s.metadata);
   const hasDocument = useDocumentStore((s) => !!s.pdfDoc);
+  const canUndo = useHistoryStore((s) => s.past.length > 0);
+  const canRedo = useHistoryStore((s) => s.future.length > 0);
 
   const pageCount = metadata?.pageCount ?? 1;
 
@@ -29,6 +33,27 @@ export function Toolbar() {
         onClick={() => void savePdf(false)}
       >
         Save
+      </button>
+
+      <span className="mx-1 h-4 w-px bg-zinc-700" />
+
+      <button
+        type="button"
+        title="Undo (Ctrl+Z)"
+        className="rounded px-2 py-1 hover:bg-zinc-800 disabled:opacity-40"
+        disabled={!hasDocument || !canUndo}
+        onClick={() => undoEdit()}
+      >
+        Undo
+      </button>
+      <button
+        type="button"
+        title="Redo (Ctrl+Y)"
+        className="rounded px-2 py-1 hover:bg-zinc-800 disabled:opacity-40"
+        disabled={!hasDocument || !canRedo}
+        onClick={() => redoEdit()}
+      >
+        Redo
       </button>
 
       <span className="mx-1 h-4 w-px bg-zinc-700" />

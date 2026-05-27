@@ -3,6 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";
 import { useAnnotationStore } from "@/stores/annotationStore";
 import { useContentEditStore } from "@/stores/contentEditStore";
+import { recordHistory } from "@/stores/historyStore";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useUiStore } from "@/stores/uiStore";
 import { findTextAtPoint } from "@/lib/pdf/pdfEngine";
@@ -109,6 +110,7 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
         const dx = e.clientX - pending.startClientX;
         const dy = e.clientY - pending.startClientY;
         if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+        recordHistory();
         setMoving({
           id: pending.id,
           kind: pending.kind,
