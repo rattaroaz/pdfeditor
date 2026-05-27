@@ -26,13 +26,31 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis", "msi"],
+    "copyright": "Copyright © 2026 PDF Editor contributors",
+    "category": "Productivity",
+    "shortDescription": "Desktop PDF editor",
+    "longDescription": "View, annotate, edit, and save PDF documents on Windows. Built with Tauri, React, and Rust.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "displayLanguageSelector": false,
+        "languages": ["English"],
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico"
+      },
+      "wix": {
+        "language": "en-US"
+      }
+    }
   }
 }

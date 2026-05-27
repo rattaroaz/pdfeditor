@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
+import { log } from "@/lib/logging";
 import { getFormWidgetsForPage } from "@/lib/pdf/pdfEngine";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useFormStore } from "@/stores/formStore";
@@ -14,7 +15,18 @@ interface PdfFormLayerProps {
 }
 
 const FORM_FIELD_CLASS =
-  "absolute text-sm font-medium text-zinc-900 bg-white px-1 [color-scheme:light] placeholder:text-zinc-500";
+  "absolute border-0 text-sm font-medium text-zinc-900 bg-white px-1 outline-none [color-scheme:light] placeholder:text-zinc-500 focus:outline-none focus:ring-0";
+
+function widgetBorderClass(widget: { type: string; required?: boolean }, error?: string): string {
+  if (error) return "border-2 border-red-500";
+  if (widget.type === "text") {
+    return widget.required ? "ring-1 ring-amber-400" : "border-0 outline-none";
+  }
+  if (widget.type === "checkbox") {
+    return widget.required ? "border-2 border-amber-400" : "border border-blue-400";
+  }
+  return widget.required ? "border-2 border-amber-400" : "border border-blue-400";
+}
 
 const PLACE_TOOLS: Tool[] = ["form-text", "form-checkbox", "form-dropdown"];
 
@@ -204,6 +216,10 @@ export function PdfFormLayer({ pageNumber, scale, canvasRef }: PdfFormLayerProps
     });
     setFieldValue(name, kind === "checkbox" ? "Off" : "", kind);
     useDocumentStore.getState().setDirty(true);
+    log.form.info("Placed form field", {
+      userAction: "place_form_field",
+      metadata: { name, kind, pageIndex, x, y, width, height },
+    });
   };
 
   const renderNewFieldPreview = (field: FormFieldDefinition) => {
@@ -259,8 +275,8 @@ export function PdfFormLayer({ pageNumber, scale, canvasRef }: PdfFormLayerProps
       <div
         key={field.id}
         {...commonProps}
-        className={`absolute border-2 border-dashed border-violet-400 bg-violet-400/20 px-1 text-xs text-violet-100 ${dragClass} ${
-          isSelected && !isDragging ? "ring-2 ring-violet-200" : ""
+        className={`absolute bg-white/90 px-1 text-xs text-zinc-800 ${dragClass} ${
+          isSelected && !isDragging ? "ring-2 ring-violet-300" : ""
         }`}
       >
         {field.name}
@@ -306,11 +322,7 @@ export function PdfFormLayer({ pageNumber, scale, canvasRef }: PdfFormLayerProps
           width: widget.width,
           height: widget.height,
         };
-        const borderClass = error
-          ? "border-2 border-red-500"
-          : widget.required
-            ? "border-2 border-amber-400"
-            : "border border-blue-400";
+        const borderClass = widgetBorderClass(widget, error);
 
         if (widget.type === "checkbox") {
           return (

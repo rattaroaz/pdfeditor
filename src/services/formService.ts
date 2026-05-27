@@ -166,6 +166,7 @@ export async function flattenForms(): Promise<void> {
   const sourceBytes = docStore.basePdfBytes ?? docStore.pdfBytes;
   if (!sourceBytes) return;
 
+  log.form.info("Flattening form fields", { userAction: "flatten_forms" });
   docStore.setLoading(true);
   try {
     const result = await invokeLogged<PdfBytesResult>("flatten_pdf_forms", {

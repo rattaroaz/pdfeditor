@@ -1,4 +1,5 @@
 import { ZOOM_MAX, ZOOM_MIN, ZOOM_STEP } from "@/lib/constants";
+import { logUserAction } from "@/lib/logging";
 import { openPdfFromDialog, savePdf } from "@/services/documentService";
 import { undoEdit, redoEdit } from "@/services/historyService";
 import { useDocumentStore } from "@/stores/documentStore";
@@ -22,7 +23,10 @@ export function Toolbar() {
       <button
         type="button"
         className="rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-500"
-        onClick={() => void openPdfFromDialog()}
+        onClick={() => {
+          logUserAction("open", "Open PDF from toolbar");
+          void openPdfFromDialog();
+        }}
       >
         Open
       </button>
@@ -30,7 +34,10 @@ export function Toolbar() {
         type="button"
         className="rounded px-2 py-1 hover:bg-zinc-800 disabled:opacity-40"
         disabled={!hasDocument}
-        onClick={() => void savePdf(false)}
+        onClick={() => {
+          logUserAction("save", "Save PDF from toolbar");
+          void savePdf(false);
+        }}
       >
         Save
       </button>

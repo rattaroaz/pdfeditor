@@ -24,10 +24,16 @@ export async function invokeLogged<T>(
 
   try {
     const result = await invoke<T>(command, args);
-    log.invoke.debug(`invoke ok: ${command}`, {
+    const durationMs = Math.round(performance.now() - start);
+    const payload = {
       userAction: command,
-      durationMs: Math.round(performance.now() - start),
-    });
+      durationMs,
+    };
+    if (durationMs >= 2000) {
+      log.invoke.warn(`invoke slow: ${command}`, payload);
+    } else {
+      log.invoke.debug(`invoke ok: ${command}`, payload);
+    }
     return result;
   } catch (err) {
     const payload = normalizeInvokeError(err);

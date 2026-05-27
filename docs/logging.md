@@ -46,6 +46,18 @@ try {
 logUserAction("save", "User saved document");
 ```
 
+### User actions logged in the UI
+
+| Area | `userAction` examples |
+|------|------------------------|
+| Toolbar / shortcuts | `open`, `save`, `undo`, `redo` |
+| Forms | `place_form_field`, `form_save`, `flatten_forms` |
+| Annotations | `add_annotation`, `remove_annotation`, `select_tool` |
+| Content edit | `add_text_edit`, `add_image_edit`, `content_edit` |
+| Pages | `delete_pages`, `rotate_pages` |
+| Security | `protect_on_save`, `remove_password_on_save` |
+| Document | `open`, `save`, `revert` (via `log.document`) |
+
 ### Context fields
 
 | Field | Purpose |
@@ -73,6 +85,24 @@ Rust uses `tracing` with daily log rotation (14 files retained) and a panic hook
 
 Frontend events arrive via `log_frontend_event` with `target: "frontend"`.
 
+### Rust operations with spans and timing
+
+| Module | Logged operations |
+|--------|-------------------|
+| `mod` | `read_pdf_file`, `write_pdf_file`, `get_pdf_info` |
+| `pdf_forms` | inspect, create fields, apply values, flatten |
+| `pdf_content` | apply content edits |
+| `pdf_security` | inspect, encrypt, decrypt |
+| `pdf_pages` | delete, rotate, reorder |
+| `pdf_assembly` | insert blank, extract, merge |
+| `pdf_annotations` | embed, strip, prepare bytes, save with annotations |
+
+Each operation logs `elapsed_ms` and output size where applicable.
+
+### Slow invoke warnings
+
+`invokeLogged` emits a **warn** when a Tauri command takes ≥ 2000 ms (still logged at debug when faster).
+
 Query log directory:
 
 ```typescript
@@ -98,4 +128,11 @@ Files are named `pdfeditor.log.YYYY-MM-DD` (JSON per line in the file appender).
 
 ## Testing
 
-Tests disable backend shipping via `logger.setBackendShipping(false)` when needed. See `src/lib/logging/` and `src/lib/logger.test.ts`.
+Tests disable backend shipping via `logger.setBackendShipping(false)` when needed. See:
+
+- `src/lib/logging/logging.test.ts` — buffer, scoping, Rust shipping, timers, document context enrichment
+- `src/lib/logger.test.ts` — compat re-exports
+- `src/services/loggingService.test.ts` — `get_logging_info` / tail / open folder
+- Rust: `src-tauri/src/logging.rs` (tail reader), `src-tauri/src/commands/mod.rs` (`log_frontend_payload` levels)
+
+Service-layer tests (`formService.test.ts`, `documentService.test.ts`) mock `invokeLogged` and assert command order during save/apply flows.

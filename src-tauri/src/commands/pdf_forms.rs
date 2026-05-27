@@ -138,6 +138,7 @@ fn walk_fields(doc: &Document, obj: &Object, apply: &mut dyn FnMut(ObjectId, &Di
 }
 
 pub fn inspect_forms(pdf_bytes: &[u8]) -> Result<FormInfoResult, AppError> {
+  let _span = tracing::info_span!("inspect_forms", input_bytes = pdf_bytes.len()).entered();
   let doc = Document::load_mem(pdf_bytes).map_err(|e| AppError::Pdf(e.to_string()))?;
   let cat_id = catalog_id(&doc)?;
   let catalog = doc
@@ -167,11 +168,18 @@ pub fn inspect_forms(pdf_bytes: &[u8]) -> Result<FormInfoResult, AppError> {
     }
   }
 
-  Ok(FormInfoResult {
+  let result = FormInfoResult {
     has_acroform: field_count > 0 || catalog.has(b"AcroForm"),
     has_xfa,
     field_count,
-  })
+  };
+  tracing::debug!(
+    field_count = result.field_count,
+    has_acroform = result.has_acroform,
+    has_xfa = result.has_xfa,
+    "inspected AcroForm"
+  );
+  Ok(result)
 }
 
 #[derive(Debug, Deserialize)]
@@ -184,6 +192,13 @@ struct FieldValueDto {
 }
 
 pub fn apply_form_values_in_pdf(pdf_bytes: &[u8], values: &[FieldValueDto]) -> Result<Vec<u8>, AppError> {
+  let _span = tracing::info_span!(
+    "apply_form_values_in_pdf",
+    value_count = values.len(),
+    input_bytes = pdf_bytes.len()
+  )
+  .entered();
+  let start = std::time::Instant::now();
   let mut doc = Document::load_mem(pdf_bytes).map_err(|e| AppError::Pdf(e.to_string()))?;
   let cat_id = catalog_id(&doc)?;
   let catalog = doc
@@ -237,7 +252,14 @@ pub fn apply_form_values_in_pdf(pdf_bytes: &[u8], values: &[FieldValueDto]) -> R
     }
   }
 
-  save_doc(&mut doc)
+  let output = save_doc(&mut doc)?;
+  tracing::info!(
+    elapsed_ms = start.elapsed().as_millis() as u64,
+    output_bytes = output.len(),
+    values_submitted = values.len(),
+    "applied form field values"
+  );
+  Ok(output)
 }
 
 fn collect_field_targets(doc: &Document, obj: &Object, out: &mut Vec<(ObjectId, String, String)>) {
@@ -380,6 +402,28 @@ fn ensure_acroform(doc: &mut Document, cat_id: ObjectId) -> Result<ObjectId, App
   Ok(af_id)
 }
 
+fn widget_white_background(widget: &mut Dictionary) {
+  let mut mk = Dictionary::new();
+  mk.set(
+    "BG",
+    Object::Array(vec![
+      Object::Real(1.0),
+      Object::Real(1.0),
+      Object::Real(1.0),
+    ]),
+  );
+  widget.set("MK", Object::Dictionary(mk));
+}
+
+/// Text fields: white fill, no visible border (browsers draw a black box if /BC + /W are set).
+fn widget_text_background(widget: &mut Dictionary) {
+  widget_white_background(widget);
+  let mut bs = Dictionary::new();
+  bs.set("Type", Object::Name(b"Border".to_vec()));
+  bs.set("W", Object::Integer(0));
+  widget.set("BS", Object::Dictionary(bs));
+}
+
 fn widget_border_and_background(widget: &mut Dictionary) {
   let mut mk = Dictionary::new();
   mk.set(
@@ -427,7 +471,7 @@ fn decorate_widget(
       widget_border_and_background(widget);
     }
     _ => {
-      widget_border_and_background(widget);
+      widget_text_background(widget);
     }
   }
 }
@@ -700,6 +744,13 @@ fn remove_stale_usage_rights(doc: &mut Document, cat_id: ObjectId, af_id: Object
 }
 
 pub fn create_form_fields_in_pdf(pdf_bytes: &[u8], fields: &[NewFieldDto]) -> Result<Vec<u8>, AppError> {
+  let _span = tracing::info_span!(
+    "create_form_fields_in_pdf",
+    field_count = fields.len(),
+    input_bytes = pdf_bytes.len()
+  )
+  .entered();
+  let start = std::time::Instant::now();
   let mut doc = Document::load_mem(pdf_bytes).map_err(|e| AppError::Pdf(e.to_string()))?;
   let pages = doc.get_pages();
   let cat_id = catalog_id(&doc)?;
@@ -787,10 +838,19 @@ pub fn create_form_fields_in_pdf(pdf_bytes: &[u8], fields: &[NewFieldDto]) -> Re
     }
   }
 
-  save_doc(&mut doc)
+  let output = save_doc(&mut doc)?;
+  tracing::info!(
+    elapsed_ms = start.elapsed().as_millis() as u64,
+    output_bytes = output.len(),
+    fields_created = fields.len(),
+    "created form fields"
+  );
+  Ok(output)
 }
 
 pub fn flatten_forms_in_pdf(pdf_bytes: &[u8]) -> Result<Vec<u8>, AppError> {
+  let _span = tracing::info_span!("flatten_forms_in_pdf", input_bytes = pdf_bytes.len()).entered();
+  let start = std::time::Instant::now();
   let mut doc = Document::load_mem(pdf_bytes).map_err(|e| AppError::Pdf(e.to_string()))?;
   let cat_id = catalog_id(&doc)?;
   let catalog = doc
@@ -805,7 +865,13 @@ pub fn flatten_forms_in_pdf(pdf_bytes: &[u8]) -> Result<Vec<u8>, AppError> {
   }
 
   doc.prune_objects();
-  save_doc(&mut doc)
+  let output = save_doc(&mut doc)?;
+  tracing::info!(
+    elapsed_ms = start.elapsed().as_millis() as u64,
+    output_bytes = output.len(),
+    "flattened form fields"
+  );
+  Ok(output)
 }
 
 #[derive(Debug, Deserialize)]
@@ -1281,5 +1347,193 @@ mod tests {
     let saved = pdf_annotations::embed_annotations_in_pdf(&with_field, "[]").unwrap();
     let info = inspect_forms(&saved).unwrap();
     assert!(info.field_count >= 1, "form widgets must survive annotation embed on save");
+  }
+
+  /// Resolve a page's `/Annots` array whether it is inline or an indirect reference.
+  fn page_annots_array<'a>(doc: &'a Document, page_num: u32) -> Option<&'a Vec<Object>> {
+    let pages = doc.get_pages();
+    let page_id = pages.get(&page_num)?;
+    let page = doc.get_dictionary(*page_id).ok()?;
+    match page.get(b"Annots").ok()? {
+      Object::Array(arr) => Some(arr),
+      Object::Reference(id) => doc.get_object(*id).ok()?.as_array().ok(),
+      _ => None,
+    }
+  }
+
+  fn page_has_named_widget(doc: &Document, page_num: u32, name: &str) -> bool {
+    let Some(annots) = page_annots_array(doc, page_num) else {
+      return false;
+    };
+    annots.iter().any(|obj| {
+      let Ok(id) = obj.as_reference() else {
+        return false;
+      };
+      doc
+        .get_dictionary(id)
+        .ok()
+        .and_then(|d| field_name(d))
+        .map(|n| n == name)
+        .unwrap_or(false)
+    })
+  }
+
+  #[test]
+  fn create_form_fields_impl_accepts_json_payload() {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+
+    let input = blank_pdf();
+    let b64 = STANDARD.encode(&input);
+    let fields_json = r#"[{
+      "pageIndex": 0,
+      "name": "ApiField",
+      "type": "text",
+      "x": 72.0,
+      "y": 72.0,
+      "width": 200.0,
+      "height": 24.0,
+      "defaultValue": "",
+      "required": false,
+      "readOnly": false
+    }]"#;
+
+    let result = create_form_fields_impl(CreateFormFieldsPayload {
+      pdf_base64: b64,
+      fields_json: fields_json.to_string(),
+    })
+    .expect("impl should accept camelCase JSON");
+
+    let bytes = STANDARD.decode(&result.data_base64).expect("valid base64 output");
+    let info = inspect_forms(&bytes).expect("output is a valid PDF");
+    assert!(info.field_count >= 1, "field must appear in AcroForm");
+  }
+
+  #[test]
+  fn apply_form_values_impl_roundtrips_json() {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+
+    let with_field = create_form_fields_in_pdf(
+      &blank_pdf(),
+      &[NewFieldDto {
+        page_index: 0,
+        name: "Name".into(),
+        field_type: "text".into(),
+        x: 72.0,
+        y: 72.0,
+        width: 200.0,
+        height: 24.0,
+        pdf_rect: None,
+        default_value: None,
+        required: false,
+        read_only: false,
+      }],
+    )
+    .unwrap();
+
+    let values_json = r#"[{"name":"Name","value":"Jane","type":"text"}]"#;
+    let result = apply_form_values_impl(ApplyFormValuesPayload {
+      pdf_base64: STANDARD.encode(&with_field),
+      values_json: values_json.to_string(),
+    })
+    .expect("apply values impl");
+
+    let bytes = STANDARD.decode(&result.data_base64).unwrap();
+    let doc = Document::load_mem(&bytes).unwrap();
+    let cat_id = catalog_id(&doc).unwrap();
+    let af_id = doc
+      .get_dictionary(cat_id)
+      .unwrap()
+      .get(b"AcroForm")
+      .unwrap()
+      .as_reference()
+      .unwrap();
+    let fields = doc
+      .get_dictionary(af_id)
+      .unwrap()
+      .get(b"Fields")
+      .unwrap()
+      .as_array()
+      .unwrap();
+    assert!(!fields.is_empty());
+  }
+
+  #[test]
+  fn read_write_pdf_file_roundtrip() {
+    use crate::commands::{read_pdf_file, write_pdf_file};
+
+    let bytes = blank_pdf();
+    let dir = std::env::temp_dir().join(format!("pdfeditor_rw_{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let src = dir.join("in.pdf");
+    let dst = dir.join("out.pdf");
+    std::fs::write(&src, &bytes).unwrap();
+
+    let read = read_pdf_file(src.display().to_string()).expect("read");
+    write_pdf_file(dst.display().to_string(), read.data_base64).expect("write");
+
+    let written = std::fs::read(&dst).expect("read back");
+    assert!(written.starts_with(b"%PDF"));
+    let _ = std::fs::remove_dir_all(dir);
+  }
+
+  /// Integration test against the bundled DMV sample (skipped when the file is absent).
+  #[test]
+  fn dmv_sample_registers_new_widget_on_page_annots() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/dmv.pdf");
+    let bytes = match std::fs::read(&path) {
+      Ok(b) => b,
+      Err(_) => {
+        eprintln!(
+          "skip dmv_sample_registers_new_widget_on_page_annots: missing {}",
+          path.display()
+        );
+        return;
+      }
+    };
+
+    let before = page_annots_array(
+      &Document::load_mem(&bytes).expect("load dmv"),
+      2,
+    )
+    .expect("DMV page 2 must have indirect Annots")
+    .len();
+
+    let fields = vec![NewFieldDto {
+      page_index: 1,
+      name: "IntegrationTestField".into(),
+      field_type: "text".into(),
+      x: 41.0,
+      y: 654.0,
+      width: 225.0,
+      height: 24.0,
+      pdf_rect: Some([41.0, 114.0, 266.0, 138.0]),
+      default_value: None,
+      required: false,
+      read_only: false,
+    }];
+
+    let output = create_form_fields_in_pdf(&bytes, &fields).expect("create field on dmv");
+    let doc = Document::load_mem(&output).expect("reload output");
+
+    let after = page_annots_array(&doc, 2)
+      .expect("page 2 Annots after create")
+      .len();
+    assert_eq!(
+      after,
+      before + 1,
+      "new widget must be appended to the page Annots array (DMV uses indirect Annots)"
+    );
+    assert!(
+      page_has_named_widget(&doc, 2, "IntegrationTestField"),
+      "widget must be reachable from page Annots by field name"
+    );
+
+    let catalog = doc
+      .get_dictionary(catalog_id(&doc).unwrap())
+      .unwrap();
+    assert!(
+      !catalog.has(b"Perms"),
+      "stale Reader usage rights must be stripped on DMV rewrite"
+    );
   }
 }

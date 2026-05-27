@@ -156,6 +156,9 @@ pub fn write_pdf_file(path: String, data_base64: String) -> CommandResult<()> {
 
 #[tauri::command]
 pub fn get_pdf_info(path: String) -> CommandResult<PdfInfoResult> {
+  let span = tracing::info_span!("get_pdf_info", path = %path);
+  let _guard = span.enter();
+  let start = std::time::Instant::now();
   let metadata = fs::metadata(&path).map_err(AppError::Io)?;
   let file_size = metadata.len();
   let file_bytes = fs::read(&path).map_err(AppError::Io)?;
@@ -192,7 +195,7 @@ pub fn get_pdf_info(path: String) -> CommandResult<PdfInfoResult> {
     Err(_) => (0, None, None, None, None, None, None),
   };
 
-  Ok(PdfInfoResult {
+  let result = PdfInfoResult {
     metadata: PdfMetadata {
       title,
       author,
@@ -204,7 +207,15 @@ pub fn get_pdf_info(path: String) -> CommandResult<PdfInfoResult> {
       file_size,
       is_password_protected: security.is_encrypted,
     },
-  })
+  };
+  tracing::info!(
+    duration_ms = start.elapsed().as_millis() as u64,
+    page_count = result.metadata.page_count,
+    file_size = result.metadata.file_size,
+    encrypted = security.is_encrypted,
+    "read pdf metadata"
+  );
+  Ok(result)
 }
 
 #[tauri::command]
@@ -471,5 +482,32 @@ mod tests {
     let a = annotation_path_for("C:\\docs\\test.pdf").unwrap();
     let b = annotation_path_for("C:\\docs\\test.pdf").unwrap();
     assert_eq!(a, b);
+  }
+
+  #[test]
+  fn log_frontend_payload_accepts_all_levels() {
+    for level in ["debug", "info", "warn", "error", "unknown"] {
+      let payload = LogEventPayload {
+        level: level.into(),
+        message: format!("test message at {level}"),
+        session_id: Some("sess-1".into()),
+        document_id: Some("doc-1".into()),
+        user_action: Some("unit_test".into()),
+        duration_ms: Some(12),
+        category: Some("app".into()),
+        component: Some("mod_tests".into()),
+        correlation_id: None,
+        error_id: None,
+        metadata_json: Some(r#"{"key":"value"}"#.into()),
+      };
+      log_frontend_payload(&payload);
+    }
+  }
+
+  #[test]
+  fn logging_info_includes_version() {
+    let info = crate::logging::logging_info();
+    assert!(!info.log_directory.is_empty());
+    assert!(!info.app_version.is_empty());
   }
 }

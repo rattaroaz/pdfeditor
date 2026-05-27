@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { logUserAction } from "@/lib/logging";
 import { openPdfFromDialog, savePdf, persistAnnotations } from "@/services/documentService";
 import { undoEdit, redoEdit } from "@/services/historyService";
 import { useDocumentStore } from "@/stores/documentStore";
@@ -35,21 +36,25 @@ export function useKeyboardShortcuts() {
 
       if (mod && e.key === "o") {
         e.preventDefault();
+        logUserAction("open", "Open PDF shortcut");
         void openPdfFromDialog();
         return;
       }
       if (mod && e.key === "s") {
         e.preventDefault();
+        logUserAction("save", e.shiftKey ? "Save As shortcut" : "Save shortcut");
         void savePdf(e.shiftKey);
         return;
       }
       if (mod && e.key === "z" && !e.shiftKey) {
         e.preventDefault();
+        logUserAction("undo", "Undo shortcut");
         undoEdit();
         return;
       }
       if (mod && (e.key === "y" || (e.key === "z" && e.shiftKey))) {
         e.preventDefault();
+        logUserAction("redo", "Redo shortcut");
         redoEdit();
         return;
       }

@@ -83,6 +83,9 @@ export function protectDocumentOnNextSave(): void {
   const password = promptForNewPassword();
   if (!password) return;
 
+  log.security.info("Password protection scheduled for next save", {
+    userAction: "protect_on_save",
+  });
   const store = useDocumentStore.getState();
   store.setPendingSavePassword(password);
   store.setRemovePasswordOnSave(false);
@@ -106,6 +109,9 @@ export async function removeDocumentPasswordProtection(): Promise<void> {
   store.setDocumentPassword(password);
   store.setDirty(true);
   store.setStatusMessage("Password will be removed when you save");
+  log.security.info("Password removal scheduled for next save", {
+    userAction: "remove_password_on_save",
+  });
 }
 
 export async function applySecurityOnSaveBytes(pdfBytes: Uint8Array): Promise<Uint8Array> {

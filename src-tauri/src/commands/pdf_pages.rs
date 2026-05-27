@@ -42,6 +42,13 @@ pub(crate) fn validate_page_numbers(pages: &BTreeMap<u32, ObjectId>, numbers: &[
 }
 
 pub fn delete_pages_in_pdf(pdf_bytes: &[u8], page_numbers: &[u32]) -> Result<Vec<u8>, AppError> {
+  let _span = tracing::info_span!(
+    "delete_pages_in_pdf",
+    page_count = page_numbers.len(),
+    input_bytes = pdf_bytes.len()
+  )
+  .entered();
+  let start = std::time::Instant::now();
   let mut doc = Document::load_mem(pdf_bytes).map_err(|e| AppError::Pdf(e.to_string()))?;
   let pages = doc.get_pages();
   let total = pages.len() as u32;
@@ -61,7 +68,14 @@ pub fn delete_pages_in_pdf(pdf_bytes: &[u8], page_numbers: &[u32]) -> Result<Vec
   sorted.sort_unstable_by(|a, b| b.cmp(a));
   doc.delete_pages(&sorted);
   doc.prune_objects();
-  save_doc(&mut doc)
+  let output = save_doc(&mut doc)?;
+  tracing::info!(
+    elapsed_ms = start.elapsed().as_millis() as u64,
+    output_bytes = output.len(),
+    pages_deleted = page_numbers.len(),
+    "deleted pages"
+  );
+  Ok(output)
 }
 
 pub fn rotate_pages_in_pdf(
@@ -69,6 +83,14 @@ pub fn rotate_pages_in_pdf(
   page_numbers: &[u32],
   degrees: i64,
 ) -> Result<Vec<u8>, AppError> {
+  let _span = tracing::info_span!(
+    "rotate_pages_in_pdf",
+    page_count = page_numbers.len(),
+    degrees,
+    input_bytes = pdf_bytes.len()
+  )
+  .entered();
+  let start = std::time::Instant::now();
   if ![90, 180, 270, -90].contains(&degrees) {
     return Err(AppError::InvalidInput(
       "rotation must be 90, 180, 270, or -90 degrees".into(),
@@ -100,10 +122,23 @@ pub fn rotate_pages_in_pdf(
     }
   }
 
-  save_doc(&mut doc)
+  let output = save_doc(&mut doc)?;
+  tracing::info!(
+    elapsed_ms = start.elapsed().as_millis() as u64,
+    output_bytes = output.len(),
+    "rotated pages"
+  );
+  Ok(output)
 }
 
 pub fn reorder_pages_in_pdf(pdf_bytes: &[u8], new_order: &[u32]) -> Result<Vec<u8>, AppError> {
+  let _span = tracing::info_span!(
+    "reorder_pages_in_pdf",
+    page_count = new_order.len(),
+    input_bytes = pdf_bytes.len()
+  )
+  .entered();
+  let start = std::time::Instant::now();
   let mut doc = Document::load_mem(pdf_bytes).map_err(|e| AppError::Pdf(e.to_string()))?;
   let pages = doc.get_pages();
   let total = pages.len() as u32;
@@ -144,7 +179,13 @@ pub fn reorder_pages_in_pdf(pdf_bytes: &[u8], new_order: &[u32]) -> Result<Vec<u
   );
   pages_dict.set("Count", Object::Integer(page_ids.len() as i64));
 
-  save_doc(&mut doc)
+  let output = save_doc(&mut doc)?;
+  tracing::info!(
+    elapsed_ms = start.elapsed().as_millis() as u64,
+    output_bytes = output.len(),
+    "reordered pages"
+  );
+  Ok(output)
 }
 
 #[derive(Debug, Deserialize)]
@@ -181,6 +222,11 @@ pub fn delete_pdf_pages_impl(payload: DeletePagesPayload) -> CommandResult<PdfBy
   )
   .map_err(map_err)?;
 
+  tracing::debug!(
+    output_bytes = output.len(),
+    pages = payload.page_numbers.len(),
+    "delete_pdf_pages command complete"
+  );
   Ok(PdfBytesResult {
     data_base64: STANDARD.encode(&output),
   })

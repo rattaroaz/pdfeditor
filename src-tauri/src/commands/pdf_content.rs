@@ -267,6 +267,14 @@ pub fn apply_content_edits_in_pdf(
   text_edits: &[TextEditDto],
   image_edits: &[ImageEditDto],
 ) -> Result<Vec<u8>, AppError> {
+  let _span = tracing::info_span!(
+    "apply_content_edits_in_pdf",
+    input_bytes = pdf_bytes.len(),
+    text_edits = text_edits.len(),
+    image_edits = image_edits.len()
+  )
+  .entered();
+  let start = std::time::Instant::now();
   let mut doc = Document::load_mem(pdf_bytes).map_err(|e| AppError::Pdf(e.to_string()))?;
   let pages: BTreeMap<u32, ObjectId> = doc.get_pages();
 
@@ -338,7 +346,15 @@ pub fn apply_content_edits_in_pdf(
     append_page_content(&mut doc, page_id, ops)?;
   }
 
-  save_doc(&mut doc)
+  let output = save_doc(&mut doc)?;
+  tracing::info!(
+    elapsed_ms = start.elapsed().as_millis() as u64,
+    output_bytes = output.len(),
+    text_edits = text_edits.len(),
+    image_edits = image_edits.len(),
+    "applied content edits"
+  );
+  Ok(output)
 }
 
 #[derive(Debug, Deserialize)]

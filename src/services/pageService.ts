@@ -67,6 +67,10 @@ async function applyPdfMutation(
 export async function deletePages(pageNumbers: number[]): Promise<void> {
   if (pageNumbers.length === 0) return;
   const sorted = [...pageNumbers].sort((a, b) => a - b);
+  log.document.info("Deleting pages", {
+    userAction: "delete_pages",
+    metadata: { pageNumbers: sorted },
+  });
 
   await applyPdfMutation(
     (pdfBase64) =>
@@ -83,6 +87,10 @@ export async function rotatePagesPermanent(
   degrees: 90 | 180 | 270 | -90,
 ): Promise<void> {
   if (pageNumbers.length === 0) return;
+  log.document.info("Rotating pages", {
+    userAction: "rotate_pages",
+    metadata: { pageNumbers, degrees },
+  });
 
   await applyPdfMutation((pdfBase64) =>
     invokeLogged<PdfBytesResult>("rotate_pdf_pages", {

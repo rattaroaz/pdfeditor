@@ -45,6 +45,14 @@ pub fn insert_blank_pages_in_pdf(
   after_page: u32,
   count: u32,
 ) -> Result<Vec<u8>, AppError> {
+  let _span = tracing::info_span!(
+    "insert_blank_pages_in_pdf",
+    after_page,
+    count,
+    input_bytes = pdf_bytes.len()
+  )
+  .entered();
+  let start = std::time::Instant::now();
   if count == 0 {
     return Err(AppError::InvalidInput("insert count must be at least 1".into()));
   }
@@ -86,10 +94,24 @@ pub fn insert_blank_pages_in_pdf(
   pages_dict.set("Kids", Object::Array(new_kids));
   pages_dict.set("Count", Object::Integer(new_count));
 
-  save_doc(&mut doc)
+  let output = save_doc(&mut doc)?;
+  tracing::info!(
+    elapsed_ms = start.elapsed().as_millis() as u64,
+    output_bytes = output.len(),
+    pages_inserted = count,
+    "inserted blank pages"
+  );
+  Ok(output)
 }
 
 pub fn extract_pages_in_pdf(pdf_bytes: &[u8], keep_pages: &[u32]) -> Result<Vec<u8>, AppError> {
+  let _span = tracing::info_span!(
+    "extract_pages_in_pdf",
+    keep_count = keep_pages.len(),
+    input_bytes = pdf_bytes.len()
+  )
+  .entered();
+  let start = std::time::Instant::now();
   if keep_pages.is_empty() {
     return Err(AppError::InvalidInput("no pages to extract".into()));
   }
@@ -106,13 +128,31 @@ pub fn extract_pages_in_pdf(pdf_bytes: &[u8], keep_pages: &[u32]) -> Result<Vec<
     .collect();
 
   if delete_pages.is_empty() {
+    tracing::info!(
+      elapsed_ms = start.elapsed().as_millis() as u64,
+      kept_pages = keep_pages.len(),
+      "extracted pages (no deletion needed)"
+    );
     return Ok(pdf_bytes.to_vec());
   }
 
-  crate::commands::pdf_pages::delete_pages_in_pdf(pdf_bytes, &delete_pages)
+  let output = crate::commands::pdf_pages::delete_pages_in_pdf(pdf_bytes, &delete_pages)?;
+  tracing::info!(
+    elapsed_ms = start.elapsed().as_millis() as u64,
+    output_bytes = output.len(),
+    kept_pages = keep_pages.len(),
+    "extracted pages"
+  );
+  Ok(output)
 }
 
 pub fn merge_pdf_bytes_list(doc_bytes_list: &[Vec<u8>]) -> Result<Vec<u8>, AppError> {
+  let _span = tracing::info_span!(
+    "merge_pdf_bytes_list",
+    document_count = doc_bytes_list.len()
+  )
+  .entered();
+  let start = std::time::Instant::now();
   if doc_bytes_list.is_empty() {
     return Err(AppError::InvalidInput("no documents to merge".into()));
   }
@@ -209,7 +249,16 @@ pub fn merge_pdf_bytes_list(doc_bytes_list: &[Vec<u8>]) -> Result<Vec<u8>, AppEr
   document.max_id = document.objects.len() as u32;
   document.renumber_objects();
 
-  save_doc(&mut document)
+  let page_count = document.get_pages().len();
+  let output = save_doc(&mut document)?;
+  tracing::info!(
+    elapsed_ms = start.elapsed().as_millis() as u64,
+    output_bytes = output.len(),
+    document_count = doc_bytes_list.len(),
+    page_count,
+    "merged PDF documents"
+  );
+  Ok(output)
 }
 
 #[derive(Debug, Deserialize)]

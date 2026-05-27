@@ -32,11 +32,25 @@ npm run dev
 | Command | Description |
 |---------|-------------|
 | `npm run tauri dev` | Run desktop app in dev mode |
-| `npm run tauri build` | Production installer |
-| `npm run test` | Vitest unit tests |
+| `npm run build:installer` | Windows **NSIS** setup (`.exe` installer) |
+| `npm run build:win` | NSIS + MSI installers |
+| `npm run build:installer:msi` | Windows **MSI** only (requires WiX) |
+| `npm run test` | Vitest unit tests (stores, libs, services) |
 | `npm run test:coverage` | Coverage report |
+| `cargo test` (in `src-tauri/`) | Rust PDF command unit tests |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | TypeScript check |
+
+## Windows installer
+
+Build the setup executable on a Windows machine with [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) installed:
+
+```powershell
+npm install
+npm run build:installer
+```
+
+The installer is created under `src-tauri/target/release/bundle/nsis/`. See [docs/install-windows.md](docs/install-windows.md) for MSI builds, code signing, and troubleshooting.
 
 ## Architecture
 

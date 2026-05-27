@@ -60,4 +60,16 @@ describe("logging framework", () => {
     expect(entry?.context?.durationMs).toBeGreaterThanOrEqual(0);
     spy.mockRestore();
   });
+
+  it("enriches logs with document id from the store", async () => {
+    const { useDocumentStore } = await import("@/stores/documentStore");
+    useDocumentStore.setState({
+      documentId: "doc-test-123",
+      fileName: "sample.pdf",
+    });
+    log.document.info("with doc context", { userAction: "test" });
+    const entry = getLogEntries()[getLogEntries().length - 1];
+    expect(entry?.context?.documentId).toBe("doc-test-123");
+    expect(entry?.context?.metadata?.fileName).toBe("sample.pdf");
+  });
 });

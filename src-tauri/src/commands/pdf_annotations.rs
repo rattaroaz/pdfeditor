@@ -503,6 +503,12 @@ fn annot_subtype_is_preserved(doc: &Document, obj: &Object) -> bool {
 }
 
 pub fn strip_annotations_from_pdf(pdf_bytes: &[u8]) -> Result<Vec<u8>, AppError> {
+  let _span = tracing::info_span!(
+    "strip_annotations_from_pdf",
+    input_bytes = pdf_bytes.len()
+  )
+  .entered();
+  let start = std::time::Instant::now();
   let mut doc = Document::load_mem(pdf_bytes).map_err(|e| AppError::Pdf(e.to_string()))?;
   let page_ids: Vec<ObjectId> = doc.get_pages().values().copied().collect();
   for page_id in page_ids {
@@ -547,6 +553,11 @@ pub fn strip_annotations_from_pdf(pdf_bytes: &[u8]) -> Result<Vec<u8>, AppError>
   let mut output = Vec::new();
   doc.save_to(&mut output)
     .map_err(|e| AppError::Pdf(e.to_string()))?;
+  tracing::info!(
+    elapsed_ms = start.elapsed().as_millis() as u64,
+    output_bytes = output.len(),
+    "stripped non-form annotations"
+  );
   Ok(output)
 }
 
@@ -554,11 +565,13 @@ pub fn prepare_document_bytes(
   pdf_base64: String,
   has_sidecar: bool,
 ) -> CommandResult<String> {
+  let _span = tracing::info_span!("prepare_document_bytes", has_sidecar).entered();
   let bytes = STANDARD
     .decode(pdf_base64.trim())
     .map_err(|e| map_err(AppError::InvalidInput(format!("Invalid base64: {e}"))))?;
 
   let output = if has_sidecar {
+    tracing::debug!(input_bytes = bytes.len(), "stripping sidecar annotations for open");
     strip_annotations_from_pdf(&bytes).map_err(map_err)?
   } else {
     bytes
@@ -571,6 +584,12 @@ pub fn embed_annotations_in_pdf(
   pdf_bytes: &[u8],
   annotations_json: &str,
 ) -> Result<Vec<u8>, AppError> {
+  let _span = tracing::info_span!(
+    "embed_annotations_in_pdf",
+    input_bytes = pdf_bytes.len()
+  )
+  .entered();
+  let start = std::time::Instant::now();
   let annotations: Vec<AnnotationDto> = if annotations_json.trim().is_empty()
     || annotations_json.trim() == "[]"
   {
@@ -590,6 +609,12 @@ pub fn embed_annotations_in_pdf(
   let mut output = Vec::new();
   doc.save_to(&mut output)
     .map_err(|e| AppError::Pdf(e.to_string()))?;
+  tracing::info!(
+    elapsed_ms = start.elapsed().as_millis() as u64,
+    output_bytes = output.len(),
+    annotation_count = annotations.len(),
+    "embedded annotations into PDF"
+  );
   Ok(output)
 }
 

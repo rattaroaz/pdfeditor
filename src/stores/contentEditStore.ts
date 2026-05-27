@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { ImageContentEdit, TextContentEdit } from "@shared/types";
+import { log } from "@/lib/logging";
 import { recordHistory } from "@/stores/historyStore";
 import { v4 as uuidv4 } from "uuid";
 
@@ -40,6 +41,10 @@ export const useContentEditStore = create<ContentEditStore>((set, get) => ({
       textEdits: [...s.textEdits, { ...partial, id }],
       reflowWarnings: [...s.reflowWarnings, ...warnings],
     }));
+    log.content.info("Text content edit added", {
+      userAction: "add_text_edit",
+      metadata: { pageIndex: partial.pageIndex, charCount: partial.newText.length },
+    });
     return id;
   },
 
@@ -55,6 +60,10 @@ export const useContentEditStore = create<ContentEditStore>((set, get) => ({
     set((s) => ({
       imageEdits: [...s.imageEdits, { ...partial, id: uuidv4() }],
     }));
+    log.content.info("Image content edit added", {
+      userAction: "add_image_edit",
+      metadata: { pageIndex: partial.pageIndex, mimeType: partial.mimeType },
+    });
   },
 
   removeTextEdit: (id) => {

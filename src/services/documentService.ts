@@ -213,6 +213,7 @@ export async function savePdf(saveAs = false): Promise<void> {
 
   try {
     if (useContentEditStore.getState().hasEdits()) {
+      log.document.info("Applying content edits before save", { userAction: "save" });
       const ok = await applyContentEdits();
       if (!ok) {
         docStore.setStatusMessage(null);
@@ -224,6 +225,13 @@ export async function savePdf(saveAs = false): Promise<void> {
     const hasNewFormFields = formStore.newFields.length > 0;
     const hasFormValues = Object.keys(formStore.values).length > 0;
     if (hasNewFormFields || hasFormValues) {
+      log.document.info("Applying form changes before save", {
+        userAction: "save",
+        metadata: {
+          newFields: hasNewFormFields,
+          hasValues: hasFormValues,
+        },
+      });
       const ok = await applyFormChanges();
       if (!ok) {
         docStore.setStatusMessage(null);

@@ -1,5 +1,6 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useEffect } from "react";
+import { ask } from "@tauri-apps/plugin-dialog";
+import { useEffect, useRef } from "react";
 import { openPdfFromPath } from "@/services/documentService";
 import { MenuBar } from "./MenuBar";
 import { Toolbar } from "./Toolbar";
@@ -22,19 +23,31 @@ export function AppShell() {
   const reflowWarnings = useContentEditStore((s) => s.reflowWarnings);
   const showLogViewer = useUiStore((s) => s.showLogViewer);
   const toggleLogViewer = useUiStore((s) => s.toggleLogViewer);
+  const forceClosingRef = useRef(false);
 
   useEffect(() => {
     const win = getCurrentWindow();
     const unlistenPromise = win.onCloseRequested(async (event) => {
-      const { isDirty } = useDocumentStore.getState();
-      if (!isDirty) return;
+      // Tauri blocks the OS close button while this listener exists; we must
+      // call destroy() ourselves (requires core:window:allow-destroy).
       event.preventDefault();
-      const discard = window.confirm(
-        "You have unsaved changes. Close without saving?",
-      );
-      if (discard) {
-        await win.close();
+
+      if (forceClosingRef.current) {
+        await win.destroy();
+        return;
       }
+
+      const { isDirty } = useDocumentStore.getState();
+      if (isDirty) {
+        const discard = await ask(
+          "You have unsaved changes. Close without saving?",
+          { title: "PDF Editor", kind: "warning" },
+        );
+        if (!discard) return;
+        forceClosingRef.current = true;
+      }
+
+      await win.destroy();
     });
     return () => {
       void unlistenPromise.then((fn) => fn());

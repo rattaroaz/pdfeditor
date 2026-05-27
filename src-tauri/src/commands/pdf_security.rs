@@ -62,10 +62,11 @@ fn load_document(bytes: &[u8], password: Option<&str>) -> Result<Document, AppEr
 }
 
 pub fn inspect_pdf_security(bytes: &[u8]) -> SecurityInfoResult {
+  let _span = tracing::info_span!("inspect_pdf_security", input_bytes = bytes.len()).entered();
   let has_encrypt_marker = bytes.windows(8).any(|window| window == b"/Encrypt");
 
   if !has_encrypt_marker {
-    return SecurityInfoResult {
+    let result = SecurityInfoResult {
       is_encrypted: false,
       requires_password: false,
       allow_form_filling: true,
@@ -74,9 +75,11 @@ pub fn inspect_pdf_security(bytes: &[u8]) -> SecurityInfoResult {
       permissions_bits: None,
       has_doc_mdp: false,
     };
+    tracing::debug!(is_encrypted = false, "inspected PDF security");
+    return result;
   }
 
-  match Document::load_mem(bytes) {
+  let result = match Document::load_mem(bytes) {
     Ok(doc) => security_info_from_doc(&doc, false),
     Err(_) => SecurityInfoResult {
       is_encrypted: true,
@@ -87,7 +90,14 @@ pub fn inspect_pdf_security(bytes: &[u8]) -> SecurityInfoResult {
       permissions_bits: None,
       has_doc_mdp: false,
     },
-  }
+  };
+  tracing::debug!(
+    is_encrypted = result.is_encrypted,
+    requires_password = result.requires_password,
+    has_doc_mdp = result.has_doc_mdp,
+    "inspected PDF security"
+  );
+  result
 }
 
 fn security_info_from_doc(doc: &Document, requires_password: bool) -> SecurityInfoResult {
@@ -153,6 +163,13 @@ pub fn encrypt_pdf_in_memory(
   owner_password: Option<&str>,
   current_password: Option<&str>,
 ) -> Result<Vec<u8>, AppError> {
+  let _span = tracing::info_span!(
+    "encrypt_pdf_in_memory",
+    input_bytes = bytes.len(),
+    had_current_password = current_password.is_some()
+  )
+  .entered();
+  let start = std::time::Instant::now();
   if user_password.is_empty() {
     return Err(AppError::InvalidInput("Password cannot be empty".into()));
   }
@@ -193,10 +210,18 @@ pub fn encrypt_pdf_in_memory(
   doc.encrypt(&state)
     .map_err(|e| AppError::Pdf(format!("Encryption failed: {e}")))?;
 
-  save_doc(&mut doc)
+  let output = save_doc(&mut doc)?;
+  tracing::info!(
+    elapsed_ms = start.elapsed().as_millis() as u64,
+    output_bytes = output.len(),
+    "encrypted PDF"
+  );
+  Ok(output)
 }
 
 pub fn decrypt_pdf_in_memory(bytes: &[u8], password: &str) -> Result<Vec<u8>, AppError> {
+  let _span = tracing::info_span!("decrypt_pdf_in_memory", input_bytes = bytes.len()).entered();
+  let start = std::time::Instant::now();
   let mut doc = load_document(bytes, Some(password))?;
 
   if doc.is_encrypted() {
@@ -204,7 +229,13 @@ pub fn decrypt_pdf_in_memory(bytes: &[u8], password: &str) -> Result<Vec<u8>, Ap
       .map_err(|e| AppError::Pdf(format!("Incorrect password or unsupported encryption: {e}")))?;
   }
 
-  save_doc(&mut doc)
+  let output = save_doc(&mut doc)?;
+  tracing::info!(
+    elapsed_ms = start.elapsed().as_millis() as u64,
+    output_bytes = output.len(),
+    "decrypted PDF"
+  );
+  Ok(output)
 }
 
 pub fn inspect_security_impl(payload: InspectSecurityPayload) -> CommandResult<SecurityInfoResult> {

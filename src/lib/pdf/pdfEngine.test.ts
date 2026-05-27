@@ -1,9 +1,25 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mockDoc = { numPages: 2, getPage: vi.fn() };
+const mockGetDocument = vi.hoisted(() =>
+  vi.fn(() => ({
+    promise: Promise.resolve(mockDoc),
+  })),
+);
+
+vi.mock("pdfjs-dist", () => ({
+  getDocument: mockGetDocument,
+  GlobalWorkerOptions: { workerSrc: "/pdf.worker.min.mjs" },
+  TextLayer: vi.fn(),
+}));
+
+import { ensurePdfExtension } from "./pdfBinary";
 import {
   decodeBase64Pdf,
   encodeBase64Pdf,
-  ensurePdfExtension,
-} from "./pdfBinary";
+  loadPdfFromBytes,
+  PdfPasswordRequiredError,
+} from "./pdfEngine";
 
 describe("pdf binary codec", () => {
   it("round-trips PDF bytes through base64", () => {
@@ -28,5 +44,47 @@ describe("pdf binary codec", () => {
   it("adds .pdf extension when missing", () => {
     expect(ensurePdfExtension("report")).toBe("report.pdf");
     expect(ensurePdfExtension("report.PDF")).toBe("report.PDF");
+  });
+});
+
+describe("loadPdfFromBytes", () => {
+  const bytes = new Uint8Array([0x25, 0x50, 0x44, 0x46]);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetDocument.mockImplementation(() => ({
+      promise: Promise.resolve(mockDoc),
+    }));
+  });
+
+  it("loads document via pdf.js", async () => {
+    const doc = await loadPdfFromBytes(bytes);
+    expect(doc.numPages).toBe(2);
+    expect(mockGetDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.any(Uint8Array), password: undefined }),
+    );
+  });
+
+  it("passes password to pdf.js", async () => {
+    await loadPdfFromBytes(bytes, "secret");
+    expect(mockGetDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ password: "secret" }),
+    );
+  });
+
+  it("throws PdfPasswordRequiredError when password needed", async () => {
+    mockGetDocument.mockImplementation(() => ({
+      promise: Promise.reject({ code: 1 }),
+    }));
+    await expect(loadPdfFromBytes(bytes)).rejects.toBeInstanceOf(PdfPasswordRequiredError);
+  });
+
+  it("marks incorrect password", async () => {
+    mockGetDocument.mockImplementation(() => ({
+      promise: Promise.reject({ code: 2 }),
+    }));
+    await expect(loadPdfFromBytes(bytes, "wrong")).rejects.toMatchObject({
+      incorrect: true,
+    });
   });
 });
