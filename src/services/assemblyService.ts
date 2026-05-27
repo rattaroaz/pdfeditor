@@ -7,7 +7,7 @@ import { useDocumentStore } from "@/stores/documentStore";
 import { useAnnotationStore } from "@/stores/annotationStore";
 import { useUiStore } from "@/stores/uiStore";
 import { errorMessage } from "@/lib/parseInvokeError";
-import { logger } from "@/lib/logger";
+import { log } from "@/lib/logging";
 import type { ReadFileResult } from "@shared/types";
 
 interface PdfBytesResult {
@@ -46,7 +46,7 @@ async function applyMergedOrNewDocument(newBytes: Uint8Array, fileName: string):
     isDirty: true,
   });
   annStore.clearAnnotations();
-  logger.info("Document loaded from assembly operation", { userAction: "assembly" });
+  log.assembly.info("Document loaded from assembly operation", { userAction: "assembly" });
 }
 
 export async function mergePdfFromDialog(): Promise<void> {
@@ -98,7 +98,7 @@ export async function mergeIntoCurrentDocument(): Promise<void> {
       pdfBytes: bytes,
       pageCount: pdfDoc.numPages,
     });
-    logger.info("Merged PDFs into current document", { userAction: "merge" });
+    log.assembly.info("Merged PDFs into current document", { userAction: "merge" });
   } catch (err) {
     showError(err);
   } finally {
@@ -134,7 +134,7 @@ export async function extractPagesToFile(pageNumbers: number[]): Promise<void> {
       dataBase64: result.dataBase64,
     });
     docStore.setStatusMessage(`Extracted ${pageNumbers.length} page(s)`);
-    logger.info("Extracted pages to file", { userAction: "extract", path: target });
+    log.assembly.info("Extracted pages to file", { userAction: "extract", path: target });
   } catch (err) {
     showError(err);
   } finally {
@@ -241,7 +241,7 @@ export async function exportPageAsPng(pageNumber: number, dpi = 150): Promise<vo
     const binary = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
     await writeFile(target, binary);
     docStore.setStatusMessage(`Exported page ${pageNumber} as PNG`);
-    logger.info("Exported page as PNG", { userAction: "export", pageNumber });
+    log.assembly.info("Exported page as PNG", { userAction: "export", pageNumber });
   } catch (err) {
     showError(err);
   }

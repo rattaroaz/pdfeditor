@@ -1,12 +1,49 @@
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
+/** Logical area of the app — used for filtering and structured log files. */
+export type LogCategory =
+  | "app"
+  | "document"
+  | "pdf"
+  | "annotation"
+  | "form"
+  | "content"
+  | "security"
+  | "assembly"
+  | "ui"
+  | "invoke"
+  | "perf"
+  | "system";
+
 export interface LogContext {
   sessionId?: string;
   documentId?: string;
   userAction?: string;
   durationMs?: number;
   errorId?: string;
+  category?: LogCategory;
+  component?: string;
+  correlationId?: string;
+  /** Extra structured fields (serialized to JSON in file logs). */
+  metadata?: Record<string, unknown>;
   [key: string]: unknown;
+}
+
+export interface LogEntry {
+  id: string;
+  timestamp: string;
+  level: LogLevel;
+  message: string;
+  sessionId: string;
+  context?: LogContext;
+}
+
+export interface LoggingInfo {
+  logDirectory: string;
+  sessionId: string;
+  minLevel: LogLevel;
+  appVersion: string;
+  platform: string;
 }
 
 export interface PdfMetadata {

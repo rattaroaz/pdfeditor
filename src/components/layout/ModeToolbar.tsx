@@ -1,3 +1,4 @@
+import { logUserAction } from "@/lib/logging";
 import { useUiStore } from "@/stores/uiStore";
 import { useAnnotationStore } from "@/stores/annotationStore";
 import { useDocumentStore } from "@/stores/documentStore";
@@ -38,6 +39,9 @@ export function ModeToolbar() {
           type="button"
           onClick={() => {
             setAppMode(mode.id);
+            logUserAction("set_app_mode", `Mode changed to ${mode.id}`, "info", {
+              metadata: { mode: mode.id },
+            });
             if (mode.id === "edit") setActiveTool("add-text-block");
             if (mode.id === "forms") {
               setActiveTool("select");

@@ -50,6 +50,8 @@ Logs are written to:
 - `~/Library/Application Support/pdfeditor/logs/` (macOS)
 - `~/.local/share/pdfeditor/logs/` (Linux)
 
+See [docs/logging.md](docs/logging.md) for the full logging framework (categories, scoped loggers, log viewer, and Rust integration).
+
 ## Keyboard shortcuts
 
 | Shortcut | Action |

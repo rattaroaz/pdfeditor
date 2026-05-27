@@ -69,6 +69,16 @@ pub struct LogEventPayload {
   pub document_id: Option<String>,
   pub user_action: Option<String>,
   pub duration_ms: Option<u64>,
+  #[serde(default)]
+  pub category: Option<String>,
+  #[serde(default)]
+  pub component: Option<String>,
+  #[serde(default)]
+  pub correlation_id: Option<String>,
+  #[serde(default)]
+  pub error_id: Option<String>,
+  #[serde(default)]
+  pub metadata_json: Option<String>,
 }
 
 fn ensure_data_dir() -> Result<PathBuf, AppError> {
@@ -377,39 +387,79 @@ pub fn decrypt_pdf(pdf_base64: String, password: String) -> CommandResult<pdf_se
   })
 }
 
-#[tauri::command]
-pub fn log_frontend_event(payload: LogEventPayload) -> CommandResult<()> {
+fn log_frontend_payload(payload: &LogEventPayload) {
+  let meta = payload.metadata_json.as_deref().unwrap_or("");
   match payload.level.as_str() {
     "debug" => tracing::debug!(
+      target: "frontend",
       session_id = ?payload.session_id,
       document_id = ?payload.document_id,
       user_action = ?payload.user_action,
       duration_ms = ?payload.duration_ms,
+      category = ?payload.category,
+      component = ?payload.component,
+      correlation_id = ?payload.correlation_id,
+      error_id = ?payload.error_id,
+      metadata = %meta,
       "{}", payload.message
     ),
     "warn" => tracing::warn!(
+      target: "frontend",
       session_id = ?payload.session_id,
       document_id = ?payload.document_id,
       user_action = ?payload.user_action,
       duration_ms = ?payload.duration_ms,
+      category = ?payload.category,
+      component = ?payload.component,
+      correlation_id = ?payload.correlation_id,
+      error_id = ?payload.error_id,
+      metadata = %meta,
       "{}", payload.message
     ),
     "error" => tracing::error!(
+      target: "frontend",
       session_id = ?payload.session_id,
       document_id = ?payload.document_id,
       user_action = ?payload.user_action,
       duration_ms = ?payload.duration_ms,
+      category = ?payload.category,
+      component = ?payload.component,
+      correlation_id = ?payload.correlation_id,
+      error_id = ?payload.error_id,
+      metadata = %meta,
       "{}", payload.message
     ),
     _ => tracing::info!(
+      target: "frontend",
       session_id = ?payload.session_id,
       document_id = ?payload.document_id,
       user_action = ?payload.user_action,
       duration_ms = ?payload.duration_ms,
+      category = ?payload.category,
+      component = ?payload.component,
+      correlation_id = ?payload.correlation_id,
+      error_id = ?payload.error_id,
+      metadata = %meta,
       "{}", payload.message
     ),
   }
+}
+
+#[tauri::command]
+pub fn log_frontend_event(payload: LogEventPayload) -> CommandResult<()> {
+  log_frontend_payload(&payload);
   Ok(())
+}
+
+#[tauri::command]
+pub fn get_logging_info() -> CommandResult<crate::logging::LoggingInfoResult> {
+  Ok(crate::logging::logging_info())
+}
+
+#[tauri::command]
+pub fn read_recent_log_lines(max_lines: u32) -> CommandResult<Vec<String>> {
+  let cap = max_lines.clamp(1, 2000) as usize;
+  crate::logging::read_recent_log_lines(cap).map_err(crate::error::map_err)
 }
 
 #[cfg(test)]

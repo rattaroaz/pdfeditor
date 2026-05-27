@@ -44,58 +44,128 @@ fn parse_hex_color(color: &str) -> (f32, f32, f32) {
   (0.0, 0.0, 0.0)
 }
 
-fn ensure_page_font(doc: &mut Document, page_id: ObjectId) -> Result<(), AppError> {
-  let resources_id = {
+/// Helvetica font alias used by our content edits. Chosen to be unlikely to
+/// collide with names used by the original document (which typically uses
+/// `F1`, `F2`, ...). Using the same name as an existing font would silently
+/// replace it and visually garble the original page text.
+pub(super) const PDFEDITOR_FONT_NAME: &str = "PdfEdH";
+
+/// Resolve the Resources dict object id for a page, creating one if missing.
+///
+/// Handles three PDF cases:
+/// 1. `/Resources` is a reference → use it.
+/// 2. `/Resources` is an inline dictionary → promote it to an indirect object
+///    and update the page to reference it (preserves all existing entries).
+/// 3. `/Resources` is missing → walk up the page tree (PDF spec inheritance)
+///    and clone the inherited dict onto this page so we can mutate it safely
+///    without affecting sibling pages.
+fn resolve_page_resources_id(
+  doc: &mut Document,
+  page_id: ObjectId,
+) -> Result<ObjectId, AppError> {
+  // Case 1 / 2: page has /Resources directly.
+  let direct = {
     let page = doc
       .get_dictionary(page_id)
       .map_err(|e| AppError::Pdf(e.to_string()))?;
-    if page.has(b"Resources") {
-      if let Ok(id) = page.get(b"Resources").and_then(Object::as_reference) {
-        Some(id)
-      } else {
-        None
-      }
-    } else {
-      None
-    }
+    page.get(b"Resources").ok().cloned()
   };
 
-  let resources_id = if let Some(id) = resources_id {
-    id
-  } else {
-    let id = doc.add_object(Object::Dictionary(Dictionary::new()));
-    let page = doc
-      .get_dictionary_mut(page_id)
-      .map_err(|e| AppError::Pdf(e.to_string()))?;
-    page.set("Resources", Object::Reference(id));
-    id
-  };
+  if let Some(obj) = direct {
+    match obj {
+      Object::Reference(id) => return Ok(id),
+      Object::Dictionary(dict) => {
+        let id = doc.add_object(Object::Dictionary(dict));
+        let page = doc
+          .get_dictionary_mut(page_id)
+          .map_err(|e| AppError::Pdf(e.to_string()))?;
+        page.set("Resources", Object::Reference(id));
+        return Ok(id);
+      }
+      _ => {}
+    }
+  }
+
+  // Case 3: walk parents for inherited /Resources.
+  let mut inherited: Option<Dictionary> = None;
+  let mut cursor_id = doc
+    .get_dictionary(page_id)
+    .ok()
+    .and_then(|d| d.get(b"Parent").ok())
+    .and_then(|p| p.as_reference().ok());
+
+  while let Some(parent_id) = cursor_id {
+    let parent = match doc.get_dictionary(parent_id) {
+      Ok(d) => d,
+      Err(_) => break,
+    };
+    if let Ok(res) = parent.get(b"Resources") {
+      let resolved = match res {
+        Object::Dictionary(d) => Some(d.clone()),
+        Object::Reference(id) => doc.get_dictionary(*id).ok().cloned(),
+        _ => None,
+      };
+      if let Some(d) = resolved {
+        inherited = Some(d);
+        break;
+      }
+    }
+    cursor_id = parent.get(b"Parent").ok().and_then(|p| p.as_reference().ok());
+  }
+
+  let dict = inherited.unwrap_or_else(Dictionary::new);
+  let id = doc.add_object(Object::Dictionary(dict));
+  let page = doc
+    .get_dictionary_mut(page_id)
+    .map_err(|e| AppError::Pdf(e.to_string()))?;
+  page.set("Resources", Object::Reference(id));
+  Ok(id)
+}
+
+fn ensure_page_font(doc: &mut Document, page_id: ObjectId) -> Result<(), AppError> {
+  let resources_id = resolve_page_resources_id(doc, page_id)?;
 
   let helv = doc.add_object(Object::Dictionary(Dictionary::from_iter(vec![
-      (
-        b"Type".to_vec(),
-        Object::Name(b"Font".to_vec()),
-      ),
-      (
-        b"Subtype".to_vec(),
-        Object::Name(b"Type1".to_vec()),
-      ),
-      (
-        b"BaseFont".to_vec(),
-        Object::Name(b"Helvetica".to_vec()),
-      ),
-      (
-        b"Encoding".to_vec(),
-        Object::Name(b"WinAnsiEncoding".to_vec()),
-      ),
-    ])));
-  let mut font_dict = Dictionary::new();
-  font_dict.set("F1", Object::Reference(helv));
-  let resources = doc
-    .get_dictionary_mut(resources_id)
-    .map_err(|e| AppError::Pdf(e.to_string()))?;
-  if !resources.has(b"Font") {
-    resources.set("Font", Object::Dictionary(font_dict));
+    (b"Type".to_vec(), Object::Name(b"Font".to_vec())),
+    (b"Subtype".to_vec(), Object::Name(b"Type1".to_vec())),
+    (b"BaseFont".to_vec(), Object::Name(b"Helvetica".to_vec())),
+    (b"Encoding".to_vec(), Object::Name(b"WinAnsiEncoding".to_vec())),
+  ])));
+
+  // Read what's currently in /Font (could be missing, inline dict, or reference).
+  let existing_font = {
+    let resources = doc
+      .get_dictionary(resources_id)
+      .map_err(|e| AppError::Pdf(e.to_string()))?;
+    resources.get(b"Font").ok().cloned()
+  };
+
+  match existing_font {
+    Some(Object::Dictionary(mut d)) => {
+      if !d.has(PDFEDITOR_FONT_NAME.as_bytes()) {
+        d.set(PDFEDITOR_FONT_NAME, Object::Reference(helv));
+      }
+      let resources = doc
+        .get_dictionary_mut(resources_id)
+        .map_err(|e| AppError::Pdf(e.to_string()))?;
+      resources.set("Font", Object::Dictionary(d));
+    }
+    Some(Object::Reference(font_dict_id)) => {
+      let font_dict = doc
+        .get_dictionary_mut(font_dict_id)
+        .map_err(|e| AppError::Pdf(e.to_string()))?;
+      if !font_dict.has(PDFEDITOR_FONT_NAME.as_bytes()) {
+        font_dict.set(PDFEDITOR_FONT_NAME, Object::Reference(helv));
+      }
+    }
+    _ => {
+      let mut font_dict = Dictionary::new();
+      font_dict.set(PDFEDITOR_FONT_NAME, Object::Reference(helv));
+      let resources = doc
+        .get_dictionary_mut(resources_id)
+        .map_err(|e| AppError::Pdf(e.to_string()))?;
+      resources.set("Font", Object::Dictionary(font_dict));
+    }
   }
 
   Ok(())
@@ -107,8 +177,18 @@ fn append_page_content(doc: &mut Document, page_id: ObjectId, ops: Vec<Operation
     .unwrap_or(Content {
       operations: vec![],
     });
-  existing.operations.extend(ops);
-  let encoded = existing
+
+  // Wrap the original content in q/Q so any leaked graphics state from our
+  // new operations cannot mutate the appearance of the existing content.
+  // We then append our edits *after* the wrapped original.
+  let mut combined: Vec<Operation> = Vec::with_capacity(existing.operations.len() + ops.len() + 2);
+  combined.push(Operation::new("q", vec![]));
+  combined.append(&mut existing.operations);
+  combined.push(Operation::new("Q", vec![]));
+  combined.extend(ops);
+
+  let new_content = Content { operations: combined };
+  let encoded = new_content
     .encode()
     .map_err(|e| AppError::Pdf(e.to_string()))?;
   doc.change_page_content(page_id, encoded)
@@ -170,7 +250,7 @@ fn text_edit_operations(
   ));
   ops.push(Operation::new(
     "Tf",
-    vec!["F1".into(), edit.font_size.into()],
+    vec![PDFEDITOR_FONT_NAME.into(), edit.font_size.into()],
   ));
   ops.push(Operation::new("Td", vec![x1.into(), y1.into()]));
   ops.push(Operation::new(
@@ -209,7 +289,7 @@ pub fn apply_content_edits_in_pdf(
       .copied()
       .ok_or_else(|| AppError::InvalidInput(format!("invalid page index {}", edit.page_index)))?;
     let ph = page_height(&doc, page_id);
-    let [x1, y1, _, y2] = pdf_rect(edit.x, edit.y, edit.width, edit.height, ph);
+    let [x1, y1, _, _y2] = pdf_rect(edit.x, edit.y, edit.width, edit.height, ph);
     let img_bytes = STANDARD
       .decode(&edit.image_base64)
       .map_err(|e| AppError::InvalidInput(e.to_string()))?;
@@ -366,5 +446,117 @@ mod tests {
     let output = apply_content_edits_in_pdf(&input, &edits, &[]).unwrap();
     let doc = Document::load_mem(&output).unwrap();
     assert_eq!(doc.get_pages().len(), 1);
+  }
+
+  /// Build a PDF whose page has an inline /Resources dict containing an
+  /// original /F1 font. The bug: previous code would replace this inline
+  /// dictionary with an empty one, erasing the original font and garbling
+  /// the page's existing text.
+  fn pdf_with_inline_resources() -> Vec<u8> {
+    let mut doc = Document::with_version("1.5");
+    let pages_id = doc.new_object_id();
+    let page_id = doc.new_object_id();
+    let catalog_id = doc.new_object_id();
+
+    let original_font = doc.add_object(Object::Dictionary(Dictionary::from_iter(vec![
+      (b"Type".to_vec(), Object::Name(b"Font".to_vec())),
+      (b"Subtype".to_vec(), Object::Name(b"Type1".to_vec())),
+      (b"BaseFont".to_vec(), Object::Name(b"Times-Roman".to_vec())),
+    ])));
+    let mut font_dict = Dictionary::new();
+    font_dict.set("F1", Object::Reference(original_font));
+
+    let mut resources = Dictionary::new();
+    resources.set("Font", Object::Dictionary(font_dict));
+
+    let content = Content {
+      operations: vec![
+        Operation::new("BT", vec![]),
+        Operation::new("Tf", vec!["F1".into(), 12.into()]),
+        Operation::new("Td", vec![100.into(), 700.into()]),
+        Operation::new("Tj", vec![Object::string_literal("Original")]),
+        Operation::new("ET", vec![]),
+      ],
+    };
+    let content_id = doc.add_object(Object::Stream(Stream::new(
+      Dictionary::new(),
+      content.encode().unwrap(),
+    )));
+
+    let mut page_dict = Dictionary::new();
+    page_dict.set("Type", Object::Name(b"Page".to_vec()));
+    page_dict.set(
+      "MediaBox",
+      Object::Array(vec![
+        Object::Integer(0),
+        Object::Integer(0),
+        Object::Integer(612),
+        Object::Integer(792),
+      ]),
+    );
+    page_dict.set("Parent", Object::Reference(pages_id));
+    page_dict.set("Contents", Object::Reference(content_id));
+    // Inline resources dict — the case that triggered the bug.
+    page_dict.set("Resources", Object::Dictionary(resources));
+    doc.objects.insert(page_id, Object::Dictionary(page_dict));
+
+    let mut pages_dict = Dictionary::new();
+    pages_dict.set("Type", Object::Name(b"Pages".to_vec()));
+    pages_dict.set("Kids", Object::Array(vec![Object::Reference(page_id)]));
+    pages_dict.set("Count", Object::Integer(1));
+    doc.objects.insert(pages_id, Object::Dictionary(pages_dict));
+
+    let mut catalog_dict = Dictionary::new();
+    catalog_dict.set("Type", Object::Name(b"Catalog".to_vec()));
+    catalog_dict.set("Pages", Object::Reference(pages_id));
+    doc.objects.insert(catalog_id, Object::Dictionary(catalog_dict));
+    doc.trailer.set("Root", Object::Reference(catalog_id));
+
+    let mut buffer = Vec::new();
+    doc.save_to(&mut buffer).unwrap();
+    buffer
+  }
+
+  #[test]
+  fn preserves_existing_inline_resources_after_text_edit() {
+    let input = pdf_with_inline_resources();
+    let edits = vec![TextEditDto {
+      page_index: 0,
+      x: 100.0,
+      y: 100.0,
+      width: 200.0,
+      height: 20.0,
+      new_text: "Added".into(),
+      font_size: 12.0,
+      color: "#000000".into(),
+      cover_old: false,
+    }];
+    let output = apply_content_edits_in_pdf(&input, &edits, &[]).unwrap();
+    let doc = Document::load_mem(&output).unwrap();
+    let page_id = *doc.get_pages().values().next().unwrap();
+    let page = doc.get_dictionary(page_id).unwrap();
+
+    let resources_id = page.get(b"Resources").unwrap().as_reference().unwrap();
+    let resources = doc.get_dictionary(resources_id).unwrap();
+    let font_obj = resources.get(b"Font").unwrap();
+
+    // Find the F1 reference in the Font dict and verify it still points to
+    // the original Times-Roman font — not to a fresh empty dict and not
+    // overwritten with our edit font.
+    let font_dict = match font_obj {
+      Object::Dictionary(d) => d.clone(),
+      Object::Reference(id) => doc.get_dictionary(*id).unwrap().clone(),
+      _ => panic!("unexpected Font object"),
+    };
+    assert!(font_dict.has(b"F1"), "original /F1 font must survive");
+    assert!(
+      font_dict.has(PDFEDITOR_FONT_NAME.as_bytes()),
+      "edit font must be added"
+    );
+
+    let f1_id = font_dict.get(b"F1").unwrap().as_reference().unwrap();
+    let f1 = doc.get_dictionary(f1_id).unwrap();
+    let base_font = f1.get(b"BaseFont").unwrap().as_name().unwrap();
+    assert_eq!(base_font, b"Times-Roman");
   }
 }

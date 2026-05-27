@@ -13,7 +13,9 @@ interface UiStore {
   showSearch: boolean;
   lastError: AppErrorPayload | null;
   showErrorDialog: boolean;
+  showLogViewer: boolean;
   setAppMode: (mode: AppMode) => void;
+  toggleLogViewer: () => void;
   setSearchQuery: (query: string) => void;
   setSearchMatches: (matches: SearchMatch[]) => void;
   setActiveMatchIndex: (index: number) => void;
@@ -38,8 +40,10 @@ export const useUiStore = create<UiStore>((set) => ({
   showSearch: false,
   lastError: null,
   showErrorDialog: false,
+  showLogViewer: false,
 
   setAppMode: (appMode) => set({ appMode }),
+  toggleLogViewer: () => set((s) => ({ showLogViewer: !s.showLogViewer })),
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   setSearchMatches: (searchMatches) =>
     set({ searchMatches, activeMatchIndex: 0 }),

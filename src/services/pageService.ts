@@ -9,7 +9,7 @@ import { useDocumentStore } from "@/stores/documentStore";
 import { useAnnotationStore } from "@/stores/annotationStore";
 import { useUiStore } from "@/stores/uiStore";
 import { errorMessage } from "@/lib/parseInvokeError";
-import { logger } from "@/lib/logger";
+import { log } from "@/lib/logging";
 
 interface PdfBytesResult {
   dataBase64: string;
@@ -52,7 +52,7 @@ async function applyPdfMutation(
       annStore.setAnnotations(remapAnnotations(annStore.annotations));
     }
 
-    logger.info("Page mutation applied", {
+    log.document.info("Page mutation applied", {
       userAction: "page_edit",
       pageCount: pdfDoc.numPages,
     });

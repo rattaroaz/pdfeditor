@@ -13,12 +13,15 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useUiStore } from "@/stores/uiStore";
 import { useContentEditStore } from "@/stores/contentEditStore";
+import { LogViewerPanel } from "@/components/debug/LogViewerPanel";
 
 export function AppShell() {
   useKeyboardShortcuts();
   const presentationMode = useDocumentStore((s) => s.presentationMode);
   const appMode = useUiStore((s) => s.appMode);
   const reflowWarnings = useContentEditStore((s) => s.reflowWarnings);
+  const showLogViewer = useUiStore((s) => s.showLogViewer);
+  const toggleLogViewer = useUiStore((s) => s.toggleLogViewer);
 
   useEffect(() => {
     const win = getCurrentWindow();
@@ -90,6 +93,7 @@ export function AppShell() {
         <PdfViewer />
       </div>
       <StatusBar />
+      {showLogViewer && <LogViewerPanel onClose={toggleLogViewer} />}
     </div>
   );
 }

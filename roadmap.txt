@@ -37,7 +37,7 @@ Logging and error infrastructure must exist from day one — not bolted on later
 [x] Global error boundary (React) + unhandled rejection / panic handlers (Rust)
 [x] User-facing error toast/dialog with copyable error ID for support
 [ ] Optional: crash report hook (Sentry or similar) behind feature flag
-[ ] Dev-only log viewer panel in app settings
+[x] Dev-only log viewer panel in app settings
 
 
 ================================================================================

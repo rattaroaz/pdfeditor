@@ -1,7 +1,7 @@
 import * as pdfjsLib from "pdfjs-dist";
 import { TextLayer } from "pdfjs-dist";
 import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from "pdfjs-dist";
-import { logger } from "@/lib/logger";
+import { log } from "@/lib/logging";
 import type { OutlineItem, HighlightRect } from "@shared/types";
 export { decodeBase64Pdf, encodeBase64Pdf } from "./pdfBinary";
 
@@ -38,7 +38,7 @@ export async function loadPdfFromBytes(
   });
   try {
     const doc = await loadingTask.promise;
-    logger.info("PDF document loaded", {
+    log.pdf.info("PDF document loaded", {
       durationMs: Math.round(performance.now() - start),
       pageCount: doc.numPages,
     });

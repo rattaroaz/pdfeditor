@@ -4,7 +4,7 @@ import { useContentEditStore } from "@/stores/contentEditStore";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useUiStore } from "@/stores/uiStore";
 import { errorMessage } from "@/lib/parseInvokeError";
-import { logger } from "@/lib/logger";
+import { log } from "@/lib/logging";
 
 interface PdfBytesResult {
   dataBase64: string;
@@ -55,7 +55,7 @@ export async function applyContentEdits(): Promise<boolean> {
       pageCount: pdfDoc.numPages,
     });
     editStore.clearEdits();
-    logger.info("Content edits applied", { userAction: "content_edit" });
+    log.content.info("Content edits applied", { userAction: "content_edit" });
     return true;
   } catch (err) {
     useUiStore.getState().showError({

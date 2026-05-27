@@ -1,7 +1,7 @@
 import { writeFile } from "@tauri-apps/plugin-fs";
 import { invokeLogged } from "@/lib/tauriInvoke";
 import { encodeBase64Pdf } from "@/lib/pdf/pdfBinary";
-import { logger } from "@/lib/logger";
+import { log } from "@/lib/logging";
 
 export async function writePdfBytes(
   path: string,
@@ -17,13 +17,13 @@ export async function writePdfBytes(
   // Prefer direct binary write (no base64 IPC overhead)
   try {
     await writeFile(path, bytes);
-    logger.info("Saved PDF via fs plugin", {
+    log.document.info("Saved PDF via fs plugin", {
       userAction: "save",
       size: bytes.byteLength,
     });
     return;
   } catch (err) {
-    logger.warn("fs writeFile failed, falling back to Rust", {
+    log.document.warn("fs writeFile failed, falling back to Rust", {
       userAction: "save",
     });
   }

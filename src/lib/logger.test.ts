@@ -1,10 +1,12 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { logger } from "./logger";
+import { clearLogBuffer, logger } from "./logging";
 import { invoke } from "@tauri-apps/api/core";
 
-describe("logger", () => {
+describe("logger compat re-export", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    clearLogBuffer();
+    logger.setBackendShipping(true);
   });
 
   it("logs info messages to console", () => {

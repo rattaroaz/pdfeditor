@@ -26,6 +26,7 @@ import {
   protectDocumentOnNextSave,
   removeDocumentPasswordProtection,
 } from "@/services/securityService";
+import { openLogDirectory } from "@/services/loggingService";
 
 
 
@@ -42,6 +43,7 @@ export function MenuBar() {
   const setFlattenOnSave = useUiStore((s) => s.setFlattenOnSave);
 
   const toggleSearch = useUiStore((s) => s.toggleSearch);
+  const toggleLogViewer = useUiStore((s) => s.toggleLogViewer);
 
   const pastLength = useAnnotationStore((s) => s.past.length);
   const futureLength = useAnnotationStore((s) => s.future.length);
@@ -328,6 +330,12 @@ export function MenuBar() {
           Presentation mode
 
         </MenuItem>
+
+        <div className="my-1 border-t border-zinc-700" />
+
+        <MenuItem onClick={() => run(toggleLogViewer)}>View log panel</MenuItem>
+
+        <MenuItem onClick={() => run(() => void openLogDirectory())}>Open log folder…</MenuItem>
 
       </MenuDropdown>
 

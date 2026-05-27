@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import { logger } from "@/lib/logger";
+import { log } from "@/lib/logging";
 import { v4 as uuidv4 } from "uuid";
 
 interface Props {
@@ -25,8 +25,14 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
-    logger.error("React error boundary caught", {
+    log.system.error("React error boundary caught", {
       userAction: "render",
+      errorId: this.state.errorId ?? undefined,
+      component: "ErrorBoundary",
+      metadata: {
+        stack: error.stack,
+        componentStack: info.componentStack,
+      },
     });
     console.error(error, info);
     if (this.state.errorId && this.state.message) {

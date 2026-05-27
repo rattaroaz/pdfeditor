@@ -10,7 +10,7 @@ import { useDocumentStore } from "@/stores/documentStore";
 import { useFormStore } from "@/stores/formStore";
 import { useUiStore } from "@/stores/uiStore";
 import { errorMessage } from "@/lib/parseInvokeError";
-import { logger } from "@/lib/logger";
+import { log } from "@/lib/logging";
 import type { FormFieldDefinition, FormFieldValue, FormInfo } from "@shared/types";
 import type { PdfDocument } from "@/lib/pdf/pdfEngine";
 
@@ -151,7 +151,7 @@ export async function applyFormChanges(): Promise<boolean> {
     useFormStore.setState({ newFields: [] });
     await inspectDocumentForms(newBytes);
     await loadFormFieldsFromPdf(pdfDoc);
-    logger.info("Form changes applied", { userAction: "form_save" });
+    log.form.info("Form changes applied", { userAction: "form_save" });
     return true;
   } catch (err) {
     showError(err);

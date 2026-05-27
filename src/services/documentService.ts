@@ -8,7 +8,7 @@ import { useAnnotationStore } from "@/stores/annotationStore";
 import { useUiStore } from "@/stores/uiStore";
 import { useContentEditStore } from "@/stores/contentEditStore";
 import { useFormStore } from "@/stores/formStore";
-import { logger } from "@/lib/logger";
+import { log } from "@/lib/logging";
 import type { Annotation, PdfMetadata, ReadFileResult } from "@shared/types";
 import { applyContentEdits } from "@/services/contentEditService";
 import { applyFormChanges, inspectDocumentForms, loadFormFieldsFromPdf } from "@/services/formService";
@@ -55,7 +55,7 @@ async function fetchMetadata(
     const info = await invokeLogged<PdfInfoResponse>("get_pdf_info", { path: filePath });
     return { ...info.metadata, pageCount };
   } catch {
-    logger.warn("get_pdf_info failed, using pdf.js metadata", {
+    log.document.warn("get_pdf_info failed, using pdf.js metadata", {
       userAction: "open",
     });
     return { pageCount, fileSize };
@@ -130,7 +130,7 @@ export async function openPdfFromPath(filePath: string): Promise<void> {
     try {
       security = await inspectPdfSecurity(pdfBytes);
     } catch {
-      logger.warn("Security inspection failed, assuming document is not protected", {
+      log.document.warn("Security inspection failed, assuming document is not protected", {
         userAction: "open",
       });
     }
@@ -155,7 +155,7 @@ export async function openPdfFromPath(filePath: string): Promise<void> {
     try {
       await invokeLogged("add_recent_file", { path: filePath });
     } catch {
-      logger.warn("Failed to update recent files", { userAction: "open" });
+      log.document.warn("Failed to update recent files", { userAction: "open" });
     }
 
     if (sidecarJson) {
@@ -170,10 +170,10 @@ export async function openPdfFromPath(filePath: string): Promise<void> {
       await inspectDocumentForms(baseBytes);
       await loadFormFieldsFromPdf(pdfDoc);
     } catch {
-      logger.warn("Form inspection failed", { userAction: "open" });
+      log.document.warn("Form inspection failed", { userAction: "open" });
     }
 
-    logger.info("Document opened", {
+    log.document.info("Document opened", {
       documentId: useDocumentStore.getState().documentId ?? undefined,
       userAction: "open",
     });
@@ -181,7 +181,7 @@ export async function openPdfFromPath(filePath: string): Promise<void> {
     const message = errorMessage(err);
     showError(err);
     docStore.setLoadError(message);
-    logger.error("Open failed", { userAction: "open" });
+    log.document.error("Open failed", { userAction: "open" });
   } finally {
     docStore.setLoading(false);
   }
@@ -275,7 +275,7 @@ export async function savePdf(saveAs = false): Promise<void> {
       await loadFormFieldsFromPdf(reloadedDoc);
       useFormStore.setState({ newFields: [] });
     } catch {
-      logger.warn("Form reload after save failed", { userAction: "save" });
+      log.document.warn("Form reload after save failed", { userAction: "save" });
     }
 
     const flatten = useUiStore.getState().flattenOnSave;
@@ -296,11 +296,11 @@ export async function savePdf(saveAs = false): Promise<void> {
           json: JSON.stringify(annStore.annotations),
         });
       } catch (err) {
-        logger.warn("Annotation sidecar save failed", { userAction: "save" });
+        log.document.warn("Annotation sidecar save failed", { userAction: "save" });
       }
     }
 
-    logger.info("Document saved with embedded annotations", {
+    log.document.info("Document saved with embedded annotations", {
       userAction: "save",
       path: targetPath,
     });
@@ -380,7 +380,7 @@ export async function revertToSaved(): Promise<void> {
       // forms optional on revert
     }
 
-    logger.info("Document reverted to saved", { userAction: "revert" });
+    log.document.info("Document reverted to saved", { userAction: "revert" });
   } catch (err) {
     showError(err);
   } finally {
