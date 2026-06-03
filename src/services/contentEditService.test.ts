@@ -17,6 +17,7 @@ vi.mock("@/lib/pdf/pdfEngine", () => ({
   encodeBase64Pdf: (bytes: Uint8Array) => encodeBase64Pdf(bytes),
   decodeBase64Pdf: () => PDF_BYTES.slice(),
   loadPdfFromBytes: mockLoadPdf,
+  viewportRectToPdfRect: () => [72, 700, 272, 724],
 }));
 
 import { applyContentEdits } from "./contentEditService";
@@ -31,6 +32,8 @@ describe("contentEditService", () => {
       pdfBytes: PDF_BYTES,
       basePdfBytes: PDF_BYTES,
       isLoading: false,
+      pdfDoc: { getPage: vi.fn().mockResolvedValue({}) } as never,
+      rotation: 0,
     });
     mockLoadPdf.mockResolvedValue(mockPdfDoc);
     mockInvokeLogged.mockResolvedValue({ dataBase64: PDF_BASE64 });
@@ -58,12 +61,10 @@ describe("contentEditService", () => {
 
     const ok = await applyContentEdits();
     expect(ok).toBe(true);
-    expect(mockInvokeLogged).toHaveBeenCalledWith(
-      "apply_content_edits",
-      expect.objectContaining({
-        textEditsJson: expect.stringContaining("Hello"),
-      }),
-    );
+    const payload = mockInvokeLogged.mock.calls[0]?.[1] as { textEditsJson: string };
+    const parsed = JSON.parse(payload.textEditsJson) as Array<{ newText: string; pdfX1: number }>;
+    expect(parsed[0]?.newText).toBe("Hello");
+    expect(parsed[0]?.pdfX1).toBe(72);
     expect(useContentEditStore.getState().hasEdits()).toBe(false);
   });
 });

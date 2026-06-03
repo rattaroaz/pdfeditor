@@ -14,6 +14,7 @@ interface UiStore {
   lastError: AppErrorPayload | null;
   showErrorDialog: boolean;
   showLogViewer: boolean;
+  showSplitDialog: boolean;
   setAppMode: (mode: AppMode) => void;
   toggleLogViewer: () => void;
   setSearchQuery: (query: string) => void;
@@ -26,6 +27,8 @@ interface UiStore {
   toggleSearch: () => void;
   showError: (error: AppErrorPayload) => void;
   dismissError: () => void;
+  openSplitDialog: () => void;
+  closeSplitDialog: () => void;
 }
 
 export const useUiStore = create<UiStore>((set) => ({
@@ -41,6 +44,7 @@ export const useUiStore = create<UiStore>((set) => ({
   lastError: null,
   showErrorDialog: false,
   showLogViewer: false,
+  showSplitDialog: false,
 
   setAppMode: (appMode) => set({ appMode }),
   toggleLogViewer: () => set((s) => ({ showLogViewer: !s.showLogViewer })),
@@ -55,4 +59,6 @@ export const useUiStore = create<UiStore>((set) => ({
   toggleSearch: () => set((s) => ({ showSearch: !s.showSearch })),
   showError: (lastError) => set({ lastError, showErrorDialog: true }),
   dismissError: () => set({ showErrorDialog: false }),
+  openSplitDialog: () => set({ showSplitDialog: true }),
+  closeSplitDialog: () => set({ showSplitDialog: false }),
 }));

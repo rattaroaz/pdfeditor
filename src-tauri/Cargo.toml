@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "Production PDF editor — Adobe Acrobat clone"
 authors = ["pdfeditor"]
 edition = "2021"
+# Required when extra binaries exist under src/bin/ (e.g. probe_pdf); Tauri dev runs `cargo run`.
+default-run = "pdfeditor"
 
 [lib]
 name = "pdfeditor_lib"

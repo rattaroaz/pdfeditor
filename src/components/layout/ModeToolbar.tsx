@@ -8,6 +8,7 @@ const MODES: { id: AppMode; label: string }[] = [
   { id: "markup", label: "Markup" },
   { id: "edit", label: "Edit" },
   { id: "forms", label: "Forms" },
+  { id: "document", label: "Document" },
 ];
 
 const EDIT_TOOLS: { id: Tool; label: string; icon: string }[] = [
@@ -46,6 +47,10 @@ export function ModeToolbar() {
             if (mode.id === "forms") {
               setActiveTool("select");
               useDocumentStore.getState().setSidebarTab("forms");
+            }
+            if (mode.id === "document") {
+              setActiveTool("select");
+              useDocumentStore.getState().setSidebarTab("document");
             }
             if (mode.id === "markup") setActiveTool("select");
           }}

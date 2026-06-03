@@ -174,7 +174,7 @@ export type Tool =
   | "form-checkbox"
   | "form-dropdown";
 
-export type AppMode = "markup" | "edit" | "forms";
+export type AppMode = "markup" | "edit" | "forms" | "document";
 
 export interface TextContentEdit {
   id: string;
@@ -232,7 +232,14 @@ export interface FormInfo {
   fieldCount: number;
 }
 
-export type SidebarTab = "pages" | "outline" | "recent" | "info" | "annotations" | "forms";
+export type SidebarTab =
+  | "pages"
+  | "outline"
+  | "recent"
+  | "info"
+  | "annotations"
+  | "forms"
+  | "document";
 
 export interface OutlineItem {
   title: string;

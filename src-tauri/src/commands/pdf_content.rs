@@ -203,6 +203,10 @@ struct TextEditDto {
   y: f64,
   width: f64,
   height: f64,
+  pdf_x1: Option<f64>,
+  pdf_y1: Option<f64>,
+  pdf_x2: Option<f64>,
+  pdf_y2: Option<f64>,
   new_text: String,
   font_size: f64,
   color: String,
@@ -221,27 +225,43 @@ struct ImageEditDto {
   mime_type: String,
 }
 
-fn text_edit_operations(
-  edit: &TextEditDto,
-  page_height: f64,
-) -> Vec<Operation> {
-  let [x1, y1, x2, y2] = pdf_rect(edit.x, edit.y, edit.width, edit.height, page_height);
+fn edit_pdf_rect(edit: &TextEditDto, page_height: f64) -> [f64; 4] {
+  if let (Some(x1), Some(y1), Some(x2), Some(y2)) =
+    (edit.pdf_x1, edit.pdf_y1, edit.pdf_x2, edit.pdf_y2)
+  {
+    return [x1, y1, x2, y2];
+  }
+  pdf_rect(edit.x, edit.y, edit.width, edit.height, page_height)
+}
+
+fn text_edit_operations(edit: &TextEditDto, page_height: f64) -> Vec<Operation> {
+  let [x1, y1, x2, y2] = edit_pdf_rect(edit, page_height);
   let w = x2 - x1;
   let h = y2 - y1;
   let (r, g, b) = parse_hex_color(&edit.color);
   let mut ops = vec![Operation::new("q", vec![])];
 
   if edit.cover_old {
+    let pad = 1.0;
+    let vpad = 0.5;
     ops.push(Operation::new(
       "rg",
       vec![1.0.into(), 1.0.into(), 1.0.into()],
     ));
     ops.push(Operation::new(
       "re",
-      vec![x1.into(), y1.into(), w.into(), h.into()],
+      vec![
+        (x1 - pad).into(),
+        (y1 - vpad).into(),
+        (w + pad * 2.0).into(),
+        (h + vpad * 2.0).into(),
+      ],
     ));
     ops.push(Operation::new("f", vec![]));
   }
+
+  // Baseline sits above the bottom of the glyph box in PDF user space.
+  let baseline_y = y1 + (edit.font_size * 0.22).min(h * 0.45);
 
   ops.push(Operation::new("BT", vec![]));
   ops.push(Operation::new(
@@ -252,7 +272,7 @@ fn text_edit_operations(
     "Tf",
     vec![PDFEDITOR_FONT_NAME.into(), edit.font_size.into()],
   ));
-  ops.push(Operation::new("Td", vec![x1.into(), y1.into()]));
+  ops.push(Operation::new("Td", vec![x1.into(), baseline_y.into()]));
   ops.push(Operation::new(
     "Tj",
     vec![Object::string_literal(edit.new_text.clone())],
@@ -454,6 +474,10 @@ mod tests {
       y: 90.0,
       width: 200.0,
       height: 20.0,
+      pdf_x1: None,
+      pdf_y1: None,
+      pdf_x2: None,
+      pdf_y2: None,
       new_text: "World".into(),
       font_size: 14.0,
       color: "#000000".into(),
@@ -542,6 +566,10 @@ mod tests {
       y: 100.0,
       width: 200.0,
       height: 20.0,
+      pdf_x1: None,
+      pdf_y1: None,
+      pdf_x2: None,
+      pdf_y2: None,
       new_text: "Added".into(),
       font_size: 12.0,
       color: "#000000".into(),

@@ -12,7 +12,6 @@ import {
 import {
   mergeIntoCurrentDocument,
   mergePdfFromDialog,
-  splitPdfByRanges,
 } from "@/services/assemblyService";
 
 import { useDocumentStore } from "@/stores/documentStore";
@@ -149,8 +148,16 @@ export function MenuBar() {
         <MenuItem disabled={!hasDocument} onClick={() => run(() => void mergeIntoCurrentDocument())}>
           Append to current…
         </MenuItem>
-        <MenuItem disabled={!hasDocument} onClick={() => run(() => void splitPdfByRanges())}>
-          Split by range…
+        <MenuItem
+          disabled={!hasDocument}
+          onClick={() =>
+            run(() => {
+              useDocumentStore.getState().setSidebarTab("document");
+              useUiStore.getState().openSplitDialog();
+            })
+          }
+        >
+          Split PDF…
         </MenuItem>
       </MenuDropdown>
 

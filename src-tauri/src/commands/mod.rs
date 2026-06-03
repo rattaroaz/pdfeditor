@@ -292,37 +292,67 @@ pub fn prepare_document_bytes(
 }
 
 #[tauri::command]
-pub fn delete_pdf_pages(payload: pdf_pages::DeletePagesPayload) -> CommandResult<pdf_pages::PdfBytesResult> {
-  pdf_pages::delete_pdf_pages_impl(payload)
+pub fn delete_pdf_pages(
+  pdf_base64: String,
+  page_numbers: Vec<u32>,
+) -> CommandResult<pdf_pages::PdfBytesResult> {
+  pdf_pages::delete_pdf_pages_impl(pdf_pages::DeletePagesPayload {
+    pdf_base64,
+    page_numbers,
+  })
 }
 
 #[tauri::command]
-pub fn rotate_pdf_pages(payload: pdf_pages::RotatePagesPayload) -> CommandResult<pdf_pages::PdfBytesResult> {
-  pdf_pages::rotate_pdf_pages_impl(payload)
+pub fn rotate_pdf_pages(
+  pdf_base64: String,
+  page_numbers: Vec<u32>,
+  degrees: i64,
+) -> CommandResult<pdf_pages::PdfBytesResult> {
+  pdf_pages::rotate_pdf_pages_impl(pdf_pages::RotatePagesPayload {
+    pdf_base64,
+    page_numbers,
+    degrees,
+  })
 }
 
 #[tauri::command]
-pub fn reorder_pdf_pages(payload: pdf_pages::ReorderPagesPayload) -> CommandResult<pdf_pages::PdfBytesResult> {
-  pdf_pages::reorder_pdf_pages_impl(payload)
+pub fn reorder_pdf_pages(
+  pdf_base64: String,
+  new_order: Vec<u32>,
+) -> CommandResult<pdf_pages::PdfBytesResult> {
+  pdf_pages::reorder_pdf_pages_impl(pdf_pages::ReorderPagesPayload {
+    pdf_base64,
+    new_order,
+  })
 }
 
 #[tauri::command]
 pub fn insert_blank_pages(
-  payload: pdf_assembly::InsertBlankPagesPayload,
+  pdf_base64: String,
+  after_page: u32,
+  count: u32,
 ) -> CommandResult<pdf_assembly::PdfBytesResult> {
-  pdf_assembly::insert_blank_pages_impl(payload)
+  pdf_assembly::insert_blank_pages_impl(pdf_assembly::InsertBlankPagesPayload {
+    pdf_base64,
+    after_page,
+    count,
+  })
 }
 
 #[tauri::command]
 pub fn extract_pdf_pages(
-  payload: pdf_assembly::ExtractPagesPayload,
+  pdf_base64: String,
+  page_numbers: Vec<u32>,
 ) -> CommandResult<pdf_assembly::PdfBytesResult> {
-  pdf_assembly::extract_pdf_pages_impl(payload)
+  pdf_assembly::extract_pdf_pages_impl(pdf_assembly::ExtractPagesPayload {
+    pdf_base64,
+    page_numbers,
+  })
 }
 
 #[tauri::command]
-pub fn merge_pdfs(payload: pdf_assembly::MergePdfsPayload) -> CommandResult<pdf_assembly::PdfBytesResult> {
-  pdf_assembly::merge_pdfs_impl(payload)
+pub fn merge_pdfs(pdf_base64_list: Vec<String>) -> CommandResult<pdf_assembly::PdfBytesResult> {
+  pdf_assembly::merge_pdfs_impl(pdf_assembly::MergePdfsPayload { pdf_base64_list })
 }
 
 #[tauri::command]

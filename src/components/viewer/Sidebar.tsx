@@ -6,9 +6,11 @@ import { RecentFilesPanel } from "./RecentFilesPanel";
 import { MetadataPanel } from "./MetadataPanel";
 import { AnnotationsPanel } from "./AnnotationsPanel";
 import { FormsPanel } from "@/components/forms/FormsPanel";
+import { DocumentPanel } from "@/components/document/DocumentPanel";
 
 const TABS: { id: SidebarTab; label: string }[] = [
   { id: "pages", label: "Pages" },
+  { id: "document", label: "Document" },
   { id: "annotations", label: "Marks" },
   { id: "forms", label: "Forms" },
   { id: "outline", label: "Outline" },
@@ -44,6 +46,7 @@ export function Sidebar() {
       </div>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {sidebarTab === "pages" && pdfDoc && <ThumbnailPanelContent />}
+        {sidebarTab === "document" && <DocumentPanel />}
         {sidebarTab === "annotations" && pdfDoc && <AnnotationsPanel />}
         {sidebarTab === "forms" && pdfDoc && <FormsPanel />}
         {sidebarTab === "outline" && pdfDoc && <OutlinePanel />}

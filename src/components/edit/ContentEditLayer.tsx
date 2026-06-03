@@ -7,6 +7,11 @@ import { recordHistory } from "@/stores/historyStore";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useUiStore } from "@/stores/uiStore";
 import { findTextAtPoint } from "@/lib/pdf/pdfEngine";
+import {
+  alignBoxToHit,
+  computeTextEditBox,
+  measureTextWidth,
+} from "@/lib/textEditBox";
 
 interface ContentEditLayerProps {
   pageIndex: number;
@@ -21,9 +26,27 @@ type MovingEdit = {
 };
 
 const MIN_DRAG_SIZE = 4;
-const DEFAULT_TEXT_WIDTH = 220;
-const DEFAULT_TEXT_HEIGHT = 24;
+const DEFAULT_FONT_SIZE = 12;
 const DRAG_THRESHOLD_PX = 5;
+
+function syncTextBoxSize(
+  edit: { fontSize: number; coverOld: boolean; oldText?: string },
+  text: string,
+  update: (patch: { width: number; height: number }) => void,
+) {
+  const coverMin = edit.coverOld
+    ? Math.max(
+        measureTextWidth(edit.oldText ?? "", edit.fontSize),
+        measureTextWidth(text, edit.fontSize),
+      )
+    : undefined;
+  update(
+    computeTextEditBox(text, edit.fontSize, {
+      coverOld: edit.coverOld,
+      minWidth: coverMin,
+    }),
+  );
+}
 
 export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
   const appMode = useUiStore((s) => s.appMode);
@@ -93,11 +116,22 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
     }
 
     const trimmed = text.trim();
+    const existing = textEdits.find((e) => e.id === id);
     if (!trimmed) {
       removeTextEdit(id);
       if (selectedId === id) setSelectedId(null);
     } else {
-      updateTextEdit(id, { newText: trimmed });
+      const coverMin = existing!.coverOld
+        ? Math.max(
+            measureTextWidth(existing!.oldText ?? "", existing!.fontSize),
+            measureTextWidth(trimmed, existing!.fontSize),
+          )
+        : undefined;
+      const box = computeTextEditBox(trimmed, existing!.fontSize, {
+        coverOld: existing!.coverOld,
+        minWidth: coverMin,
+      });
+      updateTextEdit(id, { newText: trimmed, width: box.width, height: box.height });
       useDocumentStore.getState().setDirty(true);
     }
     setEditingId(null);
@@ -150,15 +184,16 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
 
   if (appMode !== "edit") return null;
 
-  const placeTextBlock = (x: number, y: number, width: number, height: number) => {
+  const placeTextBlock = (x: number, y: number) => {
+    const box = computeTextEditBox("", DEFAULT_FONT_SIZE);
     const id = addTextEdit({
       pageIndex,
       x,
       y,
-      width,
-      height,
+      width: box.width,
+      height: box.height,
       newText: "",
-      fontSize: 12,
+      fontSize: DEFAULT_FONT_SIZE,
       fontFamily: "Helvetica",
       color: "#000000",
       coverOld: false,
@@ -175,12 +210,12 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
 
     if (activeTool === "add-text-block") {
       if (width < MIN_DRAG_SIZE || height < MIN_DRAG_SIZE) {
-        width = DEFAULT_TEXT_WIDTH;
-        height = DEFAULT_TEXT_HEIGHT;
-        x = x1;
-        y = y1;
+        placeTextBlock(x1, y1);
+      } else {
+        const fontSize = DEFAULT_FONT_SIZE;
+        const box = computeTextEditBox("", fontSize);
+        placeTextBlock(x, y + (height - box.height) / 2);
       }
-      placeTextBlock(x, y, width, height);
       return;
     }
 
@@ -221,12 +256,17 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
     }
     const newText = window.prompt("Edit text:", hit.text);
     if (newText === null || newText === hit.text) return;
+    const box = computeTextEditBox(newText, hit.fontSize, {
+      coverOld: true,
+      minWidth: hit.width,
+    });
+    const placed = alignBoxToHit(hit, box, true);
     addTextEdit({
       pageIndex,
-      x: hit.x,
-      y: hit.y,
-      width: hit.width,
-      height: hit.height,
+      x: placed.x,
+      y: placed.y,
+      width: placed.width,
+      height: placed.height,
       oldText: hit.text,
       newText,
       fontSize: hit.fontSize,
@@ -270,19 +310,24 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
         const isSelected = selectedId === edit.id;
         const isDragging = moving?.id === edit.id;
         const isEditing = editingId === edit.id;
+        const replacing = edit.coverOld;
         return (
           <div
             key={edit.id}
             title={isEditing ? undefined : "Double-click to edit · drag to move"}
-            className={`absolute overflow-hidden border border-dashed border-emerald-500 bg-emerald-500/15 ${
-              isEditing ? "ring-2 ring-emerald-400" : ""
-            } ${
+            className={`absolute overflow-hidden border border-dashed ${
+              replacing
+                ? "border-emerald-600 bg-white"
+                : "border-emerald-500 bg-emerald-500/15"
+            } ${isEditing ? "ring-2 ring-emerald-400" : ""} ${
               isDragging
                 ? "cursor-grabbing ring-2 ring-emerald-400"
                 : isEditing
                   ? ""
-                  : "cursor-grab hover:bg-emerald-500/25"
-            } ${isSelected && !isDragging && !isEditing ? "ring-2 ring-emerald-300" : ""}`}
+                  : "cursor-grab"
+            } ${isSelected && !isDragging && !isEditing ? "ring-2 ring-emerald-300" : ""} ${
+              !replacing && !isEditing && !isDragging ? "hover:bg-emerald-500/25" : ""
+            }`}
             style={{
               left: edit.x * scale,
               top: edit.y * scale,
@@ -302,10 +347,19 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
               <textarea
                 autoFocus
                 defaultValue={edit.newText}
-                className="h-full w-full resize-none border-0 bg-white p-1 text-zinc-900 outline-none"
-                style={{ fontSize: edit.fontSize * scale, lineHeight: 1.2 }}
+                className="block h-full w-full resize-none overflow-hidden border-0 bg-white p-0 text-zinc-900 outline-none"
+                style={{
+                  fontSize: edit.fontSize * scale,
+                  lineHeight: 1,
+                  fontFamily: "Helvetica, Arial, sans-serif",
+                }}
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
+                onInput={(e) => {
+                  syncTextBoxSize(edit, e.currentTarget.value, (patch) =>
+                    updateTextEdit(edit.id, patch),
+                  );
+                }}
                 onBlur={(e) => {
                   if (skipEditBlurRef.current) {
                     skipEditBlurRef.current = false;
@@ -324,8 +378,14 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
               />
             ) : (
               <div
-                className="flex h-full items-start px-1 font-medium text-emerald-900 select-none"
-                style={{ fontSize: edit.fontSize * scale, lineHeight: 1.2 }}
+                className={`block h-full w-full overflow-hidden whitespace-pre font-medium select-none ${
+                  replacing ? "text-zinc-900" : "text-emerald-900"
+                }`}
+                style={{
+                  fontSize: edit.fontSize * scale,
+                  lineHeight: 1,
+                  fontFamily: "Helvetica, Arial, sans-serif",
+                }}
               >
                 {edit.newText || (
                   <span className="text-emerald-700/60 italic">Double-click to edit</span>
