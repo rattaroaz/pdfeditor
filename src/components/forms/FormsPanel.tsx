@@ -1,10 +1,14 @@
 import { useFormStore } from "@/stores/formStore";
+import { useDocumentStore } from "@/stores/documentStore";
+import { normalizeDropdownOptions } from "@/lib/dropdownOptions";
+import { DropdownOptionsEditor } from "./DropdownOptionsEditor";
 
 export function FormsPanel() {
   const formInfo = useFormStore((s) => s.formInfo);
   const values = useFormStore((s) => s.values);
   const newFields = useFormStore((s) => s.newFields);
   const validationErrors = useFormStore((s) => s.validationErrors);
+  const updateNewField = useFormStore((s) => s.updateNewField);
 
   if (formInfo?.hasXfa) {
     return (
@@ -31,7 +35,21 @@ export function FormsPanel() {
             <div className="text-xs text-violet-400">
               New {field.kind} · page {field.pageIndex + 1}
             </div>
-            <div className="text-xs text-zinc-500">Saved on next document save</div>
+            {field.kind === "dropdown" ? (
+              <div className="mt-2 border-t border-violet-800/60 pt-2">
+                <p className="mb-2 text-[10px] text-zinc-500">Edit dropdown choices</p>
+                <DropdownOptionsEditor
+                  compact
+                  options={field.options ?? ["Option 1", "Option 2"]}
+                  onChange={(options) => {
+                    updateNewField(field.id, { options: normalizeDropdownOptions(options) });
+                    useDocumentStore.getState().setDirty(true);
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="text-xs text-zinc-500">Saved on next document save</div>
+            )}
           </li>
         ))}
         {entries.map((field) => (

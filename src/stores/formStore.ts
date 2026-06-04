@@ -11,7 +11,11 @@ interface FormStore {
   validationErrors: Record<string, string>;
   setFormInfo: (info: FormInfo | null) => void;
   setFieldValue: (name: string, value: string, type?: FormFieldValue["type"]) => void;
-  addNewField: (field: Omit<FormFieldDefinition, "id">) => void;
+  addNewField: (field: Omit<FormFieldDefinition, "id">) => string;
+  updateNewField: (
+    id: string,
+    patch: Partial<Pick<FormFieldDefinition, "options" | "defaultValue" | "required" | "readOnly">>,
+  ) => void;
   updateNewFieldPosition: (id: string, x: number, y: number) => void;
   removeNewField: (id: string) => void;
   setActiveField: (name: string | null) => void;
@@ -40,9 +44,47 @@ export const useFormStore = create<FormStore>((set, get) => ({
 
   addNewField: (partial) => {
     recordHistory();
+    const id = uuidv4();
     set((s) => ({
-      newFields: [...s.newFields, { ...partial, id: uuidv4() }],
+      newFields: [...s.newFields, { ...partial, id }],
     }));
+    return id;
+  },
+
+  updateNewField: (id, patch) => {
+    recordHistory();
+    const field = get().newFields.find((f) => f.id === id);
+    if (!field) return;
+
+    const mergedOptions =
+      patch.options && field.kind === "dropdown"
+        ? patch.options
+        : field.options;
+    const nextDefault =
+      mergedOptions && field.kind === "dropdown"
+        ? mergedOptions[0] ?? field.defaultValue ?? ""
+        : patch.defaultValue ?? field.defaultValue;
+
+    set((s) => ({
+      newFields: s.newFields.map((f) =>
+        f.id === id
+          ? {
+              ...f,
+              ...patch,
+              ...(mergedOptions && field.kind === "dropdown"
+                ? { options: mergedOptions, defaultValue: nextDefault }
+                : {}),
+            }
+          : f,
+      ),
+    }));
+
+    if (mergedOptions && field.kind === "dropdown") {
+      const current = get().values[field.name]?.value ?? "";
+      if (!mergedOptions.includes(current)) {
+        get().setFieldValue(field.name, nextDefault ?? "", "dropdown");
+      }
+    }
   },
 
   updateNewFieldPosition: (id, x, y) =>

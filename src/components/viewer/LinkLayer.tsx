@@ -3,6 +3,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { getPageLinks } from "@/lib/pdf/pdfEngine";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useUiStore } from "@/stores/uiStore";
+import { useAnnotationStore } from "@/stores/annotationStore";
 
 interface ViewportLink {
   left: number;
@@ -23,8 +24,9 @@ export function LinkLayer({ pageNumber, scale }: LinkLayerProps) {
   const rotation = useDocumentStore((s) => s.rotation);
   const setCurrentPage = useDocumentStore((s) => s.setCurrentPage);
   const appMode = useUiStore((s) => s.appMode);
+  const activeTool = useAnnotationStore((s) => s.activeTool);
   const [links, setLinks] = useState<ViewportLink[]>([]);
-  const linksInteractive = appMode === "markup";
+  const linksInteractive = appMode === "markup" && activeTool === "select";
 
   useEffect(() => {
     if (!pdfDoc) {
@@ -84,7 +86,7 @@ export function LinkLayer({ pageNumber, scale }: LinkLayerProps) {
           key={i}
           href={link.url ?? "#"}
           title={link.url ?? "Go to page"}
-          className="absolute bg-transparent"
+          className="absolute z-[45] bg-transparent"
           style={{
             left: link.left,
             top: link.top,

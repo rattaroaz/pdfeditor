@@ -46,6 +46,14 @@ fn pdf_rect(x: f64, y: f64, w: f64, h: f64, page_height: f64) -> [f64; 4] {
   [x, y1, x + w, y2]
 }
 
+fn object_as_f64(obj: &Object) -> Option<f64> {
+  match obj {
+    Object::Integer(i) => Some(*i as f64),
+    Object::Real(r) => Some(*r as f64),
+    _ => None,
+  }
+}
+
 fn field_name(field: &Dictionary) -> Option<String> {
   field.get(b"T").ok().and_then(|t| {
     let bytes: Vec<u8> = match t {
@@ -249,6 +257,34 @@ pub fn apply_form_values_in_pdf(pdf_bytes: &[u8], values: &[FieldValueDto]) -> R
           w.set("AS", Object::Name(state.to_vec()));
         }
       }
+    } else if field_type == "dropdown" {
+      if let Some(helv_id) = helv_font_id(&doc, af_ref) {
+        for w_id in widgets {
+          if let Ok(w) = doc.get_dictionary(w_id) {
+            let rect = w
+              .get(b"Rect")
+              .ok()
+              .and_then(|r| r.as_array().ok())
+              .and_then(|a| {
+                if a.len() >= 4 {
+                  Some((
+                    object_as_f64(&a[0]).unwrap_or(0.0),
+                    object_as_f64(&a[1]).unwrap_or(0.0),
+                    object_as_f64(&a[2]).unwrap_or(0.0),
+                    object_as_f64(&a[3]).unwrap_or(0.0),
+                  ))
+                } else {
+                  None
+                }
+              });
+            if let Some((x1, y1, x2, y2)) = rect {
+              let width = (x2 - x1).abs();
+              let height = (y2 - y1).abs();
+              let _ = attach_text_appearance(&mut doc, w_id, width, height, &dto.value, helv_id);
+            }
+          }
+        }
+      }
     }
   }
 
@@ -311,6 +347,7 @@ struct NewFieldDto {
   default_value: Option<String>,
   required: bool,
   read_only: bool,
+  options: Option<Vec<String>>,
 }
 
 /// Default appearance for variable-text fields (`/DA`). Uses the standard AcroForm
@@ -793,6 +830,14 @@ pub fn create_form_fields_in_pdf(pdf_bytes: &[u8], fields: &[NewFieldDto]) -> Re
           b"Off".to_vec()
         },
       )
+    } else if field.field_type == "dropdown" {
+      let initial = field
+        .default_value
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .or_else(|| field.options.as_ref()?.first().map(String::as_str))
+        .unwrap_or("");
+      Object::string_literal(initial)
     } else {
       Object::string_literal(field.default_value.as_deref().unwrap_or(""))
     };
@@ -808,6 +853,21 @@ pub fn create_form_fields_in_pdf(pdf_bytes: &[u8], fields: &[NewFieldDto]) -> Re
       (b"Rect".to_vec(), Object::Array(rect.iter().map(|v| Object::Real(*v as f32)).collect())),
       (b"P".to_vec(), Object::Reference(page_id)),
     ]);
+    if field.field_type == "dropdown" {
+      if let Some(options) = &field.options {
+        if !options.is_empty() {
+          widget.set(
+            "Opt",
+            Object::Array(
+              options
+                .iter()
+                .map(|o| Object::string_literal(o.clone()))
+                .collect(),
+            ),
+          );
+        }
+      }
+    }
     decorate_widget(&mut widget, &field.field_type, flags, field_value.clone());
     let field_id = doc.add_object(Object::Dictionary(widget));
     let widget_id = field_id;
@@ -825,7 +885,12 @@ pub fn create_form_fields_in_pdf(pdf_bytes: &[u8], fields: &[NewFieldDto]) -> Re
       }
       "dropdown" => {
         if let Some(helv_id) = helv_font_id(&doc, af_id) {
-          let initial = field.default_value.as_deref().unwrap_or("");
+          let initial = field
+            .default_value
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .or_else(|| field.options.as_ref()?.first().map(String::as_str))
+            .unwrap_or("");
           attach_text_appearance(&mut doc, widget_id, width_pt, height_pt, initial, helv_id)?;
         }
       }
@@ -1062,10 +1127,218 @@ mod tests {
       default_value: Some("Test".into()),
       required: true,
       read_only: false,
+      options: None,
     }];
     let output = create_form_fields_in_pdf(&input, &fields).unwrap();
     let info = inspect_forms(&output).unwrap();
     assert!(info.field_count >= 1);
+  }
+
+  fn field_opt_strings(doc: &Document, field_id: ObjectId) -> Vec<String> {
+    let dict = doc.get_dictionary(field_id).unwrap();
+    let opt = dict.get(b"Opt").unwrap().as_array().unwrap();
+    opt.iter()
+      .filter_map(|o| {
+        o.as_str()
+          .ok()
+          .map(|b| String::from_utf8_lossy(b).into_owned())
+      })
+      .collect()
+  }
+
+  #[test]
+  fn creates_dropdown_with_opt_array() {
+    let input = blank_pdf();
+    let options = vec!["Red".into(), "Green".into(), "Blue".into()];
+    let fields = vec![NewFieldDto {
+      page_index: 0,
+      name: "Color".into(),
+      field_type: "dropdown".into(),
+      x: 100.0,
+      y: 100.0,
+      width: 160.0,
+      height: 24.0,
+      pdf_rect: None,
+      default_value: Some("Red".into()),
+      required: false,
+      read_only: false,
+      options: Some(options.clone()),
+    }];
+    let output = create_form_fields_in_pdf(&input, &fields).unwrap();
+    let doc = Document::load_mem(&output).unwrap();
+    let cat_id = catalog_id(&doc).unwrap();
+    let af_id = doc
+      .get_dictionary(cat_id)
+      .unwrap()
+      .get(b"AcroForm")
+      .unwrap()
+      .as_reference()
+      .unwrap();
+    let fields_arr = doc
+      .get_dictionary(af_id)
+      .unwrap()
+      .get(b"Fields")
+      .unwrap()
+      .as_array()
+      .unwrap();
+    assert_eq!(fields_arr.len(), 1);
+    let field_id = fields_arr[0].as_reference().unwrap();
+    assert_eq!(field_opt_strings(&doc, field_id), options);
+  }
+
+  #[test]
+  fn create_form_fields_impl_deserializes_dropdown_options_from_json() {
+    let input = blank_pdf();
+    let fields_json = r#"[
+      {
+        "pageIndex": 0,
+        "name": "Size",
+        "type": "dropdown",
+        "x": 10,
+        "y": 20,
+        "width": 120,
+        "height": 22,
+        "defaultValue": "Small",
+        "required": false,
+        "readOnly": false,
+        "options": ["Small", "Medium", "Large"]
+      }
+    ]"#;
+    let fields: Vec<NewFieldDto> = serde_json::from_str(fields_json).unwrap();
+    assert_eq!(fields[0].options.as_ref().unwrap().len(), 3);
+    let output = create_form_fields_in_pdf(&input, &fields).unwrap();
+    let doc = Document::load_mem(&output).unwrap();
+    let cat_id = catalog_id(&doc).unwrap();
+    let af_id = doc
+      .get_dictionary(cat_id)
+      .unwrap()
+      .get(b"AcroForm")
+      .unwrap()
+      .as_reference()
+      .unwrap();
+    let field_id = doc
+      .get_dictionary(af_id)
+      .unwrap()
+      .get(b"Fields")
+      .unwrap()
+      .as_array()
+      .unwrap()[0]
+      .as_reference()
+      .unwrap();
+    assert_eq!(
+      field_opt_strings(&doc, field_id),
+      vec!["Small", "Medium", "Large"]
+    );
+  }
+
+  #[test]
+  fn apply_form_values_preserves_dropdown_opt() {
+    let options = vec!["Small".into(), "Medium".into(), "Large".into()];
+    let with_field = create_form_fields_in_pdf(
+      &blank_pdf(),
+      &[NewFieldDto {
+        page_index: 0,
+        name: "Size".into(),
+        field_type: "dropdown".into(),
+        x: 72.0,
+        y: 72.0,
+        width: 160.0,
+        height: 24.0,
+        pdf_rect: None,
+        default_value: Some("Small".into()),
+        required: false,
+        read_only: false,
+        options: Some(options.clone()),
+      }],
+    )
+    .unwrap();
+
+    let values_json = r#"[{"name":"Size","value":"Medium","type":"dropdown"}]"#;
+    let output = apply_form_values_in_pdf(
+      &with_field,
+      &[FieldValueDto {
+        name: "Size".into(),
+        value: "Medium".into(),
+        field_type: "dropdown".into(),
+      }],
+    )
+    .unwrap();
+
+    let doc = Document::load_mem(&output).unwrap();
+    let cat_id = catalog_id(&doc).unwrap();
+    let af_id = doc
+      .get_dictionary(cat_id)
+      .unwrap()
+      .get(b"AcroForm")
+      .unwrap()
+      .as_reference()
+      .unwrap();
+    let field_id = doc
+      .get_dictionary(af_id)
+      .unwrap()
+      .get(b"Fields")
+      .unwrap()
+      .as_array()
+      .unwrap()[0]
+      .as_reference()
+      .unwrap();
+    assert_eq!(field_opt_strings(&doc, field_id), options);
+  }
+
+  #[test]
+  fn save_pipeline_preserves_dropdown_opt() {
+    use crate::commands::pdf_annotations;
+
+    let options = vec!["A".into(), "B".into(), "C".into()];
+    let with_field = create_form_fields_in_pdf(
+      &blank_pdf(),
+      &[NewFieldDto {
+        page_index: 0,
+        name: "Choice".into(),
+        field_type: "dropdown".into(),
+        x: 72.0,
+        y: 72.0,
+        width: 160.0,
+        height: 24.0,
+        pdf_rect: None,
+        default_value: Some("A".into()),
+        required: false,
+        read_only: false,
+        options: Some(options.clone()),
+      }],
+    )
+    .unwrap();
+
+    let after_values = apply_form_values_in_pdf(
+      &with_field,
+      &[FieldValueDto {
+        name: "Choice".into(),
+        value: "B".into(),
+        field_type: "dropdown".into(),
+      }],
+    )
+    .unwrap();
+
+    let saved = pdf_annotations::embed_annotations_in_pdf(&after_values, "[]").unwrap();
+    let doc = Document::load_mem(&saved).unwrap();
+    let cat_id = catalog_id(&doc).unwrap();
+    let af_id = doc
+      .get_dictionary(cat_id)
+      .unwrap()
+      .get(b"AcroForm")
+      .unwrap()
+      .as_reference()
+      .unwrap();
+    let field_id = doc
+      .get_dictionary(af_id)
+      .unwrap()
+      .get(b"Fields")
+      .unwrap()
+      .as_array()
+      .unwrap()[0]
+      .as_reference()
+      .unwrap();
+    assert_eq!(field_opt_strings(&doc, field_id), options);
   }
 
   #[test]
@@ -1083,6 +1356,7 @@ mod tests {
       default_value: None,
       required: false,
       read_only: false,
+      options: None,
     }];
     let output = create_form_fields_in_pdf(&input, &fields).unwrap();
     let doc = Document::load_mem(&output).unwrap();
@@ -1117,6 +1391,7 @@ mod tests {
       default_value: None,
       required: false,
       read_only: false,
+      options: None,
     }];
     let output = create_form_fields_in_pdf(&input, &fields).unwrap();
     let doc = Document::load_mem(&output).unwrap();
@@ -1148,6 +1423,7 @@ mod tests {
       default_value: Some("Off".into()),
       required: false,
       read_only: false,
+      options: None,
     }];
     let output = create_form_fields_in_pdf(&input, &fields).unwrap();
     let doc = Document::load_mem(&output).unwrap();
@@ -1182,6 +1458,7 @@ mod tests {
       default_value: Some("Off".into()),
       required: false,
       read_only: false,
+      options: None,
     }];
     let pdf_with_field = create_form_fields_in_pdf(&input, &fields).unwrap();
     let values = vec![FieldValueDto {
@@ -1219,6 +1496,7 @@ mod tests {
       default_value: None,
       required: false,
       read_only: false,
+      options: None,
     }];
     let output = create_form_fields_in_pdf(&input, &fields).unwrap();
     let doc = Document::load_mem(&output).unwrap();
@@ -1274,6 +1552,7 @@ mod tests {
       default_value: None,
       required: false,
       read_only: false,
+      options: None,
     }];
     let output = create_form_fields_in_pdf(&input, &fields).unwrap();
     let doc = Document::load_mem(&output).unwrap();
@@ -1318,6 +1597,7 @@ mod tests {
       default_value: None,
       required: false,
       read_only: false,
+      options: None,
     }];
     let with_field = create_form_fields_in_pdf(&input, &fields).unwrap();
     let stripped = pdf_annotations::strip_annotations_from_pdf(&with_field).unwrap();
@@ -1342,6 +1622,7 @@ mod tests {
       default_value: None,
       required: false,
       read_only: false,
+      options: None,
     }];
     let with_field = create_form_fields_in_pdf(&input, &fields).unwrap();
     let saved = pdf_annotations::embed_annotations_in_pdf(&with_field, "[]").unwrap();
@@ -1426,6 +1707,7 @@ mod tests {
         default_value: None,
         required: false,
         read_only: false,
+      options: None,
       }],
     )
     .unwrap();
@@ -1510,6 +1792,7 @@ mod tests {
       default_value: None,
       required: false,
       read_only: false,
+      options: None,
     }];
 
     let output = create_form_fields_in_pdf(&bytes, &fields).expect("create field on dmv");

@@ -13,11 +13,12 @@ interface ContentEditStore {
     id: string,
     patch: Partial<Pick<TextContentEdit, "newText" | "width" | "height">>,
   ) => void;
-  addImageEdit: (edit: Omit<ImageContentEdit, "id">) => void;
+  addImageEdit: (edit: Omit<ImageContentEdit, "id">) => string;
   removeTextEdit: (id: string) => void;
   removeImageEdit: (id: string) => void;
   updateTextEditPosition: (id: string, x: number, y: number) => void;
   updateImageEditPosition: (id: string, x: number, y: number) => void;
+  updateImageEditSize: (id: string, width: number, height: number) => void;
   clearEdits: () => void;
   setReflowWarnings: (warnings: string[]) => void;
   hasEdits: () => boolean;
@@ -57,13 +58,15 @@ export const useContentEditStore = create<ContentEditStore>((set, get) => ({
 
   addImageEdit: (partial) => {
     recordHistory();
+    const id = uuidv4();
     set((s) => ({
-      imageEdits: [...s.imageEdits, { ...partial, id: uuidv4() }],
+      imageEdits: [...s.imageEdits, { ...partial, id }],
     }));
     log.content.info("Image content edit added", {
       userAction: "add_image_edit",
       metadata: { pageIndex: partial.pageIndex, mimeType: partial.mimeType },
     });
+    return id;
   },
 
   removeTextEdit: (id) => {
@@ -84,6 +87,11 @@ export const useContentEditStore = create<ContentEditStore>((set, get) => ({
   updateImageEditPosition: (id, x, y) =>
     set((s) => ({
       imageEdits: s.imageEdits.map((e) => (e.id === id ? { ...e, x, y } : e)),
+    })),
+
+  updateImageEditSize: (id, width, height) =>
+    set((s) => ({
+      imageEdits: s.imageEdits.map((e) => (e.id === id ? { ...e, width, height } : e)),
     })),
 
   clearEdits: () => set({ textEdits: [], imageEdits: [], reflowWarnings: [] }),

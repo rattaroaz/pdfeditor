@@ -56,4 +56,24 @@ describe("formStore", () => {
     expect(field?.x).toBe(50);
     expect(field?.y).toBe(80);
   });
+
+  it("updates new field dropdown options", () => {
+    useFormStore.getState().addNewField({
+      pageIndex: 0,
+      name: "Field1",
+      kind: "dropdown",
+      x: 10,
+      y: 20,
+      width: 100,
+      height: 24,
+      defaultValue: "Option 1",
+      required: false,
+      readOnly: false,
+      options: ["Option 1", "Option 2"],
+    });
+    const id = useFormStore.getState().newFields[0]!.id;
+    useFormStore.getState().updateNewField(id, { options: ["Red", "Green", "Blue"] });
+    expect(useFormStore.getState().newFields[0]?.options).toEqual(["Red", "Green", "Blue"]);
+    expect(useFormStore.getState().values.Field1?.value).toBe("Red");
+  });
 });

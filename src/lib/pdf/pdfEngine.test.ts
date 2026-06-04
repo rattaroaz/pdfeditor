@@ -15,11 +15,38 @@ vi.mock("pdfjs-dist", () => ({
 
 import { ensurePdfExtension } from "./pdfBinary";
 import {
+  choiceOptionsFromPdfField,
   decodeBase64Pdf,
   encodeBase64Pdf,
   loadPdfFromBytes,
   PdfPasswordRequiredError,
 } from "./pdfEngine";
+
+describe("choiceOptionsFromPdfField", () => {
+  it("reads pdf.js items array", () => {
+    expect(
+      choiceOptionsFromPdfField({
+        items: [
+          { exportValue: "Red", displayValue: "Red" },
+          { exportValue: "Green", displayValue: "Green" },
+        ],
+      }),
+    ).toEqual(["Red", "Green"]);
+  });
+
+  it("prefers explicit options when present", () => {
+    expect(
+      choiceOptionsFromPdfField({
+        options: ["A", "B"],
+        items: [{ exportValue: "X", displayValue: "X" }],
+      }),
+    ).toEqual(["A", "B"]);
+  });
+
+  it("returns undefined when no choices exist", () => {
+    expect(choiceOptionsFromPdfField({})).toBeUndefined();
+  });
+});
 
 describe("pdf binary codec", () => {
   it("round-trips PDF bytes through base64", () => {

@@ -44,13 +44,12 @@ export function PdfTextLayer({ pageNumber, scale }: TextLayerProps) {
     };
   }, [pdfDoc, pageNumber, scale, rotation]);
 
-  const selectable =
-    appMode === "markup" && (activeTool === "select" || activeTool === "text");
+  const selectable = appMode === "markup" && activeTool === "select";
 
   return (
     <div
       ref={containerRef}
-      className="textLayer absolute left-0 top-0"
+      className="textLayer absolute left-0 top-0 z-[35]"
       style={{ pointerEvents: selectable ? "auto" : "none" }}
     />
   );

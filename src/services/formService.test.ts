@@ -106,6 +106,32 @@ describe("formService", () => {
     expect(useFormStore.getState().newFields).toHaveLength(0);
   });
 
+  it("includes all dropdown options in create_form_fields payload", async () => {
+    useFormStore.getState().addNewField({
+      pageIndex: 0,
+      name: "Color",
+      kind: "dropdown",
+      x: 41,
+      y: 100,
+      width: 160,
+      height: 24,
+      defaultValue: "Red",
+      required: false,
+      readOnly: false,
+      options: ["Red", "Green", "Blue"],
+    });
+    useFormStore.getState().setFieldValue("Color", "Red", "dropdown");
+
+    const ok = await applyFormChanges();
+    expect(ok).toBe(true);
+    const call = mockInvokeLogged.mock.calls.find(([cmd]) => cmd === "create_form_fields");
+    expect(call).toBeDefined();
+    const payload = JSON.parse((call?.[1] as { fieldsJson: string }).fieldsJson) as Array<{
+      options?: string[];
+    }>;
+    expect(payload[0]?.options).toEqual(["Red", "Green", "Blue"]);
+  });
+
   it("invokes apply_form_values when values are present", async () => {
     useFormStore.getState().setFieldValue("existing", "hello", "text");
 

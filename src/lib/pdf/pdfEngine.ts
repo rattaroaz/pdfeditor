@@ -348,6 +348,22 @@ export interface FormWidgetRect {
   readOnly?: boolean;
 }
 
+/** pdf.js choice fields expose `items`; some producers use plain `options`. */
+export function choiceOptionsFromPdfField(field: {
+  options?: string[];
+  items?: Array<string | { exportValue?: string; displayValue?: string }>;
+}): string[] | undefined {
+  if (field.options?.length) return field.options;
+  if (!field.items?.length) return undefined;
+  const labels = field.items
+    .map((item) => {
+      if (typeof item === "string") return item;
+      return item.displayValue ?? item.exportValue ?? "";
+    })
+    .filter(Boolean);
+  return labels.length > 0 ? labels : undefined;
+}
+
 /** Viewport coords at scale 1 (top-left origin, same as annotation/content edit layers). */
 export function viewportRectToPdfRect(
   page: PdfPage,
@@ -390,8 +406,10 @@ export async function getFormWidgetsForPage(
         type?: string;
         value?: string;
         options?: string[];
+        items?: Array<string | { exportValue?: string; displayValue?: string }>;
         required?: boolean;
         readOnly?: boolean;
+        editable?: boolean;
       };
       if (field.page !== pageIndex || !field.rect || field.rect.length < 4) continue;
       const [x1, y1, x2, y2] = field.rect;
@@ -406,9 +424,9 @@ export async function getFormWidgetsForPage(
         width: Math.abs(vx2 - vx1),
         height: Math.abs(vy2 - vy1),
         value: field.value,
-        options: field.options,
+        options: choiceOptionsFromPdfField(field),
         required: field.required,
-        readOnly: field.readOnly,
+        readOnly: field.readOnly ?? field.editable === false,
       });
     }
   }

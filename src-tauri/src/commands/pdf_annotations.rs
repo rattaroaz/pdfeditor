@@ -725,6 +725,85 @@ mod tests {
   }
 
   #[test]
+  fn embeds_markup_annotation_types() {
+    let mut doc = Document::with_version("1.5");
+    let page_id = doc.new_object_id();
+    let pages_id = doc.new_object_id();
+    let catalog_id = doc.new_object_id();
+
+    let mut page_dict = Dictionary::new();
+    page_dict.set(b"Type", Object::Name(b"Page".to_vec()));
+    page_dict.set(
+      b"MediaBox",
+      Object::Array(vec![
+        Object::Integer(0),
+        Object::Integer(0),
+        Object::Integer(612),
+        Object::Integer(792),
+      ]),
+    );
+    page_dict.set(b"Parent", Object::Reference(pages_id));
+    doc.objects.insert(page_id, Object::Dictionary(page_dict));
+
+    let mut pages_dict = Dictionary::new();
+    pages_dict.set(b"Type", Object::Name(b"Pages".to_vec()));
+    pages_dict.set(b"Kids", Object::Array(vec![Object::Reference(page_id)]));
+    pages_dict.set(b"Count", Object::Integer(1));
+    doc.objects.insert(pages_id, Object::Dictionary(pages_dict));
+
+    let mut catalog_dict = Dictionary::new();
+    catalog_dict.set(b"Type", Object::Name(b"Catalog".to_vec()));
+    catalog_dict.set(b"Pages", Object::Reference(pages_id));
+    doc.objects.insert(catalog_id, Object::Dictionary(catalog_dict));
+    doc.trailer.set(b"Root", Object::Reference(catalog_id));
+
+    let mut buffer = Vec::new();
+    doc.save_to(&mut buffer).unwrap();
+
+    let json = r##"[
+      {"type":"highlight","pageIndex":0,"rects":[{"x":10,"y":10,"width":100,"height":20}],"color":"#FFEB3B","author":"User"},
+      {"type":"underline","pageIndex":0,"rects":[{"x":10,"y":40,"width":100,"height":20}],"color":"#2196F3","author":"User"},
+      {"type":"freehand","pageIndex":0,"points":[{"x":10,"y":60},{"x":50,"y":80}],"strokeWidth":2,"color":"#E91E63","author":"User"},
+      {"type":"stamp","pageIndex":0,"x":10,"y":100,"stamp":"approved","color":"#D32F2F","author":"User"},
+      {"type":"text","pageIndex":0,"x":10,"y":140,"width":120,"height":24,"content":"Hello","fontSize":12,"color":"#212121","author":"User"},
+      {"type":"shape","pageIndex":0,"shape":"arrow","x1":10,"y1":180,"x2":100,"y2":220,"strokeWidth":2,"color":"#2196F3","author":"User"}
+    ]"##;
+
+    let output = embed_annotations_in_pdf(&buffer, json).unwrap();
+    let saved = Document::load_mem(&output).unwrap();
+    let subtypes: Vec<Vec<u8>> = saved
+      .objects
+      .values()
+      .filter_map(|obj| {
+        if let Object::Dictionary(dict) = obj {
+          dict
+            .get(b"Subtype")
+            .ok()
+            .and_then(|s| s.as_name().ok())
+            .map(|n| n.to_vec())
+        } else {
+          None
+        }
+      })
+      .collect();
+
+    for expected in [
+      b"Highlight".as_slice(),
+      b"Underline".as_slice(),
+      b"Ink".as_slice(),
+      b"Stamp".as_slice(),
+      b"FreeText".as_slice(),
+      b"Line".as_slice(),
+    ] {
+      assert!(
+        subtypes.iter().any(|s| s.as_slice() == expected),
+        "missing annotation subtype {:?}",
+        String::from_utf8_lossy(expected)
+      );
+    }
+  }
+
+  #[test]
   fn pdf_rect_flips_y_axis() {
     let rect = pdf_rect(10.0, 20.0, 100.0, 30.0, 800.0);
     assert_eq!(rect[0], 10.0);

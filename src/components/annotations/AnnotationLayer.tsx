@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useAnnotationStore } from "@/stores/annotationStore";
 import { useUiStore } from "@/stores/uiStore";
+import { hitTestAnnotation, MARKUP_COLOR, lineMarkupBandY, MARKUP_LINE_THICKNESS, normalizeMarkupRect } from "@/lib/annotationHitTest";
 import { persistAnnotations } from "@/services/documentService";
 import type {
   FreehandAnnotation,
@@ -69,8 +70,13 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
       if (type === "highlight") {
         ctx.fillRect(r.x * scale, r.y * scale, r.width * scale, r.height * scale);
       } else {
-        const y = type === "underline" ? r.y + r.height - 2 : r.y + r.height / 2;
-        ctx.fillRect(r.x * scale, y * scale, r.width * scale, 2 * scale);
+        const bandY = lineMarkupBandY(r, type);
+        ctx.fillRect(
+          r.x * scale,
+          bandY * scale,
+          r.width * scale,
+          MARKUP_LINE_THICKNESS * scale,
+        );
       }
     };
 
@@ -126,7 +132,18 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
       }
       if (ann.type === "shape") {
         const shape = ann as ShapeAnnotation;
+        const selected = selectedId === ann.id;
         drawShape(ctx, shape, scale, shape.color);
+        if (selected) {
+          drawSelectionOutline(ctx, shape, scale);
+        }
+      }
+    }
+
+    if (selectedId) {
+      const selected = pageAnnotations.find((a) => a.id === selectedId);
+      if (selected && selected.type !== "stamp" && selected.type !== "shape") {
+        drawSelectionForAnnotation(ctx, selected, scale);
       }
     }
 
@@ -177,16 +194,100 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
     }
 
     if (drawing && start && current && ["highlight", "underline", "strikeout"].includes(activeTool)) {
-      const x = Math.min(start.x, current.x);
-      const y = Math.min(start.y, current.y);
-      const width = Math.abs(current.x - start.x);
-      const height = Math.abs(current.y - start.y);
-      drawRect(
-        { x, y, width, height },
-        activeTool as "highlight" | "underline" | "strikeout",
-      );
+      const kind = activeTool as "highlight" | "underline" | "strikeout";
+      const rect = normalizeMarkupRect(start, current, kind);
+      if (rect) {
+        drawRect(rect, kind);
+      }
     }
   };
+
+  function drawSelectionOutline(
+    ctx: CanvasRenderingContext2D,
+    shape: Pick<ShapeAnnotation, "shape" | "x1" | "y1" | "x2" | "y2">,
+    scale: number,
+  ) {
+    ctx.save();
+    ctx.strokeStyle = "#2196F3";
+    ctx.lineWidth = 2;
+    const x1 = shape.x1 * scale;
+    const y1 = shape.y1 * scale;
+    const x2 = shape.x2 * scale;
+    const y2 = shape.y2 * scale;
+    if (shape.shape === "rectangle") {
+      ctx.strokeRect(
+        Math.min(x1, x2) - 2,
+        Math.min(y1, y2) - 2,
+        Math.abs(x2 - x1) + 4,
+        Math.abs(y2 - y1) + 4,
+      );
+    } else if (shape.shape === "ellipse") {
+      const cx = (x1 + x2) / 2;
+      const cy = (y1 + y2) / 2;
+      ctx.beginPath();
+      ctx.ellipse(
+        cx,
+        cy,
+        Math.abs(x2 - x1) / 2 + 2,
+        Math.abs(y2 - y1) / 2 + 2,
+        0,
+        0,
+        Math.PI * 2,
+      );
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawSelectionForAnnotation(
+    ctx: CanvasRenderingContext2D,
+    ann: Annotation,
+    scale: number,
+  ) {
+    ctx.save();
+    ctx.strokeStyle = "#2196F3";
+    ctx.lineWidth = 2;
+    if (ann.type === "highlight" || ann.type === "underline" || ann.type === "strikeout") {
+      for (const r of (ann as RectAnnotation).rects) {
+        ctx.strokeRect(
+          r.x * scale - 2,
+          r.y * scale - 2,
+          r.width * scale + 4,
+          r.height * scale + 4,
+        );
+      }
+    } else if (ann.type === "freehand") {
+      const fh = ann as FreehandAnnotation;
+      if (fh.points.length < 2) return;
+      let minX = fh.points[0].x;
+      let minY = fh.points[0].y;
+      let maxX = fh.points[0].x;
+      let maxY = fh.points[0].y;
+      for (const p of fh.points) {
+        minX = Math.min(minX, p.x);
+        minY = Math.min(minY, p.y);
+        maxX = Math.max(maxX, p.x);
+        maxY = Math.max(maxY, p.y);
+      }
+      ctx.strokeRect(
+        minX * scale - 4,
+        minY * scale - 4,
+        (maxX - minX) * scale + 8,
+        (maxY - minY) * scale + 8,
+      );
+    } else if (ann.type === "note") {
+      const note = ann as NoteAnnotation;
+      ctx.beginPath();
+      ctx.arc(note.x * scale, note.y * scale, 12, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
 
   function drawShape(
     ctx: CanvasRenderingContext2D,
@@ -243,35 +344,8 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
     paint();
   }, [pageAnnotations, scale, drawing, start, current, points, activeTool, selectedId]);
 
-  const hitTest = (x: number, y: number): Annotation | null => {
-    for (let i = pageAnnotations.length - 1; i >= 0; i--) {
-      const ann = pageAnnotations[i];
-      if (ann.type === "note") {
-        const note = ann as NoteAnnotation;
-        const dx = x - note.x;
-        const dy = y - note.y;
-        if (dx * dx + dy * dy < 100) return ann;
-      }
-      if (ann.type === "stamp") {
-        const stamp = ann as StampAnnotation;
-        if (x >= stamp.x && x <= stamp.x + 120 && y >= stamp.y && y <= stamp.y + 30) {
-          return ann;
-        }
-      }
-      if (
-        ann.type === "highlight" ||
-        ann.type === "underline" ||
-        ann.type === "strikeout"
-      ) {
-        for (const r of (ann as RectAnnotation).rects) {
-          if (x >= r.x && x <= r.x + r.width && y >= r.y && y <= r.y + r.height) {
-            return ann;
-          }
-        }
-      }
-    }
-    return null;
-  };
+  const hitTest = (x: number, y: number): Annotation | null =>
+    hitTestAnnotation(annotations, pageIndex, x, y);
 
   const localCoords = (e: React.MouseEvent) => {
     const rect = containerRef.current!.getBoundingClientRect();
@@ -283,6 +357,8 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (activeTool === "select") {
+      e.preventDefault();
+      e.stopPropagation();
       const pt = localCoords(e);
       const hit = hitTest(pt.x, pt.y);
       selectAnnotation(hit?.id ?? null);
@@ -346,12 +422,6 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
 
   const finishRect = async (end: { x: number; y: number }) => {
     if (!start) return;
-    const x = Math.min(start.x, end.x);
-    const y = Math.min(start.y, end.y);
-    const width = Math.abs(end.x - start.x);
-    const height = Math.abs(end.y - start.y);
-    if (width < 4 || height < 4) return;
-
     const type =
       activeTool === "highlight"
         ? "highlight"
@@ -359,12 +429,15 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
           ? "underline"
           : "strikeout";
 
+    const rect = normalizeMarkupRect(start, end, type);
+    if (!rect) return;
+
     addAnnotation({
       type,
       pageIndex,
       author: "User",
-      color: "#FFEB3B",
-      rects: [{ x, y, width, height }],
+      color: MARKUP_COLOR[type],
+      rects: [rect],
     });
     await persistAnnotations();
   };
@@ -421,9 +494,8 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
     await persistAnnotations();
   };
 
-  const handleMouseUp = async (e: React.MouseEvent) => {
+  const finishDrawingAt = async (end: { x: number; y: number }) => {
     if (!drawing || activeTool === "note") return;
-    const end = localCoords(e);
     if (activeTool === "freehand" && points.length > 1) {
       addAnnotation({
         type: "freehand",
@@ -447,32 +519,43 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
     setPoints([]);
   };
 
-  const interactive =
+  const handleMouseUp = async (e: React.MouseEvent) => {
+    await finishDrawingAt(localCoords(e));
+  };
+
+  const drawingMode =
     appMode === "markup" && activeTool !== "hand" && activeTool !== "select";
   const selectMode = appMode === "markup" && activeTool === "select";
+  const layerInteractive = appMode === "markup" && activeTool !== "hand";
+
+  if (appMode !== "markup") {
+    return (
+      <div ref={containerRef} className="pointer-events-none absolute inset-0">
+        <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
+      </div>
+    );
+  }
 
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0"
-      style={{ pointerEvents: interactive ? "auto" : "none" }}
+      className="absolute inset-0 z-[40]"
+      style={{ pointerEvents: layerInteractive ? "auto" : "none" }}
     >
       <canvas
         ref={canvasRef}
         className="absolute inset-0 h-full w-full touch-none"
-        style={{ pointerEvents: interactive ? "auto" : "none" }}
+        style={{
+          pointerEvents: layerInteractive ? "auto" : "none",
+          cursor: selectMode ? "default" : drawingMode ? "crosshair" : undefined,
+        }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={() => {
           if (drawing && start && current) {
-            if (["highlight", "underline", "strikeout"].includes(activeTool)) {
-              void finishRect(current);
-            } else if (activeTool === "text") {
-              void finishTextBox(current);
-            } else if (SHAPE_TOOLS.includes(activeTool)) {
-              void finishShape(current);
-            }
+            void finishDrawingAt(current);
+            return;
           }
           setDrawing(false);
           setStart(null);

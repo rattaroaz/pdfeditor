@@ -7,6 +7,7 @@ import { recordHistory } from "@/stores/historyStore";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useUiStore } from "@/stores/uiStore";
 import { findTextAtPoint } from "@/lib/pdf/pdfEngine";
+import { encodeBase64Pdf } from "@/lib/pdf/pdfBinary";
 import {
   alignBoxToHit,
   computeTextEditBox,
@@ -23,6 +24,12 @@ type MovingEdit = {
   kind: "text" | "image";
   offsetX: number;
   offsetY: number;
+};
+
+type ResizingImage = {
+  id: string;
+  originX: number;
+  originY: number;
 };
 
 const MIN_DRAG_SIZE = 4;
@@ -57,6 +64,7 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
   const removeTextEdit = useContentEditStore((s) => s.removeTextEdit);
   const updateTextEditPosition = useContentEditStore((s) => s.updateTextEditPosition);
   const updateImageEditPosition = useContentEditStore((s) => s.updateImageEditPosition);
+  const updateImageEditSize = useContentEditStore((s) => s.updateImageEditSize);
   const textEdits = useContentEditStore((s) => s.textEdits);
   const imageEdits = useContentEditStore((s) => s.imageEdits);
   const pdfDoc = useDocumentStore((s) => s.pdfDoc);
@@ -65,6 +73,7 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
   const [start, setStart] = useState<{ x: number; y: number } | null>(null);
   const [current, setCurrent] = useState<{ x: number; y: number } | null>(null);
   const [moving, setMoving] = useState<MovingEdit | null>(null);
+  const [resizing, setResizing] = useState<ResizingImage | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const layerRef = useRef<HTMLDivElement>(null);
@@ -104,6 +113,19 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
     setSelectedId(id);
   };
 
+  const beginResize = (
+    e: React.MouseEvent,
+    id: string,
+    originX: number,
+    originY: number,
+  ) => {
+    e.stopPropagation();
+    e.preventDefault();
+    recordHistory();
+    setSelectedId(id);
+    setResizing({ id, originX, originY });
+  };
+
   const finishEditing = (id: string, text: string, opts?: { cancel?: boolean }) => {
     if (opts?.cancel) {
       const existing = textEdits.find((e) => e.id === id);
@@ -139,6 +161,14 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
+      if (resizing) {
+        const coords = localCoords(e);
+        const width = Math.max(MIN_DRAG_SIZE, coords.x - resizing.originX);
+        const height = Math.max(MIN_DRAG_SIZE, coords.y - resizing.originY);
+        updateImageEditSize(resizing.id, width, height);
+        return;
+      }
+
       const pending = pendingDragRef.current;
       if (pending && !moving) {
         const dx = e.clientX - pending.startClientX;
@@ -168,6 +198,11 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
 
     const onUp = () => {
       pendingDragRef.current = null;
+      if (resizing) {
+        setResizing(null);
+        useDocumentStore.getState().setDirty(true);
+        return;
+      }
       if (moving) {
         setMoving(null);
         useDocumentStore.getState().setDirty(true);
@@ -180,7 +215,7 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
-  }, [moving, scale, updateTextEditPosition, updateImageEditPosition]);
+  }, [moving, resizing, scale, updateTextEditPosition, updateImageEditPosition, updateImageEditSize]);
 
   if (appMode !== "edit") return null;
 
@@ -230,16 +265,16 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
       const bytes = await readFile(selected);
       const ext = selected.split(".").pop()?.toLowerCase() ?? "png";
       const mimeType = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : `image/${ext}`;
-      const binary = bytes.reduce((acc, b) => acc + String.fromCharCode(b), "");
-      addImageEdit({
+      const id = addImageEdit({
         pageIndex,
         x,
         y,
         width,
         height,
-        imageBase64: btoa(binary),
+        imageBase64: encodeBase64Pdf(bytes),
         mimeType,
       });
+      setSelectedId(id);
       useDocumentStore.getState().setDirty(true);
     }
   };
@@ -283,9 +318,9 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
     <div
       ref={layerRef}
       className="absolute inset-0 z-[25]"
-      style={{ pointerEvents: "auto", cursor: moving ? "grabbing" : undefined }}
+      style={{ pointerEvents: "auto", cursor: resizing ? "se-resize" : moving ? "grabbing" : undefined }}
       onMouseDown={(e) => {
-        if (moving || editingId || activeTool === "edit-text") return;
+        if (moving || resizing || editingId || activeTool === "edit-text") return;
         if (canPlaceNew) {
           setSelectedId(null);
           setStart(localCoords(e));
@@ -296,7 +331,7 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
         if (start && !moving) setCurrent(localCoords(e));
       }}
       onMouseUp={(e) => {
-        if (moving || !start) return;
+        if (moving || resizing || !start) return;
         const end = localCoords(e);
         void finishRect(start.x, start.y, end.x, end.y);
         setStart(null);
@@ -398,13 +433,14 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
       {pageImageEdits.map((edit) => {
         const isSelected = selectedId === edit.id;
         const isDragging = moving?.id === edit.id;
+        const isResizing = resizing?.id === edit.id;
         return (
           <div
             key={edit.id}
-            title="Drag to move"
-            className={`absolute border border-dashed border-purple-500 bg-purple-500/15 ${
-              isDragging ? "cursor-grabbing ring-2 ring-purple-400" : "cursor-grab hover:bg-purple-500/25"
-            } ${isSelected && !isDragging ? "ring-2 ring-purple-300" : ""}`}
+            title="Drag to move · grab corner to resize"
+            className={`absolute overflow-visible border border-dashed border-purple-500 ${
+              isDragging ? "cursor-grabbing ring-2 ring-purple-400" : "cursor-grab hover:ring-2 hover:ring-purple-300/60"
+            } ${isSelected && !isDragging ? "ring-2 ring-purple-300" : ""} ${isResizing ? "ring-2 ring-purple-400" : ""}`}
             style={{
               left: edit.x * scale,
               top: edit.y * scale,
@@ -413,7 +449,22 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
               pointerEvents: "auto",
             }}
             onMouseDown={(e) => beginMove(e, edit.id, "image", edit.x, edit.y)}
-          />
+          >
+            <img
+              src={`data:${edit.mimeType};base64,${edit.imageBase64}`}
+              alt=""
+              draggable={false}
+              className="pointer-events-none block h-full w-full object-fill select-none"
+            />
+            {(isSelected || isResizing) && (
+              <div
+                role="presentation"
+                title="Resize"
+                className="absolute -bottom-1 -right-1 z-10 h-3 w-3 cursor-se-resize border border-purple-700 bg-white shadow-sm"
+                onMouseDown={(e) => beginResize(e, edit.id, edit.x, edit.y)}
+              />
+            )}
+          </div>
         );
       })}
       {start && current && canPlaceNew && !moving && (

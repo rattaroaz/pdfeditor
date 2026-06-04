@@ -7,6 +7,7 @@ import { recordHistory } from "@/stores/historyStore";
 import { useUiStore } from "@/stores/uiStore";
 import { useAnnotationStore } from "@/stores/annotationStore";
 import type { FormFieldDefinition, FormFieldKind, Tool } from "@shared/types";
+import { DropdownOptionsDialog } from "./DropdownOptionsDialog";
 
 interface PdfFormLayerProps {
   pageNumber: number;
@@ -53,6 +54,24 @@ function toolToKind(tool: Tool): FormFieldKind {
   return "text";
 }
 
+function isChoiceWidget(type: string): boolean {
+  return type === "combobox" || type === "dropdown" || type === "listbox";
+}
+
+function resolveFieldOptions(
+  name: string,
+  options: string[] | undefined,
+  newFields: FormFieldDefinition[],
+): string[] {
+  if (options?.length) return options;
+  return newFields.find((f) => f.name === name)?.options ?? [];
+}
+
+function optionsForSelect(value: string, options: string[]): string[] {
+  if (!value || options.includes(value)) return options;
+  return [value, ...options];
+}
+
 export function PdfFormLayer({ pageNumber, scale, canvasRef }: PdfFormLayerProps) {
   const appMode = useUiStore((s) => s.appMode);
   const pdfDoc = useDocumentStore((s) => s.pdfDoc);
@@ -71,6 +90,13 @@ export function PdfFormLayer({ pageNumber, scale, canvasRef }: PdfFormLayerProps
   const [current, setCurrent] = useState<{ x: number; y: number } | null>(null);
   const [moving, setMoving] = useState<MovingField | null>(null);
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
+  const [pendingDropdown, setPendingDropdown] = useState<{
+    name: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const layerRef = useRef<HTMLDivElement>(null);
   const inputRefs = useRef<Map<string, HTMLInputElement | HTMLSelectElement>>(new Map());
   const pendingDragRef = useRef<
@@ -201,6 +227,11 @@ export function PdfFormLayer({ pageNumber, scale, canvasRef }: PdfFormLayerProps
       name = `Field${n}`;
     }
 
+    if (kind === "dropdown") {
+      setPendingDropdown({ name, x, y, width, height });
+      return;
+    }
+
     addNewField({
       pageIndex,
       name,
@@ -212,13 +243,38 @@ export function PdfFormLayer({ pageNumber, scale, canvasRef }: PdfFormLayerProps
       defaultValue: kind === "checkbox" ? "Off" : "",
       required: false,
       readOnly: false,
-      options: kind === "dropdown" ? ["Option 1", "Option 2"] : undefined,
     });
     setFieldValue(name, kind === "checkbox" ? "Off" : "", kind);
     useDocumentStore.getState().setDirty(true);
     log.form.info("Placed form field", {
       userAction: "place_form_field",
       metadata: { name, kind, pageIndex, x, y, width, height },
+    });
+  };
+
+  const confirmPendingDropdown = (options: string[]) => {
+    if (!pendingDropdown) return;
+    const { name, x, y, width, height } = pendingDropdown;
+    const id = addNewField({
+      pageIndex,
+      name,
+      kind: "dropdown",
+      x,
+      y,
+      width,
+      height,
+      defaultValue: options[0] ?? "",
+      required: false,
+      readOnly: false,
+      options,
+    });
+    setFieldValue(name, options[0] ?? "", "dropdown");
+    setSelectedFieldId(id);
+    setPendingDropdown(null);
+    useDocumentStore.getState().setDirty(true);
+    log.form.info("Placed form field", {
+      userAction: "place_form_field",
+      metadata: { name, kind: "dropdown", pageIndex, x, y, width, height, optionCount: options.length },
     });
   };
 
@@ -258,15 +314,38 @@ export function PdfFormLayer({ pageNumber, scale, canvasRef }: PdfFormLayerProps
     }
 
     if (field.kind === "dropdown") {
+      const options = field.options ?? ["Option 1", "Option 2"];
+      const selected = values[field.name]?.value ?? field.defaultValue ?? options[0] ?? "";
       return (
         <div
           key={field.id}
-          {...commonProps}
-          className={`absolute border-2 border-dashed border-violet-400 bg-violet-400/20 px-1 text-xs text-violet-100 ${dragClass} ${
+          title="Drag from the edge to move"
+          style={style}
+          className={`absolute overflow-hidden border-2 border-dashed border-violet-400 ${dragClass} ${
             isSelected && !isDragging ? "ring-2 ring-violet-200" : ""
           }`}
+          onMouseDown={(e) => {
+            if ((e.target as HTMLElement).tagName === "SELECT") return;
+            beginMoveField(e, field);
+          }}
         >
-          {field.options?.[0] ?? "Dropdown"}
+          <select
+            value={selected}
+            className={`${FORM_FIELD_CLASS} ${widgetBorderClass({ type: "combobox", required: field.required })} h-full w-full`}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => {
+              recordHistory();
+              setFieldValue(field.name, e.target.value, "dropdown");
+              useDocumentStore.getState().setDirty(true);
+            }}
+          >
+            {optionsForSelect(selected, options).map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
         </div>
       );
     }
@@ -345,24 +424,34 @@ export function PdfFormLayer({ pageNumber, scale, canvasRef }: PdfFormLayerProps
           );
         }
 
-        if (widget.type === "combobox" || widget.type === "dropdown") {
+        if (isChoiceWidget(widget.type)) {
+          const options = optionsForSelect(
+            val,
+            resolveFieldOptions(widget.name, widget.options, newFields),
+          );
+          if (options.length === 0) {
+            options.push(val || "—");
+          }
+          const displayValue = val || options[0] || "";
           return (
             <select
               key={widget.name}
               ref={(el) => {
                 if (el) inputRefs.current.set(widget.name, el);
               }}
-              value={val}
+              value={displayValue}
               disabled={widget.readOnly}
               className={`${FORM_FIELD_CLASS} ${borderClass}`}
               style={commonStyle}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
               onChange={(e) => {
                 recordHistory();
                 setFieldValue(widget.name, e.target.value, "dropdown");
                 useDocumentStore.getState().setDirty(true);
               }}
             >
-              {(widget.options ?? []).map((opt) => (
+              {options.map((opt) => (
                 <option key={opt} value={opt}>
                   {opt}
                 </option>
@@ -411,6 +500,14 @@ export function PdfFormLayer({ pageNumber, scale, canvasRef }: PdfFormLayerProps
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4 text-center text-xs text-violet-200/80">
           Click or drag to add a field. Drag placed fields to reposition. Save to embed in the PDF.
         </div>
+      )}
+
+      {pendingDropdown && (
+        <DropdownOptionsDialog
+          fieldName={pendingDropdown.name}
+          onConfirm={confirmPendingDropdown}
+          onCancel={() => setPendingDropdown(null)}
+        />
       )}
     </div>
   );

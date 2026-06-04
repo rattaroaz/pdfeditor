@@ -11,6 +11,7 @@ import { useFormStore } from "@/stores/formStore";
 import { useUiStore } from "@/stores/uiStore";
 import { errorMessage } from "@/lib/parseInvokeError";
 import { log } from "@/lib/logging";
+import { defaultDropdownOptions, normalizeDropdownOptions } from "@/lib/dropdownOptions";
 import type { FormFieldDefinition, FormFieldValue, FormInfo } from "@shared/types";
 import type { PdfDocument } from "@/lib/pdf/pdfEngine";
 
@@ -125,6 +126,10 @@ export async function applyFormChanges(): Promise<boolean> {
             defaultValue: f.defaultValue ?? "",
             required: f.required ?? false,
             readOnly: f.readOnly ?? false,
+            options:
+              f.kind === "dropdown"
+                ? normalizeDropdownOptions(f.options ?? defaultDropdownOptions(2))
+                : undefined,
           };
         }),
       );
