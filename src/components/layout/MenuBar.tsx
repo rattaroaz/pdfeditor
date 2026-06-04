@@ -25,6 +25,7 @@ import {
   protectDocumentOnNextSave,
   removeDocumentPasswordProtection,
 } from "@/services/securityService";
+import { isLogViewerEnabled } from "@/lib/logging";
 import { openLogDirectory } from "@/services/loggingService";
 
 
@@ -87,15 +88,17 @@ export function MenuBar() {
 
         label="File"
 
+        menuTestId="menu-file"
+
         open={openMenu === "file"}
 
         onToggle={() => setOpenMenu((m) => (m === "file" ? null : "file"))}
 
       >
 
-        <MenuItem onClick={() => run(() => void openPdfFromDialog())}>Open…</MenuItem>
+        <MenuItem testId="menu-open" onClick={() => run(() => void openPdfFromDialog())}>Open…</MenuItem>
 
-        <MenuItem disabled={!hasDocument} onClick={() => run(() => void savePdf(false))}>
+        <MenuItem testId="menu-save" disabled={!hasDocument} onClick={() => run(() => void savePdf(false))}>
 
           Save
 
@@ -232,6 +235,8 @@ export function MenuBar() {
 
         label="View"
 
+        menuTestId="menu-view"
+
         open={openMenu === "view"}
 
         onToggle={() => setOpenMenu((m) => (m === "view" ? null : "view"))}
@@ -320,7 +325,9 @@ export function MenuBar() {
 
         <div className="my-1 border-t border-zinc-700" />
 
-        <MenuItem onClick={() => run(toggleLogViewer)}>View log panel</MenuItem>
+        {isLogViewerEnabled() && (
+          <MenuItem testId="menu-log-panel" onClick={() => run(toggleLogViewer)}>View log panel</MenuItem>
+        )}
 
         <MenuItem onClick={() => run(() => void openLogDirectory())}>Open log folder…</MenuItem>
 
@@ -338,6 +345,8 @@ function MenuDropdown({
 
   label,
 
+  menuTestId,
+
   open,
 
   onToggle,
@@ -347,6 +356,8 @@ function MenuDropdown({
 }: {
 
   label: string;
+
+  menuTestId?: string;
 
   open: boolean;
 
@@ -363,6 +374,8 @@ function MenuDropdown({
       <button
 
         type="button"
+
+        data-testid={menuTestId}
 
         onClick={onToggle}
 
@@ -396,6 +409,8 @@ function MenuItem({
 
   children,
 
+  testId,
+
   onClick,
 
   disabled,
@@ -403,6 +418,8 @@ function MenuItem({
 }: {
 
   children: React.ReactNode;
+
+  testId?: string;
 
   onClick?: () => void;
 
@@ -415,6 +432,8 @@ function MenuItem({
     <button
 
       type="button"
+
+      data-testid={testId}
 
       disabled={disabled}
 

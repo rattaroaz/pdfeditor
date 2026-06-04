@@ -10,7 +10,10 @@ export function ErrorDialog() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    <div
+      data-testid="error-dialog"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+    >
       <div
         role="alertdialog"
         aria-labelledby="error-title"
@@ -20,7 +23,7 @@ export function ErrorDialog() {
           Error
         </h2>
         <p className="mt-2 text-sm text-zinc-300">{lastError.message}</p>
-        <p className="mt-3 font-mono text-xs text-zinc-500">
+        <p data-testid="error-id" className="mt-3 font-mono text-xs text-zinc-500">
           ID: {lastError.errorId}
           {lastError.code ? ` · ${lastError.code}` : ""}
         </p>
@@ -34,6 +37,7 @@ export function ErrorDialog() {
           </button>
           <button
             type="button"
+            data-testid="error-dismiss"
             onClick={dismissError}
             className="rounded-md bg-blue-600 px-3 py-1.5 text-sm hover:bg-blue-500"
           >

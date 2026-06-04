@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { logUserAction } from "@/lib/logging";
-import { errorMessage } from "@/lib/parseInvokeError";
+import { logUserAction, reportError } from "@/lib/logging";
 import {
   buildSplitRanges,
   describeSplitParts,
@@ -8,7 +7,6 @@ import {
   type SplitMode,
 } from "@/services/assemblyService";
 import { useDocumentStore } from "@/stores/documentStore";
-import { useUiStore } from "@/stores/uiStore";
 
 export const SPLIT_MODES: { id: SplitMode; label: string; hint: string }[] = [
   {
@@ -98,10 +96,7 @@ export function SplitPdfControls({
     void splitPdfWithOptions(splitMode, options)
       .then(() => onComplete?.())
       .catch((err) => {
-        useUiStore.getState().showError({
-          errorId: crypto.randomUUID(),
-          message: errorMessage(err),
-        });
+        reportError(err, { category: "assembly", userAction: "split_pdf" });
       });
   };
 

@@ -46,7 +46,7 @@ export function PdfViewer() {
 
   if (viewMode === "single") {
     return (
-      <div ref={scrollRef} className="flex-1 overflow-auto bg-zinc-800 p-6">
+      <div ref={scrollRef} data-testid="pdf-viewer" className="flex-1 overflow-auto bg-zinc-800 p-6">
         <PdfPage pageNumber={currentPage} scale={zoom} />
       </div>
     );
@@ -54,7 +54,7 @@ export function PdfViewer() {
 
   if (viewMode === "spread") {
     return (
-      <div ref={scrollRef} className="flex-1 overflow-auto bg-zinc-800 p-6">
+      <div ref={scrollRef} data-testid="pdf-viewer" className="flex-1 overflow-auto bg-zinc-800 p-6">
       {Array.from({ length: Math.ceil(pages.length / 2) }, (_, pairIndex) => {
         const left = pairIndex * 2 + 1;
         const right = left + 1;
@@ -74,7 +74,7 @@ export function PdfViewer() {
   }
 
   return (
-    <div ref={scrollRef} className="flex-1 overflow-auto bg-zinc-800 p-6">
+    <div ref={scrollRef} data-testid="pdf-viewer" className="flex-1 overflow-auto bg-zinc-800 p-6">
       {pages.map((num) => (
         <PdfPage key={num} pageNumber={num} scale={zoom} onVisible={onVisible} />
       ))}

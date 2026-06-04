@@ -10,3 +10,11 @@ export {
   subscribeLogBuffer,
 } from "./buffer";
 export { enrichLogContext } from "./context";
+export { createCorrelationId } from "../correlation";
+
+/** Log panel and verbose session tools — on in dev or when explicitly enabled. */
+export function isLogViewerEnabled(): boolean {
+  return import.meta.env.DEV || import.meta.env.VITE_ENABLE_LOG_VIEWER === "true";
+}
+export { reportError, toAppErrorPayload } from "../reportError";
+export type { ReportErrorOptions } from "../reportError";

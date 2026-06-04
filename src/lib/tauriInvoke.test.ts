@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
-import { clearLogBuffer, logger } from "@/lib/logging";
+import { clearLogBuffer, getLogEntries, logger } from "@/lib/logging";
 import { AppInvokeError, invokeLogged } from "./tauriInvoke";
 
 describe("invokeLogged", () => {
@@ -16,6 +16,13 @@ describe("invokeLogged", () => {
     const result = await invokeLogged<{ ok: boolean }>("read_pdf_file", { path: "/x.pdf" });
     expect(result.ok).toBe(true);
     expect(invoke).toHaveBeenCalledWith("read_pdf_file", { path: "/x.pdf" });
+  });
+
+  it("threads correlationId through invoke logs", async () => {
+    vi.mocked(invoke).mockResolvedValue({});
+    await invokeLogged("get_pdf_info", { path: "/a.pdf" }, { correlationId: "trace-42" });
+    const start = getLogEntries().find((e) => e.message.includes("invoke start"));
+    expect(start?.context?.correlationId).toBe("trace-42");
   });
 
   it("throws AppInvokeError for structured failures", async () => {

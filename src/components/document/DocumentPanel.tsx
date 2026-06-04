@@ -1,8 +1,6 @@
-import { logUserAction } from "@/lib/logging";
+import { logUserAction, reportError } from "@/lib/logging";
 import { mergeIntoCurrentDocument, mergePdfFromDialog } from "@/services/assemblyService";
-import { errorMessage } from "@/lib/parseInvokeError";
 import { useDocumentStore } from "@/stores/documentStore";
-import { useUiStore } from "@/stores/uiStore";
 import { SplitPdfControls } from "./SplitPdfControls";
 
 export function DocumentPanel() {
@@ -15,10 +13,7 @@ export function DocumentPanel() {
   const run = (action: string, fn: () => Promise<void>) => {
     logUserAction(action, action, "info", { metadata: { panel: "document" } });
     void fn().catch((err) => {
-      useUiStore.getState().showError({
-        errorId: crypto.randomUUID(),
-        message: errorMessage(err),
-      });
+      reportError(err, { category: "assembly", userAction: action });
     });
   };
 

@@ -8,20 +8,15 @@ import { ensurePdfExtension } from "@/lib/pdf/pdfBinary";
 import { requireTauriDesktop } from "@/lib/tauriRuntime";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useAnnotationStore } from "@/stores/annotationStore";
-import { useUiStore } from "@/stores/uiStore";
-import { errorMessage } from "@/lib/parseInvokeError";
-import { log } from "@/lib/logging";
+import { log, reportError } from "@/lib/logging";
 import type { ReadFileResult } from "@shared/types";
 
 interface PdfBytesResult {
   dataBase64: string;
 }
 
-function showError(err: unknown): void {
-  useUiStore.getState().showError({
-    errorId: crypto.randomUUID(),
-    message: errorMessage(err),
-  });
+function showError(err: unknown, userAction = "assembly"): void {
+  reportError(err, { category: "assembly", userAction });
 }
 
 function getOpenDocumentBytes(): Uint8Array | null {

@@ -45,7 +45,10 @@ export function LogViewerPanel({ onClose }: LogViewerPanelProps) {
   const filtered = entries.filter((e) => filter === "all" || e.level === filter);
 
   return (
-    <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col border-l border-zinc-700 bg-zinc-950 shadow-2xl">
+    <div
+      data-testid="log-viewer"
+      className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col border-l border-zinc-700 bg-zinc-950 shadow-2xl"
+    >
       <header className="flex items-center justify-between border-b border-zinc-800 px-3 py-2">
         <h2 className="text-sm font-semibold text-zinc-100">Logs</h2>
         <div className="flex gap-1">
@@ -125,7 +128,7 @@ export function LogViewerPanel({ onClose }: LogViewerPanelProps) {
       <div className="flex-1 overflow-y-auto p-2 font-mono text-[11px] leading-relaxed">
         {tab === "session" &&
           filtered.map((e) => (
-            <div key={e.id} className="mb-1 border-b border-zinc-900/80 pb-1">
+            <div key={e.id} data-testid="log-entry" className="mb-1 border-b border-zinc-900/80 pb-1">
               <span className="text-zinc-600">{e.timestamp.slice(11, 23)}</span>{" "}
               <span className={LEVEL_CLASS[e.level]}>[{e.level}]</span>
               {e.context?.category && (
@@ -137,6 +140,14 @@ export function LogViewerPanel({ onClose }: LogViewerPanelProps) {
               )}
               {e.context?.durationMs != null && (
                 <span className="text-zinc-600"> · {e.context.durationMs}ms</span>
+              )}
+              {e.context?.correlationId && (
+                <div className="text-[10px] text-zinc-600">
+                  corr {e.context.correlationId.slice(0, 8)}…
+                </div>
+              )}
+              {e.context?.errorId && (
+                <div className="text-[10px] text-red-300/80">err {e.context.errorId}</div>
               )}
             </div>
           ))}

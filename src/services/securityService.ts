@@ -2,8 +2,7 @@ import { log } from "@/lib/logging";
 import { invokeLogged } from "@/lib/tauriInvoke";
 import { decodeBase64Pdf, encodeBase64Pdf } from "@/lib/pdf/pdfEngine";
 import { useDocumentStore } from "@/stores/documentStore";
-import { useUiStore } from "@/stores/uiStore";
-import { errorMessage } from "@/lib/parseInvokeError";
+import { reportError } from "@/lib/logging";
 
 export interface PdfSecurityInfo {
   isEncrypted: boolean;
@@ -14,17 +13,8 @@ interface PdfBytesResult {
   dataBase64: string;
 }
 
-function showError(err: unknown): void {
-  const errorId = crypto.randomUUID();
-  log.security.error("Security operation failed", {
-    userAction: "security",
-    errorId,
-    metadata: { message: errorMessage(err) },
-  });
-  useUiStore.getState().showError({
-    errorId,
-    message: errorMessage(err),
-  });
+function showError(err: unknown, userAction = "security"): void {
+  reportError(err, { category: "security", userAction });
 }
 
 export async function inspectPdfSecurity(pdfBytes: Uint8Array): Promise<PdfSecurityInfo> {

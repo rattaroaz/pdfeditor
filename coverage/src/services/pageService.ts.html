@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">77.14% </span>
+                <span class="strong">75.67% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>27/35</span>
+                <span class='fraction'>28/37</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">54.54% </span>
+                <span class="strong">50% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>6/11</span>
+                <span class='fraction'>6/12</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">80.64% </span>
+                <span class="strong">78.78% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>25/31</span>
+                <span class='fraction'>26/33</span>
             </div>
         
             
@@ -180,9 +180,10 @@
 <a name='L115'></a><a href='#L115'>115</a>
 <a name='L116'></a><a href='#L116'>116</a>
 <a name='L117'></a><a href='#L117'>117</a>
-<a name='L118'></a><a href='#L118'>118</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -199,9 +200,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -249,6 +247,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -265,6 +267,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -306,19 +312,14 @@ import {
 } from "@/lib/pageAnnotationRemap";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useAnnotationStore } from "@/stores/annotationStore";
-import { useUiStore } from "@/stores/uiStore";
-import { errorMessage } from "@/lib/parseInvokeError";
-import { log } from "@/lib/logging";
+import { log, reportError } from "@/lib/logging";
 &nbsp;
 interface PdfBytesResult {
   dataBase64: string;
 }
 &nbsp;
-function <span class="fstat-no" title="function not covered" >showError(e</span>rr: unknown): void {
-<span class="cstat-no" title="statement not covered" >  useUiStore.getState().showError({</span>
-    errorId: crypto.randomUUID(),
-    message: errorMessage(err),
-  });
+function <span class="fstat-no" title="function not covered" >showError(e</span>rr: unknown, userAction = <span class="branch-0 cbranch-no" title="branch not covered" >"page"): void {</span>
+<span class="cstat-no" title="statement not covered" >  reportError(err, { category: "document", userAction });</span>
 }
 &nbsp;
 async function applyPdfMutation(
@@ -366,6 +367,10 @@ async function applyPdfMutation(
 export async function deletePages(pageNumbers: number[]): Promise&lt;void&gt; {
   if (pageNumbers.length === 0) return;
   const sorted = [...pageNumbers].sort((a, b) =&gt; a - b);
+  log.document.info("Deleting pages", {
+    userAction: "delete_pages",
+    metadata: { pageNumbers: sorted },
+  });
 &nbsp;
   await applyPdfMutation(
     (pdfBase64) =&gt;
@@ -382,6 +387,10 @@ export async function <span class="fstat-no" title="function not covered" >rotat
   degrees: 90 | 180 | 270 | -90,
 ): Promise&lt;void&gt; {
 <span class="cstat-no" title="statement not covered" >  if (pageNumbers.length === 0) <span class="cstat-no" title="statement not covered" >return;</span></span>
+<span class="cstat-no" title="statement not covered" >  log.document.info("Rotating pages", {</span>
+    userAction: "rotate_pages",
+    metadata: { pageNumbers, degrees },
+  });
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  await applyPdfMutation(<span class="fstat-no" title="function not covered" >(<span class="cstat-no" title="statement not covered" >p</span>dfBase64) =&gt;</span></span>
     invokeLogged&lt;PdfBytesResult&gt;("rotate_pdf_pages", {
@@ -421,7 +430,7 @@ export async function reorderPages(newOrder: number[]): Promise&lt;void&gt; {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-27T03:50:15.955Z
+                at 2026-06-04T13:57:25.529Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

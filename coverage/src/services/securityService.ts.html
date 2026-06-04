@@ -30,9 +30,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">36.66% </span>
+                <span class="strong">35.48% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>11/30</span>
+                <span class='fraction'>11/31</span>
             </div>
         
             
@@ -196,12 +196,7 @@
 <a name='L131'></a><a href='#L131'>131</a>
 <a name='L132'></a><a href='#L132'>132</a>
 <a name='L133'></a><a href='#L133'>133</a>
-<a name='L134'></a><a href='#L134'>134</a>
-<a name='L135'></a><a href='#L135'>135</a>
-<a name='L136'></a><a href='#L136'>136</a>
-<a name='L137'></a><a href='#L137'>137</a>
-<a name='L138'></a><a href='#L138'>138</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L134'></a><a href='#L134'>134</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -218,15 +213,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -286,6 +272,9 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -308,6 +297,9 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -341,8 +333,7 @@
 import { invokeLogged } from "@/lib/tauriInvoke";
 import { decodeBase64Pdf, encodeBase64Pdf } from "@/lib/pdf/pdfEngine";
 import { useDocumentStore } from "@/stores/documentStore";
-import { useUiStore } from "@/stores/uiStore";
-import { errorMessage } from "@/lib/parseInvokeError";
+import { reportError } from "@/lib/logging";
 &nbsp;
 export interface PdfSecurityInfo {
   isEncrypted: boolean;
@@ -353,17 +344,8 @@ interface PdfBytesResult {
   dataBase64: string;
 }
 &nbsp;
-function <span class="fstat-no" title="function not covered" >showError(e</span>rr: unknown): void {
-  const errorId = <span class="cstat-no" title="statement not covered" >crypto.randomUUID();</span>
-<span class="cstat-no" title="statement not covered" >  log.security.error("Security operation failed", {</span>
-    userAction: "security",
-    errorId,
-    metadata: { message: errorMessage(err) },
-  });
-<span class="cstat-no" title="statement not covered" >  useUiStore.getState().showError({</span>
-    errorId,
-    message: errorMessage(err),
-  });
+function <span class="fstat-no" title="function not covered" >showError(e</span>rr: unknown, userAction = <span class="branch-0 cbranch-no" title="branch not covered" >"security"): void {</span>
+<span class="cstat-no" title="statement not covered" >  reportError(err, { category: "security", userAction });</span>
 }
 &nbsp;
 export async function inspectPdfSecurity(pdfBytes: Uint8Array): Promise&lt;PdfSecurityInfo&gt; {
@@ -422,6 +404,9 @@ export function <span class="fstat-no" title="function not covered" >protectDocu
   const password = <span class="cstat-no" title="statement not covered" >promptForNewPassword();</span>
 <span class="cstat-no" title="statement not covered" >  if (!password) <span class="cstat-no" title="statement not covered" >return;</span></span>
 &nbsp;
+<span class="cstat-no" title="statement not covered" >  log.security.info("Password protection scheduled for next save", {</span>
+    userAction: "protect_on_save",
+  });
   const store = <span class="cstat-no" title="statement not covered" >useDocumentStore.getState();</span>
 <span class="cstat-no" title="statement not covered" >  store.setPendingSavePassword(password);</span>
 <span class="cstat-no" title="statement not covered" >  store.setRemovePasswordOnSave(false);</span>
@@ -445,6 +430,9 @@ export async function <span class="fstat-no" title="function not covered" >remov
 <span class="cstat-no" title="statement not covered" >  store.setDocumentPassword(password);</span>
 <span class="cstat-no" title="statement not covered" >  store.setDirty(true);</span>
 <span class="cstat-no" title="statement not covered" >  store.setStatusMessage("Password will be removed when you save");</span>
+<span class="cstat-no" title="statement not covered" >  log.security.info("Password removal scheduled for next save", {</span>
+    userAction: "remove_password_on_save",
+  });
 }
 &nbsp;
 export async function applySecurityOnSaveBytes(pdfBytes: Uint8Array): Promise&lt;Uint8Array&gt; {
@@ -481,7 +469,7 @@ export async function applySecurityOnSaveBytes(pdfBytes: Uint8Array): Promise&lt
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-27T03:50:15.955Z
+                at 2026-06-04T13:57:25.529Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

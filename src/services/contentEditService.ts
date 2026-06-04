@@ -8,9 +8,7 @@ import {
 import type { TextContentEdit } from "@shared/types";
 import { useContentEditStore } from "@/stores/contentEditStore";
 import { useDocumentStore } from "@/stores/documentStore";
-import { useUiStore } from "@/stores/uiStore";
-import { errorMessage } from "@/lib/parseInvokeError";
-import { log } from "@/lib/logging";
+import { log, reportError } from "@/lib/logging";
 import { TEXT_COVER_H_PAD, TEXT_COVER_V_PAD } from "@/lib/textEditBox";
 
 interface PdfBytesResult {
@@ -94,10 +92,7 @@ export async function applyContentEdits(): Promise<boolean> {
     log.content.info("Content edits applied", { userAction: "content_edit" });
     return true;
   } catch (err) {
-    useUiStore.getState().showError({
-      errorId: crypto.randomUUID(),
-      message: errorMessage(err),
-    });
+    reportError(err, { category: "content", userAction: "content_edit" });
     return false;
   } finally {
     docStore.setLoading(false);

@@ -5,15 +5,44 @@ import path from "path";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
+const isE2e = process.env.VITE_E2E === "true";
+const e2eMocks = path.resolve(__dirname, "./e2e/mocks");
+const e2eTauriAliases = isE2e
+  ? {
+      "@tauri-apps/api/core": path.join(e2eMocks, "tauriCore.ts"),
+      "@tauri-apps/api/window": path.join(e2eMocks, "tauriWindow.ts"),
+      "@tauri-apps/plugin-dialog": path.join(e2eMocks, "tauriDialog.ts"),
+      "@tauri-apps/plugin-opener": path.join(e2eMocks, "tauriOpener.ts"),
+      "@tauri-apps/plugin-fs": path.join(e2eMocks, "tauriFs.ts"),
+    }
+  : {};
 
 export default defineConfig(async () => ({
   plugins: [react(), tailwindcss()],
+  define: isE2e
+    ? {
+        "import.meta.env.VITE_E2E": JSON.stringify("true"),
+        "import.meta.env.VITE_ENABLE_LOG_VIEWER": JSON.stringify("true"),
+      }
+    : undefined,
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
       "@shared": path.resolve(__dirname, "./shared"),
+      ...e2eTauriAliases,
     },
   },
+  optimizeDeps: isE2e
+    ? {
+        exclude: [
+          "@tauri-apps/api/core",
+          "@tauri-apps/api/window",
+          "@tauri-apps/plugin-dialog",
+          "@tauri-apps/plugin-opener",
+          "@tauri-apps/plugin-fs",
+        ],
+      }
+    : undefined,
   clearScreen: false,
   server: {
     port: 1420,
@@ -34,11 +63,37 @@ export default defineConfig(async () => ({
     globals: true,
     environment: "jsdom",
     setupFiles: "./src/test/setup.ts",
+    exclude: ["**/node_modules/**", "**/dist/**", "e2e/**"],
     coverage: {
       provider: "v8",
-      reporter: ["text", "html"],
+      reporter: ["text", "html", "lcov"],
       include: ["src/**/*.{ts,tsx}"],
-      exclude: ["src/test/**", "src/main.tsx"],
+      exclude: [
+        "src/test/**",
+        "src/main.tsx",
+        "src/**/*.test.{ts,tsx}",
+        "src/components/**",
+      ],
+      thresholds: {
+        "src/lib/logging/**": {
+          lines: 85,
+          branches: 75,
+          functions: 84,
+          statements: 85,
+        },
+        "src/stores/**": {
+          lines: 60,
+          branches: 50,
+          functions: 52,
+          statements: 60,
+        },
+        "src/services/**": {
+          lines: 38,
+          branches: 32,
+          functions: 45,
+          statements: 38,
+        },
+      },
     },
   },
 }));

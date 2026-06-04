@@ -11,6 +11,7 @@ function App() {
   const isLoading = useDocumentStore((s) => s.isLoading);
 
   return (
+    <div data-testid="app-root" className="contents">
     <ErrorBoundary
       onError={(errorId, message) =>
         showError({ errorId, message })
@@ -25,6 +26,7 @@ function App() {
       <ErrorDialog />
       <SplitPdfDialog />
     </ErrorBoundary>
+    </div>
   );
 }
 

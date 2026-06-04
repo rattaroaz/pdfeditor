@@ -51,3 +51,23 @@ pub fn map_err(err: AppError) -> ErrorResponse {
     tracing::error!(error_id = %response.error_id, message = %response.message, "command failed");
     response
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn to_response_maps_error_codes() {
+        let resp = AppError::InvalidInput("bad page".into()).to_response();
+        assert_eq!(resp.code.as_deref(), Some("INVALID_INPUT"));
+        assert!(!resp.error_id.is_empty());
+        assert!(resp.message.contains("bad page"));
+    }
+
+    #[test]
+    fn map_err_preserves_error_id() {
+        let resp = map_err(AppError::Pdf("parse failed".into()));
+        assert_eq!(resp.code.as_deref(), Some("PDF_ERROR"));
+        assert!(!resp.error_id.is_empty());
+    }
+}

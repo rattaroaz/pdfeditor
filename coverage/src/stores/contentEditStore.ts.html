@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">47.05% </span>
+                <span class="strong">41.46% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>16/34</span>
+                <span class='fraction'>17/41</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">58.33% </span>
+                <span class="strong">50% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>7/12</span>
+                <span class='fraction'>7/14</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">34.78% </span>
+                <span class="strong">30.76% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>8/23</span>
+                <span class='fraction'>8/26</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">54.16% </span>
+                <span class="strong">46.66% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>13/24</span>
+                <span class='fraction'>14/30</span>
             </div>
         
             
@@ -148,7 +148,26 @@
 <a name='L83'></a><a href='#L83'>83</a>
 <a name='L84'></a><a href='#L84'>84</a>
 <a name='L85'></a><a href='#L85'>85</a>
-<a name='L86'></a><a href='#L86'>86</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -194,6 +213,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -203,8 +226,19 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -235,6 +269,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { create } from "zustand";
 import type { ImageContentEdit, TextContentEdit } from "@shared/types";
+import { log } from "@/lib/logging";
 import { recordHistory } from "@/stores/historyStore";
 import { v4 as uuidv4 } from "uuid";
 &nbsp;
@@ -247,11 +282,12 @@ interface ContentEditStore {
     id: string,
     patch: Partial&lt;Pick&lt;TextContentEdit, "newText" | "width" | "height"&gt;&gt;,
   ) =&gt; void;
-  addImageEdit: (edit: Omit&lt;ImageContentEdit, "id"&gt;) =&gt; void;
+  addImageEdit: (edit: Omit&lt;ImageContentEdit, "id"&gt;) =&gt; string;
   removeTextEdit: (id: string) =&gt; void;
   removeImageEdit: (id: string) =&gt; void;
   updateTextEditPosition: (id: string, x: number, y: number) =&gt; void;
   updateImageEditPosition: (id: string, x: number, y: number) =&gt; void;
+  updateImageEditSize: (id: string, width: number, height: number) =&gt; void;
   clearEdits: () =&gt; void;
   setReflowWarnings: (warnings: string[]) =&gt; void;
   hasEdits: () =&gt; boolean;
@@ -275,6 +311,10 @@ export const useContentEditStore = create&lt;ContentEditStore&gt;((set, get) =&g
       textEdits: [...s.textEdits, { ...partial, id }],
       reflowWarnings: [...s.reflowWarnings, ...warnings],
     }));
+    log.content.info("Text content edit added", {
+      userAction: "add_text_edit",
+      metadata: { pageIndex: partial.pageIndex, charCount: partial.newText.length },
+    });
     return id;
   },
 &nbsp;
@@ -287,9 +327,15 @@ export const useContentEditStore = create&lt;ContentEditStore&gt;((set, get) =&g
 &nbsp;
   addImageEdit: <span class="fstat-no" title="function not covered" >(p</span>artial) =&gt; {
 <span class="cstat-no" title="statement not covered" >    recordHistory();</span>
+    const <span class="cstat-no" title="statement not covered" >id = uuidv4();</span>
 <span class="cstat-no" title="statement not covered" >    set(<span class="fstat-no" title="function not covered" >(s</span>) =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span>
-      imageEdits: [...s.imageEdits, { ...partial, id: uuidv4() }],
+      imageEdits: [...s.imageEdits, { ...partial, id }],
     }));
+<span class="cstat-no" title="statement not covered" >    log.content.info("Image content edit added", {</span>
+      userAction: "add_image_edit",
+      metadata: { pageIndex: partial.pageIndex, mimeType: partial.mimeType },
+    });
+<span class="cstat-no" title="statement not covered" >    return id;</span>
   },
 &nbsp;
   removeTextEdit: <span class="fstat-no" title="function not covered" >(i</span>d) =&gt; {
@@ -312,6 +358,11 @@ export const useContentEditStore = create&lt;ContentEditStore&gt;((set, get) =&g
       imageEdits: s.imageEdits.map(<span class="fstat-no" title="function not covered" >(e</span>) =&gt; (<span class="cstat-no" title="statement not covered" >e.id === id ? { ...e, x, y } : e))</span>,
     })),
 &nbsp;
+  updateImageEditSize: <span class="fstat-no" title="function not covered" >(i</span>d, width, height) =&gt;
+<span class="cstat-no" title="statement not covered" >    set(<span class="fstat-no" title="function not covered" >(s</span>) =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span>
+      imageEdits: s.imageEdits.map(<span class="fstat-no" title="function not covered" >(e</span>) =&gt; (<span class="cstat-no" title="statement not covered" >e.id === id ? { ...e, width, height } : e))</span>,
+    })),
+&nbsp;
   clearEdits: () =&gt; set({ textEdits: [], imageEdits: [], reflowWarnings: [] }),
 &nbsp;
   setReflowWarnings: <span class="fstat-no" title="function not covered" >(r</span>eflowWarnings) =&gt; <span class="cstat-no" title="statement not covered" >set({ reflowWarnings }),</span>
@@ -325,7 +376,7 @@ export const useContentEditStore = create&lt;ContentEditStore&gt;((set, get) =&g
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-27T03:50:15.955Z
+                at 2026-06-04T13:57:25.529Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

@@ -7,19 +7,14 @@ import {
 } from "@/lib/pageAnnotationRemap";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useAnnotationStore } from "@/stores/annotationStore";
-import { useUiStore } from "@/stores/uiStore";
-import { errorMessage } from "@/lib/parseInvokeError";
-import { log } from "@/lib/logging";
+import { log, reportError } from "@/lib/logging";
 
 interface PdfBytesResult {
   dataBase64: string;
 }
 
-function showError(err: unknown): void {
-  useUiStore.getState().showError({
-    errorId: crypto.randomUUID(),
-    message: errorMessage(err),
-  });
+function showError(err: unknown, userAction = "page"): void {
+  reportError(err, { category: "document", userAction });
 }
 
 async function applyPdfMutation(

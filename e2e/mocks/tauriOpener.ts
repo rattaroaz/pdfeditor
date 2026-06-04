@@ -1,0 +1,2 @@
+export async function openPath(_path: string): Promise<void> {}
+export async function openUrl(_url: string): Promise<void> {}

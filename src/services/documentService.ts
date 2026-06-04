@@ -1,6 +1,6 @@
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { invokeLogged, AppInvokeError } from "@/lib/tauriInvoke";
-import { errorMessage } from "@/lib/parseInvokeError";
+import { invokeLogged } from "@/lib/tauriInvoke";
+import { createCorrelationId, log, reportError, startTimer } from "@/lib/logging";
 import { loadPdfFromBytes, decodeBase64Pdf, PdfPasswordRequiredError } from "@/lib/pdf/pdfEngine";
 import { ensurePdfExtension, encodeBase64Pdf } from "@/lib/pdf/pdfBinary";
 import { useDocumentStore } from "@/stores/documentStore";
@@ -9,7 +9,6 @@ import { useUiStore } from "@/stores/uiStore";
 import { useContentEditStore } from "@/stores/contentEditStore";
 import { useFormStore } from "@/stores/formStore";
 import { clearHistory } from "@/stores/historyStore";
-import { log } from "@/lib/logging";
 import type { Annotation, PdfMetadata, ReadFileResult } from "@shared/types";
 import { applyContentEdits } from "@/services/contentEditService";
 import { applyFormChanges, inspectDocumentForms, loadFormFieldsFromPdf } from "@/services/formService";
@@ -24,20 +23,8 @@ interface PdfInfoResponse {
   metadata: PdfMetadata;
 }
 
-function showError(err: unknown): void {
-  const uiStore = useUiStore.getState();
-  if (err instanceof AppInvokeError) {
-    uiStore.showError({
-      errorId: err.errorId,
-      message: err.message,
-      code: err.code,
-    });
-    return;
-  }
-  uiStore.showError({
-    errorId: crypto.randomUUID(),
-    message: errorMessage(err),
-  });
+function showError(err: unknown, userAction = "document"): void {
+  reportError(err, { category: "document", userAction });
 }
 
 async function readPdfBytes(filePath: string): Promise<Uint8Array> {
@@ -190,12 +177,14 @@ export async function openPdfFromPath(filePath: string): Promise<void> {
 }
 
 export async function savePdf(saveAs = false): Promise<void> {
+  const correlationId = createCorrelationId();
+  const timer = startTimer(log.document, "save_pdf", { userAction: "save", correlationId });
   const docStore = useDocumentStore.getState();
   const annStore = useAnnotationStore.getState();
   const { filePath, pdfBytes, fileName } = docStore;
 
   if (!pdfBytes || !docStore.pdfDoc) {
-    showError(new Error("No document open to save"));
+    showError(new Error("No document open to save"), "save");
     return;
   }
 
@@ -310,13 +299,13 @@ export async function savePdf(saveAs = false): Promise<void> {
       }
     }
 
-    log.document.info("Document saved with embedded annotations", {
-      userAction: "save",
-      path: targetPath,
+    timer.end("Document saved with embedded annotations", {
+      metadata: { path: targetPath },
     });
   } catch (err) {
     docStore.setStatusMessage(null);
-    showError(err);
+    timer.fail(err);
+    showError(err, "save");
     throw err;
   }
 }
