@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { computeTextEditBox, measureTextWidth } from "./textEditBox";
+import {
+  computeTextEditBox,
+  fontSizeFromBoxHeight,
+  MAX_TEXT_FONT_SIZE,
+  MIN_TEXT_FONT_SIZE,
+  measureTextWidth,
+} from "./textEditBox";
 
 describe("textEditBox", () => {
   it("computes tight height from font size", () => {
@@ -18,7 +24,15 @@ describe("textEditBox", () => {
     expect(box.width).toBeGreaterThanOrEqual(80);
   });
 
-  it("measureTextWidth returns positive for non-empty text", () => {
-    expect(measureTextWidth("Hello", 12)).toBeGreaterThan(0);
+  it("grows height for multiple lines", () => {
+    const one = computeTextEditBox("A", 12).height;
+    const two = computeTextEditBox("A\nB", 12).height;
+    expect(two).toBeGreaterThan(one);
+  });
+
+  it("derives font size from dragged box height", () => {
+    expect(fontSizeFromBoxHeight(24)).toBe(24);
+    expect(fontSizeFromBoxHeight(4)).toBe(MIN_TEXT_FONT_SIZE);
+    expect(fontSizeFromBoxHeight(200)).toBe(MAX_TEXT_FONT_SIZE);
   });
 });

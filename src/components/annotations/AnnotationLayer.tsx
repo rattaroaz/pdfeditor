@@ -31,6 +31,7 @@ interface Props {
 export function AnnotationLayer({ pageIndex, scale }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const finishingDrawingRef = useRef(false);
   const activeTool = useAnnotationStore((s) => s.activeTool);
   const appMode = useUiStore((s) => s.appMode);
   const annotations = useAnnotationStore((s) => s.annotations);
@@ -420,8 +421,10 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
     }
   };
 
-  const finishRect = async (end: { x: number; y: number }) => {
-    if (!start) return;
+  const finishRect = async (
+    dragStart: { x: number; y: number },
+    end: { x: number; y: number },
+  ) => {
     const type =
       activeTool === "highlight"
         ? "highlight"
@@ -429,7 +432,7 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
           ? "underline"
           : "strikeout";
 
-    const rect = normalizeMarkupRect(start, end, type);
+    const rect = normalizeMarkupRect(dragStart, end, type);
     if (!rect) return;
 
     addAnnotation({
@@ -442,12 +445,14 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
     await persistAnnotations();
   };
 
-  const finishTextBox = async (end: { x: number; y: number }) => {
-    if (!start) return;
-    const x = Math.min(start.x, end.x);
-    const y = Math.min(start.y, end.y);
-    const width = Math.abs(end.x - start.x);
-    const height = Math.abs(end.y - start.y);
+  const finishTextBox = async (
+    dragStart: { x: number; y: number },
+    end: { x: number; y: number },
+  ) => {
+    const x = Math.min(dragStart.x, end.x);
+    const y = Math.min(dragStart.y, end.y);
+    const width = Math.abs(end.x - dragStart.x);
+    const height = Math.abs(end.y - dragStart.y);
     if (width < 8 || height < 8) return;
     const content = window.prompt("Text box content:");
     if (!content?.trim()) return;
@@ -466,17 +471,21 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
     await persistAnnotations();
   };
 
-  const finishShape = async (end: { x: number; y: number }) => {
-    if (!start || !SHAPE_TOOLS.includes(activeTool)) return;
-    const dx = Math.abs(end.x - start.x);
-    const dy = Math.abs(end.y - start.y);
+  const finishShape = async (
+    dragStart: { x: number; y: number },
+    end: { x: number; y: number },
+    tool: Tool,
+  ) => {
+    if (!SHAPE_TOOLS.includes(tool)) return;
+    const dx = Math.abs(end.x - dragStart.x);
+    const dy = Math.abs(end.y - dragStart.y);
     if (dx < 4 && dy < 4) return;
     const shapeKind =
-      activeTool === "rectangle"
+      tool === "rectangle"
         ? "rectangle"
-        : activeTool === "ellipse"
+        : tool === "ellipse"
           ? "ellipse"
-          : activeTool === "line"
+          : tool === "line"
             ? "line"
             : "arrow";
     addAnnotation({
@@ -485,8 +494,8 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
       pageIndex,
       author: "User",
       color: "#2196F3",
-      x1: start.x,
-      y1: start.y,
+      x1: dragStart.x,
+      y1: dragStart.y,
       x2: end.x,
       y2: end.y,
       strokeWidth: 2,
@@ -495,28 +504,39 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
   };
 
   const finishDrawingAt = async (end: { x: number; y: number }) => {
-    if (!drawing || activeTool === "note") return;
-    if (activeTool === "freehand" && points.length > 1) {
-      addAnnotation({
-        type: "freehand",
-        pageIndex,
-        author: "User",
-        color: "#E91E63",
-        points,
-        strokeWidth: 2,
-      });
-      await persistAnnotations();
-    } else if (["highlight", "underline", "strikeout"].includes(activeTool)) {
-      await finishRect(end);
-    } else if (activeTool === "text") {
-      await finishTextBox(end);
-    } else if (SHAPE_TOOLS.includes(activeTool)) {
-      await finishShape(end);
-    }
+    if (!drawing || activeTool === "note" || finishingDrawingRef.current || !start) return;
+
+    finishingDrawingRef.current = true;
+    const dragStart = start;
+    const dragPoints = points;
+    const tool = activeTool;
+
     setDrawing(false);
     setStart(null);
     setCurrent(null);
     setPoints([]);
+
+    try {
+      if (tool === "freehand" && dragPoints.length > 1) {
+        addAnnotation({
+          type: "freehand",
+          pageIndex,
+          author: "User",
+          color: "#E91E63",
+          points: dragPoints,
+          strokeWidth: 2,
+        });
+        await persistAnnotations();
+      } else if (["highlight", "underline", "strikeout"].includes(tool)) {
+        await finishRect(dragStart, end);
+      } else if (tool === "text") {
+        await finishTextBox(dragStart, end);
+      } else if (SHAPE_TOOLS.includes(tool)) {
+        await finishShape(dragStart, end, tool);
+      }
+    } finally {
+      finishingDrawingRef.current = false;
+    }
   };
 
   const handleMouseUp = async (e: React.MouseEvent) => {
@@ -553,7 +573,7 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={() => {
-          if (drawing && start && current) {
+          if (drawing && start && current && !finishingDrawingRef.current) {
             void finishDrawingAt(current);
             return;
           }

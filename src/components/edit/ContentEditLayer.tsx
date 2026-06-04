@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";
 import { useAnnotationStore } from "@/stores/annotationStore";
@@ -11,6 +12,9 @@ import { encodeBase64Pdf } from "@/lib/pdf/pdfBinary";
 import {
   alignBoxToHit,
   computeTextEditBox,
+  DEFAULT_TEXT_FONT_SIZE,
+  fontSizeFromBoxHeight,
+  measureTextBoxFromTextarea,
   measureTextWidth,
 } from "@/lib/textEditBox";
 
@@ -33,26 +37,28 @@ type ResizingImage = {
 };
 
 const MIN_DRAG_SIZE = 4;
-const DEFAULT_FONT_SIZE = 12;
 const DRAG_THRESHOLD_PX = 5;
 
 function syncTextBoxSize(
   edit: { fontSize: number; coverOld: boolean; oldText?: string },
-  text: string,
+  el: HTMLTextAreaElement,
+  scale: number,
   update: (patch: { width: number; height: number }) => void,
 ) {
   const coverMin = edit.coverOld
     ? Math.max(
         measureTextWidth(edit.oldText ?? "", edit.fontSize),
-        measureTextWidth(text, edit.fontSize),
+        measureTextWidth(el.value, edit.fontSize),
       )
     : undefined;
   update(
-    computeTextEditBox(text, edit.fontSize, {
+    measureTextBoxFromTextarea(el, edit.fontSize, scale, {
       coverOld: edit.coverOld,
       minWidth: coverMin,
     }),
   );
+  el.scrollLeft = 0;
+  el.scrollTop = 0;
 }
 
 export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
@@ -61,6 +67,7 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
   const addTextEdit = useContentEditStore((s) => s.addTextEdit);
   const addImageEdit = useContentEditStore((s) => s.addImageEdit);
   const updateTextEdit = useContentEditStore((s) => s.updateTextEdit);
+  const updateTextEditLayout = useContentEditStore((s) => s.updateTextEditLayout);
   const removeTextEdit = useContentEditStore((s) => s.removeTextEdit);
   const updateTextEditPosition = useContentEditStore((s) => s.updateTextEditPosition);
   const updateImageEditPosition = useContentEditStore((s) => s.updateImageEditPosition);
@@ -219,16 +226,21 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
 
   if (appMode !== "edit") return null;
 
-  const placeTextBlock = (x: number, y: number) => {
-    const box = computeTextEditBox("", DEFAULT_FONT_SIZE);
+  const placeTextBlock = (
+    x: number,
+    y: number,
+    opts?: { fontSize?: number; width?: number },
+  ) => {
+    const fontSize = opts?.fontSize ?? DEFAULT_TEXT_FONT_SIZE;
+    const minBox = computeTextEditBox("", fontSize);
     const id = addTextEdit({
       pageIndex,
       x,
       y,
-      width: box.width,
-      height: box.height,
+      width: Math.max(opts?.width ?? minBox.width, minBox.width),
+      height: fontSize,
       newText: "",
-      fontSize: DEFAULT_FONT_SIZE,
+      fontSize,
       fontFamily: "Helvetica",
       color: "#000000",
       coverOld: false,
@@ -247,9 +259,8 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
       if (width < MIN_DRAG_SIZE || height < MIN_DRAG_SIZE) {
         placeTextBlock(x1, y1);
       } else {
-        const fontSize = DEFAULT_FONT_SIZE;
-        const box = computeTextEditBox("", fontSize);
-        placeTextBlock(x, y + (height - box.height) / 2);
+        const fontSize = fontSizeFromBoxHeight(height);
+        placeTextBlock(x, y, { fontSize, width });
       }
       return;
     }
@@ -318,6 +329,11 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
     <div
       ref={layerRef}
       className="absolute inset-0 z-[25]"
+      title={
+        activeTool === "add-text-block"
+          ? "Click for default text size, or drag a box — height sets font size"
+          : undefined
+      }
       style={{ pointerEvents: "auto", cursor: resizing ? "se-resize" : moving ? "grabbing" : undefined }}
       onMouseDown={(e) => {
         if (moving || resizing || editingId || activeTool === "edit-text") return;
@@ -381,19 +397,33 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
             {isEditing ? (
               <textarea
                 autoFocus
+                wrap="off"
                 defaultValue={edit.newText}
                 className="block h-full w-full resize-none overflow-hidden border-0 bg-white p-0 text-zinc-900 outline-none"
                 style={{
                   fontSize: edit.fontSize * scale,
                   lineHeight: 1,
                   fontFamily: "Helvetica, Arial, sans-serif",
+                  whiteSpace: "pre",
+                  overflowWrap: "normal",
                 }}
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
                 onInput={(e) => {
-                  syncTextBoxSize(edit, e.currentTarget.value, (patch) =>
-                    updateTextEdit(edit.id, patch),
-                  );
+                  const el = e.currentTarget;
+                  flushSync(() => {
+                    syncTextBoxSize(edit, el, scale, (patch) =>
+                      updateTextEditLayout(edit.id, patch),
+                    );
+                  });
+                }}
+                onCompositionEnd={(e) => {
+                  const el = e.currentTarget;
+                  flushSync(() => {
+                    syncTextBoxSize(edit, el, scale, (patch) =>
+                      updateTextEditLayout(edit.id, patch),
+                    );
+                  });
                 }}
                 onBlur={(e) => {
                   if (skipEditBlurRef.current) {
@@ -469,7 +499,11 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
       })}
       {start && current && canPlaceNew && !moving && (
         <div
-          className="pointer-events-none absolute border border-blue-400 bg-blue-400/10"
+          className={`pointer-events-none absolute border ${
+            activeTool === "add-text-block"
+              ? "border-emerald-400 bg-emerald-400/10"
+              : "border-blue-400 bg-blue-400/10"
+          }`}
           style={{
             left: Math.min(start.x, current.x) * scale,
             top: Math.min(start.y, current.y) * scale,

@@ -13,6 +13,11 @@ interface ContentEditStore {
     id: string,
     patch: Partial<Pick<TextContentEdit, "newText" | "width" | "height">>,
   ) => void;
+  /** Live resize while typing — does not push undo history. */
+  updateTextEditLayout: (
+    id: string,
+    patch: Pick<TextContentEdit, "width" | "height">,
+  ) => void;
   addImageEdit: (edit: Omit<ImageContentEdit, "id">) => string;
   removeTextEdit: (id: string) => void;
   removeImageEdit: (id: string) => void;
@@ -55,6 +60,20 @@ export const useContentEditStore = create<ContentEditStore>((set, get) => ({
       textEdits: s.textEdits.map((e) => (e.id === id ? { ...e, ...patch } : e)),
     }));
   },
+
+  updateTextEditLayout: (id, patch) =>
+    set((s) => ({
+      textEdits: s.textEdits.map((e) => {
+        if (e.id !== id) return e;
+        if (
+          Math.abs(e.width - patch.width) < 0.01 &&
+          Math.abs(e.height - patch.height) < 0.01
+        ) {
+          return e;
+        }
+        return { ...e, ...patch };
+      }),
+    })),
 
   addImageEdit: (partial) => {
     recordHistory();
