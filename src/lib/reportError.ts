@@ -45,3 +45,12 @@ export function reportError(err: unknown, options: ReportErrorOptions = {}): App
   useUiStore.getState().showError(payload);
   return payload;
 }
+
+/**
+ * Build a `reportError` bound to a log category, so services can share one
+ * `showError(err, userAction?)` helper instead of redefining it.
+ */
+export function createErrorReporter(category: LogCategory, defaultUserAction: string) {
+  return (err: unknown, userAction: string = defaultUserAction): AppErrorPayload =>
+    reportError(err, { category, userAction });
+}

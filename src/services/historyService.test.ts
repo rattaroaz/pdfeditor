@@ -23,7 +23,7 @@ describe("historyService", () => {
     useFormStore.getState().clearFormState();
   });
 
-  it("undo restores snapshot and marks document dirty", () => {
+  it("undo restores snapshot and marks document dirty", async () => {
     useAnnotationStore.setState({
       annotations: [
         {
@@ -40,15 +40,15 @@ describe("historyService", () => {
     useHistoryStore.getState().record();
     useAnnotationStore.setState({ annotations: [] });
 
-    undoEdit();
+    await undoEdit();
 
     expect(useAnnotationStore.getState().annotations).toHaveLength(1);
     expect(useDocumentStore.getState().isDirty).toBe(true);
     expect(mockPersistAnnotations).toHaveBeenCalled();
   });
 
-  it("redo does nothing when future stack is empty", () => {
-    redoEdit();
+  it("redo does nothing when future stack is empty", async () => {
+    await redoEdit();
     expect(mockPersistAnnotations).not.toHaveBeenCalled();
   });
 });

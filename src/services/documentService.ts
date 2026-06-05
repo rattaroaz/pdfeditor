@@ -1,9 +1,15 @@
 import { errorMessage } from "@/lib/parseInvokeError";
 import { ask, open, save } from "@tauri-apps/plugin-dialog";
 import { invokeLogged } from "@/lib/tauriInvoke";
-import { createCorrelationId, log, reportError, startTimer } from "@/lib/logging";
+import { createCorrelationId, createErrorReporter, log, startTimer } from "@/lib/logging";
 import { loadPdfFromBytes, decodeBase64Pdf, PdfPasswordRequiredError } from "@/lib/pdf/pdfEngine";
-import { ensurePdfExtension, encodeBase64Pdf } from "@/lib/pdf/pdfBinary";
+import {
+  ensurePdfExtension,
+  encodeBase64Pdf,
+  fileNameFromPath,
+  type PdfBytesResult,
+} from "@/lib/pdf/pdfBinary";
+import { APP_NAME } from "@/lib/constants";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useAnnotationStore } from "@/stores/annotationStore";
 import { useUiStore } from "@/stores/uiStore";
@@ -15,8 +21,7 @@ import { applyContentEdits } from "@/services/contentEditService";
 import { applyFormChanges, inspectDocumentForms, loadFormFieldsFromPdf } from "@/services/formService";
 import { applySecurityOnSaveBytes, inspectPdfSecurity, type PdfSecurityInfo } from "@/services/securityService";
 
-interface SavePdfResult {
-  dataBase64: string;
+interface SavePdfResult extends PdfBytesResult {
   path: string;
 }
 
@@ -24,9 +29,7 @@ interface PdfInfoResponse {
   metadata: PdfMetadata;
 }
 
-function showError(err: unknown, userAction = "document"): void {
-  reportError(err, { category: "document", userAction });
-}
+const showError = createErrorReporter("document", "document");
 
 async function readPdfBytes(filePath: string): Promise<Uint8Array> {
   const result = await invokeLogged<ReadFileResult>("read_pdf_file", {
@@ -124,7 +127,7 @@ export async function openPdfFromPath(filePath: string): Promise<void> {
       });
     }
     const { pdfDoc, password } = await loadPdfWithPasswordPrompt(viewBytes);
-    const fileName = filePath.split(/[/\\]/).pop() ?? "document.pdf";
+    const fileName = fileNameFromPath(filePath);
     const metadata = await fetchMetadata(filePath, pdfDoc.numPages, pdfBytes.byteLength);
     metadata.isPasswordProtected = security.isEncrypted;
 
@@ -295,7 +298,7 @@ export async function savePdf(saveAs = false): Promise<void> {
           filePath: targetPath,
           json: JSON.stringify(annStore.annotations),
         });
-      } catch (err) {
+      } catch {
         log.document.warn("Annotation sidecar save failed", { userAction: "save" });
       }
     }
@@ -334,7 +337,7 @@ export async function closeDocument(): Promise<void> {
   if (docStore.isDirty) {
     const discard = await ask(
       "You have unsaved changes. Close without saving?",
-      { title: "PDF Editor", kind: "warning" },
+      { title: APP_NAME, kind: "warning" },
     );
     if (!discard) return;
   }
@@ -365,7 +368,7 @@ export async function revertToSaved(): Promise<void> {
   docStore.setLoading(true);
   try {
     const pdfDoc = await loadPdfFromBytes(savedPdfBytes);
-    const fileName = filePath.split(/[/\\]/).pop() ?? "document.pdf";
+    const fileName = fileNameFromPath(filePath);
     const metadata = await fetchMetadata(
       filePath,
       pdfDoc.numPages,

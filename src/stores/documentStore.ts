@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { PdfDocument } from "@/lib/pdf/pdfEngine";
 import type { PdfMetadata, SidebarTab, ViewMode, ZoomMode } from "@shared/types";
 import { DEFAULT_ZOOM, SIDEBAR_WIDTH_DEFAULT, SIDEBAR_WIDTH_MAX, SIDEBAR_WIDTH_MIN, ZOOM_MAX, ZOOM_MIN } from "@/lib/constants";
+import { fileNameFromPath } from "@/lib/pdf/pdfBinary";
 import { v4 as uuidv4 } from "uuid";
 
 export type PageRotation = 0 | 90 | 180 | 270;
@@ -54,7 +55,6 @@ interface DocumentStore {
   setSidebarWidth: (width: number) => void;
   setSidebarTab: (tab: SidebarTab) => void;
   togglePresentationMode: () => void;
-  updatePdfBytes: (bytes: Uint8Array) => void;
   applySavedDocument: (args: {
     filePath: string;
     pdfDoc: PdfDocument;
@@ -65,7 +65,6 @@ interface DocumentStore {
     pdfBytes: Uint8Array;
     pageCount: number;
   }) => void;
-  markSaved: (filePath: string) => void;
   setStatusMessage: (message: string | null) => void;
   statusMessage: string | null;
   isPasswordProtected: boolean;
@@ -201,12 +200,11 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
   setSidebarTab: (sidebarTab) => set({ sidebarTab, showSidebar: true }),
   togglePresentationMode: () =>
     set((s) => ({ presentationMode: !s.presentationMode })),
-  updatePdfBytes: (pdfBytes) => set({ pdfBytes }),
   applySavedDocument: ({ filePath, pdfDoc, pdfBytes }) => {
     const currentPage = get().currentPage;
     set({
       filePath,
-      fileName: filePath.split(/[/\\]/).pop() ?? get().fileName,
+      fileName: fileNameFromPath(filePath, get().fileName),
       pdfDoc,
       pdfBytes,
       savedPdfBytes: pdfBytes.slice(),
@@ -229,16 +227,6 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
       scrollToPage: currentPage,
       rotation: 0,
     }));
-  },
-  markSaved: (filePath) => {
-    const pdfBytes = get().pdfBytes;
-    set({
-      filePath,
-      fileName: filePath.split(/[/\\]/).pop() ?? get().fileName,
-      isDirty: false,
-      savedPdfBytes: pdfBytes ? pdfBytes.slice() : null,
-      statusMessage: "Saved",
-    });
   },
   setStatusMessage: (statusMessage) => set({ statusMessage }),
   setPasswordProtected: (isPasswordProtected) =>

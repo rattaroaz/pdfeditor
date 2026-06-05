@@ -1,21 +1,15 @@
-import { log } from "@/lib/logging";
+import { createErrorReporter, log } from "@/lib/logging";
 import { invokeLogged } from "@/lib/tauriInvoke";
 import { decodeBase64Pdf, encodeBase64Pdf } from "@/lib/pdf/pdfEngine";
+import type { PdfBytesResult } from "@/lib/pdf/pdfBinary";
 import { useDocumentStore } from "@/stores/documentStore";
-import { reportError } from "@/lib/logging";
 
 export interface PdfSecurityInfo {
   isEncrypted: boolean;
   requiresPassword: boolean;
 }
 
-interface PdfBytesResult {
-  dataBase64: string;
-}
-
-function showError(err: unknown, userAction = "security"): void {
-  reportError(err, { category: "security", userAction });
-}
+const showError = createErrorReporter("security", "security");
 
 export async function inspectPdfSecurity(pdfBytes: Uint8Array): Promise<PdfSecurityInfo> {
   return invokeLogged<PdfSecurityInfo>("inspect_pdf_security", {

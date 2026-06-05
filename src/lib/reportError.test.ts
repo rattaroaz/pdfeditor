@@ -50,7 +50,8 @@ describe("reportError", () => {
     expect(useUiStore.getState().lastError?.errorId).toBe("invoke-99");
     expect(useUiStore.getState().showErrorDialog).toBe(true);
 
-    const last = getLogEntries().at(-1);
+    const entries = getLogEntries();
+    const last = entries[entries.length - 1];
     expect(last?.context?.errorId).toBe("invoke-99");
     expect(last?.context?.correlationId).toBe("corr-1");
   });
@@ -62,7 +63,8 @@ describe("reportError", () => {
       correlationId: "corr-abc",
     });
 
-    const last = getLogEntries().at(-1);
+    const entries = getLogEntries();
+    const last = entries[entries.length - 1];
     expect(last?.level).toBe("error");
     expect(last?.context?.errorId).toBeTruthy();
     expect(last?.context?.correlationId).toBe("corr-abc");

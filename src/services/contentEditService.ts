@@ -5,18 +5,12 @@ import {
   loadPdfFromBytes,
   viewportRectToPdfRect,
 } from "@/lib/pdf/pdfEngine";
+import type { PdfBytesResult } from "@/lib/pdf/pdfBinary";
 import type { TextContentEdit } from "@shared/types";
 import { useContentEditStore } from "@/stores/contentEditStore";
 import { useDocumentStore } from "@/stores/documentStore";
 import { log, reportError } from "@/lib/logging";
 import { TEXT_COVER_H_PAD, TEXT_COVER_V_PAD } from "@/lib/textEditBox";
-
-interface PdfBytesResult {
-  dataBase64: string;
-}
-
-const COVER_PAD = TEXT_COVER_H_PAD;
-const COVER_V_PAD = TEXT_COVER_V_PAD;
 
 export async function textEditsPayload(edits: TextContentEdit[]) {
   const { pdfDoc, rotation } = useDocumentStore.getState();
@@ -25,8 +19,8 @@ export async function textEditsPayload(edits: TextContentEdit[]) {
   const payload = [];
   for (const edit of edits) {
     const page = await pdfDoc.getPage(edit.pageIndex + 1);
-    const pad = edit.coverOld ? COVER_PAD : 0;
-    const vPad = edit.coverOld ? COVER_V_PAD : 0;
+    const pad = edit.coverOld ? TEXT_COVER_H_PAD : 0;
+    const vPad = edit.coverOld ? TEXT_COVER_V_PAD : 0;
     const [pdfX1, pdfY1, pdfX2, pdfY2] = viewportRectToPdfRect(
       page,
       edit.x - pad,

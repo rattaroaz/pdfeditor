@@ -250,10 +250,10 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
   };
 
   const finishRect = async (x1: number, y1: number, x2: number, y2: number) => {
-    let x = Math.min(x1, x2);
-    let y = Math.min(y1, y2);
-    let width = Math.abs(x2 - x1);
-    let height = Math.abs(y2 - y1);
+    const x = Math.min(x1, x2);
+    const y = Math.min(y1, y2);
+    const width = Math.abs(x2 - x1);
+    const height = Math.abs(y2 - y1);
 
     if (activeTool === "add-text-block") {
       if (width < MIN_DRAG_SIZE || height < MIN_DRAG_SIZE) {

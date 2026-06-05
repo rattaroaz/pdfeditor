@@ -148,7 +148,7 @@ Tests disable backend shipping via `logger.setBackendShipping(false)` when neede
 - `src/lib/logging/logging.test.ts` — buffer, scoping, Rust shipping, timers, document context enrichment
 - `src/lib/reportError.test.ts` — error id + correlation in logs and UI
 - `src/lib/tauriInvoke.test.ts` — invoke success/failure + correlationId
-- `src/lib/logger.test.ts` — compat re-exports
+- `src/lib/logger.test.ts` — console output + Rust shipping via the `logger` root
 - `src/services/loggingService.test.ts` — `get_logging_info` / tail / open folder
 - Rust: `src-tauri/src/logging.rs` (tail reader), `src-tauri/src/commands/mod.rs` (`log_frontend_payload` levels)
 

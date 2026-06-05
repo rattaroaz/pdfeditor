@@ -26,3 +26,14 @@ export function encodeBase64Pdf(bytes: Uint8Array): string {
 export function ensurePdfExtension(path: string): string {
   return path.toLowerCase().endsWith(".pdf") ? path : `${path}.pdf`;
 }
+
+/** Last path segment of a file path (handles both `/` and `\` separators). */
+export function fileNameFromPath(path: string, fallback = "document.pdf"): string {
+  const name = path.split(/[/\\]/).pop();
+  return name && name.length > 0 ? name : fallback;
+}
+
+/** Standard result shape for Rust commands that return base64-encoded PDF bytes. */
+export interface PdfBytesResult {
+  dataBase64: string;
+}

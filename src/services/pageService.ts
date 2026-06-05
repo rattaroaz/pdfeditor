@@ -1,5 +1,6 @@
 import { invokeLogged } from "@/lib/tauriInvoke";
 import { decodeBase64Pdf, encodeBase64Pdf, loadPdfFromBytes } from "@/lib/pdf/pdfEngine";
+import type { PdfBytesResult } from "@/lib/pdf/pdfBinary";
 import {
   remapAnnotationsAfterDelete,
   remapAnnotationsAfterInsert,
@@ -13,24 +14,25 @@ import { useAnnotationStore } from "@/stores/annotationStore";
 import { useContentEditStore } from "@/stores/contentEditStore";
 import { useFormStore } from "@/stores/formStore";
 import { recordHistory } from "@/stores/historyStore";
-import { log, reportError } from "@/lib/logging";
+import { createErrorReporter, log } from "@/lib/logging";
+import type {
+  Annotation,
+  FormFieldDefinition,
+  ImageContentEdit,
+  TextContentEdit,
+} from "@shared/types";
 
-interface PdfBytesResult {
-  dataBase64: string;
+/** Per-page state that must be remapped when pages are added, removed, or reordered. */
+interface PageIndexedState {
+  annotations: Annotation[];
+  textEdits: TextContentEdit[];
+  imageEdits: ImageContentEdit[];
+  newFields: FormFieldDefinition[];
 }
 
-function showError(err: unknown, userAction = "page"): void {
-  reportError(err, { category: "document", userAction });
-}
+const showError = createErrorReporter("document", "page");
 
-function remapAllPageIndexedState(
-  remap: {
-    annotations: ReturnType<typeof useAnnotationStore.getState>["annotations"];
-    textEdits: ReturnType<typeof useContentEditStore.getState>["textEdits"];
-    imageEdits: ReturnType<typeof useContentEditStore.getState>["imageEdits"];
-    newFields: ReturnType<typeof useFormStore.getState>["newFields"];
-  },
-): void {
+function remapAllPageIndexedState(remap: PageIndexedState): void {
   useAnnotationStore.getState().setAnnotations(remap.annotations);
   useContentEditStore.setState({
     textEdits: remap.textEdits,
@@ -41,17 +43,7 @@ function remapAllPageIndexedState(
 
 async function applyPdfMutation(
   mutate: (base64: string) => Promise<PdfBytesResult>,
-  remap?: (state: {
-    annotations: ReturnType<typeof useAnnotationStore.getState>["annotations"];
-    textEdits: ReturnType<typeof useContentEditStore.getState>["textEdits"];
-    imageEdits: ReturnType<typeof useContentEditStore.getState>["imageEdits"];
-    newFields: ReturnType<typeof useFormStore.getState>["newFields"];
-  }) => {
-    annotations: ReturnType<typeof useAnnotationStore.getState>["annotations"];
-    textEdits: ReturnType<typeof useContentEditStore.getState>["textEdits"];
-    imageEdits: ReturnType<typeof useContentEditStore.getState>["imageEdits"];
-    newFields: ReturnType<typeof useFormStore.getState>["newFields"];
-  },
+  remap?: (state: PageIndexedState) => PageIndexedState,
 ): Promise<void> {
   const docStore = useDocumentStore.getState();
   const annStore = useAnnotationStore.getState();

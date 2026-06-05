@@ -4,20 +4,14 @@ import { writeFile } from "@tauri-apps/plugin-fs";
 import { normalizeDialogPaths } from "@/lib/dialogPaths";
 import { invokeLogged } from "@/lib/tauriInvoke";
 import { decodeBase64Pdf, encodeBase64Pdf, loadPdfFromBytes, renderPageToCanvas } from "@/lib/pdf/pdfEngine";
-import { ensurePdfExtension } from "@/lib/pdf/pdfBinary";
+import { ensurePdfExtension, type PdfBytesResult } from "@/lib/pdf/pdfBinary";
 import { requireTauriDesktop } from "@/lib/tauriRuntime";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useAnnotationStore } from "@/stores/annotationStore";
-import { log, reportError } from "@/lib/logging";
+import { createErrorReporter, log } from "@/lib/logging";
 import type { ReadFileResult } from "@shared/types";
 
-interface PdfBytesResult {
-  dataBase64: string;
-}
-
-function showError(err: unknown, userAction = "assembly"): void {
-  reportError(err, { category: "assembly", userAction });
-}
+const showError = createErrorReporter("assembly", "assembly");
 
 function getOpenDocumentBytes(): Uint8Array | null {
   const { pdfBytes, basePdfBytes } = useDocumentStore.getState();

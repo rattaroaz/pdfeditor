@@ -16,5 +16,5 @@ export { createCorrelationId } from "../correlation";
 export function isLogViewerEnabled(): boolean {
   return import.meta.env.DEV || import.meta.env.VITE_ENABLE_LOG_VIEWER === "true";
 }
-export { reportError, toAppErrorPayload } from "../reportError";
+export { reportError, toAppErrorPayload, createErrorReporter } from "../reportError";
 export type { ReportErrorOptions } from "../reportError";

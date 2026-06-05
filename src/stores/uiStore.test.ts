@@ -41,7 +41,7 @@ describe("uiStore", () => {
   it("manages search and split dialog state", () => {
     useUiStore.getState().setSearchQuery("hello");
     expect(useUiStore.getState().searchQuery).toBe("hello");
-    useUiStore.getState().setSearchMatches([{ pageIndex: 0, matchIndex: 0 }]);
+    useUiStore.getState().setSearchMatches([{ pageIndex: 0, matchIndex: 0, text: "hello" }]);
     expect(useUiStore.getState().searchMatches).toHaveLength(1);
     useUiStore.getState().openSplitDialog();
     expect(useUiStore.getState().showSplitDialog).toBe(true);

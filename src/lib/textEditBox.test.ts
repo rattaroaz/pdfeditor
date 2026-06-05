@@ -4,7 +4,6 @@ import {
   fontSizeFromBoxHeight,
   MAX_TEXT_FONT_SIZE,
   MIN_TEXT_FONT_SIZE,
-  measureTextWidth,
 } from "./textEditBox";
 
 describe("textEditBox", () => {

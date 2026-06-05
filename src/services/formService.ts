@@ -6,21 +6,15 @@ import {
   loadPdfFromBytes,
   viewportRectToPdfRect,
 } from "@/lib/pdf/pdfEngine";
+import type { PdfBytesResult } from "@/lib/pdf/pdfBinary";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useFormStore } from "@/stores/formStore";
-import { useUiStore } from "@/stores/uiStore";
-import { log, reportError } from "@/lib/logging";
+import { createErrorReporter, log } from "@/lib/logging";
 import { defaultDropdownOptions, normalizeDropdownOptions } from "@/lib/dropdownOptions";
 import type { FormFieldDefinition, FormFieldValue, FormInfo } from "@shared/types";
 import type { PdfDocument } from "@/lib/pdf/pdfEngine";
 
-interface PdfBytesResult {
-  dataBase64: string;
-}
-
-function showError(err: unknown, userAction = "form"): void {
-  reportError(err, { category: "form", userAction });
-}
+const showError = createErrorReporter("form", "form");
 
 export async function inspectDocumentForms(pdfBytes: Uint8Array): Promise<FormInfo> {
   const info = await invokeLogged<FormInfo>("inspect_pdf_forms", {

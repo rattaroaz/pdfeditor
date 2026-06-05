@@ -13,6 +13,7 @@ import { useDocumentStore } from "@/stores/documentStore";
 import { useUiStore } from "@/stores/uiStore";
 import { useContentEditStore } from "@/stores/contentEditStore";
 import { LogViewerPanel } from "@/components/debug/LogViewerPanel";
+import { APP_NAME } from "@/lib/constants";
 
 export function AppShell() {
   useKeyboardShortcuts();
@@ -39,7 +40,7 @@ export function AppShell() {
       if (isDirty) {
         const discard = await ask(
           "You have unsaved changes. Close without saving?",
-          { title: "PDF Editor", kind: "warning" },
+          { title: APP_NAME, kind: "warning" },
         );
         if (!discard) return;
         forceClosingRef.current = true;

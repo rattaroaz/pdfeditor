@@ -22,7 +22,7 @@ export async function writePdfBytes(
       size: bytes.byteLength,
     });
     return;
-  } catch (err) {
+  } catch {
     log.document.warn("fs writeFile failed, falling back to Rust", {
       userAction: "save",
     });
