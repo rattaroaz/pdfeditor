@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
 import { renderPageToCanvas } from "@/lib/pdf/pdfEngine";
 import { reorderPageNumbers } from "@/lib/pageAnnotationRemap";
 import { useDocumentStore } from "@/stores/documentStore";
@@ -11,8 +11,11 @@ export function ThumbnailPanelContent() {
   const setCurrentPage = useDocumentStore((s) => s.setCurrentPage);
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const [pageDragFrom, setPageDragFrom] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const lastClicked = useRef<number | null>(null);
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const pageCount = metadata?.pageCount ?? 0;
   const pageNumbers = Array.from({ length: pageCount }, (_, i) => i + 1);
@@ -59,12 +62,50 @@ export function ThumbnailPanelContent() {
     void runAction(() => rotatePagesPermanent(targetPages, degrees));
   };
 
-  const handleDrop = (toIndex: number) => {
-    if (dragIndex === null || dragIndex === toIndex) return;
-    const newOrder = reorderPageNumbers(pageCount, dragIndex, toIndex);
-    void runAction(() => reorderPages(newOrder));
+  const finishPageDrag = (toIndex: number) => {
+    const fromIndex = pageDragFrom;
+    setPageDragFrom(null);
     setDragIndex(null);
+    setDropIndex(null);
+    if (fromIndex === null || fromIndex === toIndex) return;
+    const newOrder = reorderPageNumbers(pageCount, fromIndex, toIndex);
+    void runAction(() => reorderPages(newOrder));
   };
+
+  useEffect(() => {
+    if (pageDragFrom === null) return;
+
+    const findDropIndex = (clientY: number) => {
+      let hoverIndex = pageDragFrom!;
+      for (let i = 0; i < itemRefs.current.length; i++) {
+        const el = itemRefs.current[i];
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        if (clientY < midY) {
+          hoverIndex = i;
+          break;
+        }
+        hoverIndex = i;
+      }
+      return hoverIndex;
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      setDropIndex(findDropIndex(e.clientY));
+    };
+
+    const onPointerUp = (e: PointerEvent) => {
+      finishPageDrag(findDropIndex(e.clientY));
+    };
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+    };
+  }, [pageDragFrom, pageCount]);
 
   if (!metadata) return null;
 
@@ -127,16 +168,20 @@ export function ThumbnailPanelContent() {
         </button>
       </div>
       <p className="px-2 py-1 text-[10px] text-zinc-500">
-        Ctrl+click to multi-select · drag to reorder
+        Drag the grip to reorder · Ctrl+click to multi-select
       </p>
       <div className="flex-1 space-y-2 overflow-y-auto p-2">
         {pageNumbers.map((pageNumber, index) => (
           <ThumbnailItem
             key={`${pageNumber}-${pageCount}`}
+            ref={(el) => {
+              itemRefs.current[index] = el;
+            }}
             pageNumber={pageNumber}
             isActive={currentPage === pageNumber}
             isSelected={selected.has(pageNumber)}
             isDragging={dragIndex === index}
+            isDropTarget={dropIndex === index && pageDragFrom !== null && pageDragFrom !== index}
             disabled={busy}
             onSelect={(e) => {
               const extend = e.ctrlKey || e.metaKey;
@@ -149,10 +194,15 @@ export function ThumbnailPanelContent() {
                 toggleSelect(pageNumber, extend || range, range);
               }
             }}
-            onDragStart={() => setDragIndex(index)}
-            onDragEnd={() => setDragIndex(null)}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={() => handleDrop(index)}
+            onGripPointerDown={(e) => {
+              if (busy) return;
+              e.preventDefault();
+              e.stopPropagation();
+              e.currentTarget.setPointerCapture(e.pointerId);
+              setPageDragFrom(index);
+              setDragIndex(index);
+              setDropIndex(index);
+            }}
           />
         ))}
       </div>
@@ -160,29 +210,28 @@ export function ThumbnailPanelContent() {
   );
 }
 
-function ThumbnailItem({
-  pageNumber,
-  isActive,
-  isSelected,
-  isDragging,
-  disabled,
-  onSelect,
-  onDragStart,
-  onDragEnd,
-  onDragOver,
-  onDrop,
-}: {
-  pageNumber: number;
-  isActive: boolean;
-  isSelected: boolean;
-  isDragging: boolean;
-  disabled: boolean;
-  onSelect: (e: React.MouseEvent) => void;
-  onDragStart: () => void;
-  onDragEnd: () => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: () => void;
-}) {
+const ThumbnailItem = forwardRef(function ThumbnailItem(
+  {
+    pageNumber,
+    isActive,
+    isSelected,
+    isDragging,
+    isDropTarget,
+    disabled,
+    onSelect,
+    onGripPointerDown,
+  }: {
+    pageNumber: number;
+    isActive: boolean;
+    isSelected: boolean;
+    isDragging: boolean;
+    isDropTarget: boolean;
+    disabled: boolean;
+    onSelect: (e: React.MouseEvent) => void;
+    onGripPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
+  },
+  ref: React.Ref<HTMLDivElement>,
+) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pdfDoc = useDocumentStore((s) => s.pdfDoc);
 
@@ -208,33 +257,42 @@ function ThumbnailItem({
   }, [pdfDoc, pageNumber]);
 
   return (
-    <button
-      type="button"
-      draggable={!disabled}
-      onClick={onSelect}
-      onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = "move";
-        onDragStart();
-      }}
-      onDragEnd={onDragEnd}
-      onDragOver={onDragOver}
-      onDrop={(e) => {
-        e.preventDefault();
-        onDrop();
-      }}
-      className={`w-full rounded border p-1 text-left transition ${
+    <div
+      ref={ref}
+      className={`flex gap-1 rounded border p-1 transition ${
         isSelected
           ? "border-blue-400 bg-blue-950/30 ring-1 ring-blue-400"
           : isActive
             ? "border-blue-500 ring-1 ring-blue-500"
             : "border-zinc-700 hover:border-zinc-500"
-      } ${isDragging ? "opacity-50" : ""}`}
+      } ${isDragging ? "opacity-50" : ""} ${
+        isDropTarget ? "border-emerald-400 ring-2 ring-emerald-400/70" : ""
+      }`}
     >
-      <canvas ref={canvasRef} className="mx-auto block max-w-full bg-white" />
-      <span className="mt-1 block text-center text-xs text-zinc-400">{pageNumber}</span>
-    </button>
+      <div
+        role="button"
+        tabIndex={disabled ? -1 : 0}
+        aria-label={`Drag page ${pageNumber} to reorder`}
+        title="Drag to reorder"
+        className={`flex shrink-0 touch-none select-none items-center self-stretch px-0.5 text-zinc-500 ${
+          disabled ? "cursor-not-allowed opacity-40" : "cursor-grab hover:text-zinc-300 active:cursor-grabbing"
+        }`}
+        onPointerDown={onGripPointerDown}
+      >
+        ⋮⋮
+      </div>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onSelect}
+        className="min-w-0 flex-1 text-left"
+      >
+        <canvas ref={canvasRef} className="mx-auto block max-w-full bg-white" />
+        <span className="mt-1 block text-center text-xs text-zinc-400">{pageNumber}</span>
+      </button>
+    </div>
   );
-}
+});
 
 /** @deprecated Use Sidebar instead */
 export function ThumbnailPanel() {

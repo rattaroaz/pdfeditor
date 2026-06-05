@@ -3,9 +3,9 @@ import { log } from "@/lib/logging";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useHistoryStore } from "@/stores/historyStore";
 
-export function undoEdit(): void {
+export async function undoEdit(): Promise<void> {
   const history = useHistoryStore.getState();
-  if (!history.undo()) return;
+  if (!(await history.undo())) return;
   log.ui.info("Undo", {
     userAction: "undo",
     metadata: { canRedo: history.canRedo() },
@@ -14,9 +14,9 @@ export function undoEdit(): void {
   void persistAnnotations();
 }
 
-export function redoEdit(): void {
+export async function redoEdit(): Promise<void> {
   const history = useHistoryStore.getState();
-  if (!history.redo()) return;
+  if (!(await history.redo())) return;
   log.ui.info("Redo", {
     userAction: "redo",
     metadata: { canUndo: history.canUndo() },

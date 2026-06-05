@@ -20,6 +20,7 @@ interface DocumentStore {
   loadError: string | null;
   currentPage: number;
   scrollToPage: number | null;
+  scrollTarget: { pageNumber: number; pdfX: number; pdfY: number } | null;
   zoom: number;
   zoomMode: ZoomMode;
   viewMode: ViewMode;
@@ -40,6 +41,8 @@ interface DocumentStore {
   setDirty: (dirty: boolean) => void;
   setCurrentPage: (page: number, options?: { scroll?: boolean }) => void;
   clearScrollRequest: () => void;
+  requestScrollToTarget: (target: { pageNumber: number; pdfX: number; pdfY: number }) => void;
+  clearScrollTarget: () => void;
   setZoom: (zoom: number) => void;
   setZoomMode: (mode: ZoomMode) => void;
   setViewMode: (mode: ViewMode) => void;
@@ -87,6 +90,7 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
   loadError: null,
   currentPage: 1,
   scrollToPage: null,
+  scrollTarget: null,
   zoom: DEFAULT_ZOOM,
   zoomMode: "custom",
   viewMode: "continuous",
@@ -154,6 +158,16 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
     });
   },
   clearScrollRequest: () => set({ scrollToPage: null }),
+  requestScrollToTarget: (target) => {
+    const total = get().metadata?.pageCount ?? 1;
+    const pageNumber = Math.min(Math.max(1, target.pageNumber), total);
+    set({
+      currentPage: pageNumber,
+      scrollToPage: pageNumber,
+      scrollTarget: target,
+    });
+  },
+  clearScrollTarget: () => set({ scrollTarget: null }),
   setZoom: (zoom) =>
     set({
       zoom: Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom)),

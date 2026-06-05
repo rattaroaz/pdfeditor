@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { navigateToAnnotation } from "@/lib/navigateToTarget";
 import { useAnnotationStore } from "@/stores/annotationStore";
 import { useDocumentStore } from "@/stores/documentStore";
 import type { Annotation, AnnotationType } from "@shared/types";
@@ -63,6 +64,7 @@ export function AnnotationsPanel() {
           ))}
         </select>
       </div>
+      <p className="px-2 py-1 text-[10px] text-zinc-500">Double-click to jump to item on page</p>
       <div className="flex-1 overflow-y-auto p-2">
         {filtered.map((ann) => (
           <button
@@ -71,6 +73,10 @@ export function AnnotationsPanel() {
             onClick={() => {
               selectAnnotation(ann.id);
               setCurrentPage(ann.pageIndex + 1, { scroll: true });
+            }}
+            onDoubleClick={(e) => {
+              e.preventDefault();
+              navigateToAnnotation(ann);
             }}
             className={`mb-1 block w-full rounded border px-2 py-1.5 text-left text-xs ${
               selectedId === ann.id

@@ -73,19 +73,34 @@ export function useAutoZoom(viewportRef: RefObject<HTMLElement | null>) {
 
 export function useScrollToPage(viewportRef: RefObject<HTMLElement | null>) {
   const scrollToPage = useDocumentStore((s) => s.scrollToPage);
+  const scrollTarget = useDocumentStore((s) => s.scrollTarget);
+  const zoom = useDocumentStore((s) => s.zoom);
   const clearScrollRequest = useDocumentStore((s) => s.clearScrollRequest);
+  const clearScrollTarget = useDocumentStore((s) => s.clearScrollTarget);
 
   useEffect(() => {
     if (!scrollToPage || !viewportRef.current) return;
 
-    const target = viewportRef.current.querySelector(
-      `[data-page="${scrollToPage}"]`,
-    );
-    if (target) {
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+    const viewport = viewportRef.current;
+    const pageEl = viewport.querySelector(`[data-page="${scrollToPage}"]`) as HTMLElement | null;
+
+    const scrollToPoint = () => {
+      if (!pageEl) return;
+      pageEl.scrollIntoView({ behavior: "smooth", block: "start" });
+
+      if (scrollTarget && scrollTarget.pageNumber === scrollToPage) {
+        requestAnimationFrame(() => {
+          const pageTop = pageEl.offsetTop;
+          const targetY = pageTop + scrollTarget.pdfY * zoom - viewport.clientHeight / 3;
+          viewport.scrollTo({ top: Math.max(0, targetY), behavior: "smooth" });
+          clearScrollTarget();
+        });
+      }
+    };
+
+    scrollToPoint();
     clearScrollRequest();
-  }, [scrollToPage, clearScrollRequest, viewportRef]);
+  }, [scrollToPage, scrollTarget, zoom, clearScrollRequest, clearScrollTarget, viewportRef]);
 }
 
 export function useHandPan(

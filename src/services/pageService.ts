@@ -4,9 +4,15 @@ import {
   remapAnnotationsAfterDelete,
   remapAnnotationsAfterInsert,
   remapAnnotationsAfterReorder,
+  remapPageIndexedAfterDelete,
+  remapPageIndexedAfterInsert,
+  remapPageIndexedAfterReorder,
 } from "@/lib/pageAnnotationRemap";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useAnnotationStore } from "@/stores/annotationStore";
+import { useContentEditStore } from "@/stores/contentEditStore";
+import { useFormStore } from "@/stores/formStore";
+import { recordHistory } from "@/stores/historyStore";
 import { log, reportError } from "@/lib/logging";
 
 interface PdfBytesResult {
@@ -17,19 +23,47 @@ function showError(err: unknown, userAction = "page"): void {
   reportError(err, { category: "document", userAction });
 }
 
+function remapAllPageIndexedState(
+  remap: {
+    annotations: ReturnType<typeof useAnnotationStore.getState>["annotations"];
+    textEdits: ReturnType<typeof useContentEditStore.getState>["textEdits"];
+    imageEdits: ReturnType<typeof useContentEditStore.getState>["imageEdits"];
+    newFields: ReturnType<typeof useFormStore.getState>["newFields"];
+  },
+): void {
+  useAnnotationStore.getState().setAnnotations(remap.annotations);
+  useContentEditStore.setState({
+    textEdits: remap.textEdits,
+    imageEdits: remap.imageEdits,
+  });
+  useFormStore.setState({ newFields: remap.newFields });
+}
+
 async function applyPdfMutation(
   mutate: (base64: string) => Promise<PdfBytesResult>,
-  remapAnnotations?: (
-    annotations: ReturnType<typeof useAnnotationStore.getState>["annotations"],
-  ) => ReturnType<typeof useAnnotationStore.getState>["annotations"],
+  remap?: (state: {
+    annotations: ReturnType<typeof useAnnotationStore.getState>["annotations"];
+    textEdits: ReturnType<typeof useContentEditStore.getState>["textEdits"];
+    imageEdits: ReturnType<typeof useContentEditStore.getState>["imageEdits"];
+    newFields: ReturnType<typeof useFormStore.getState>["newFields"];
+  }) => {
+    annotations: ReturnType<typeof useAnnotationStore.getState>["annotations"];
+    textEdits: ReturnType<typeof useContentEditStore.getState>["textEdits"];
+    imageEdits: ReturnType<typeof useContentEditStore.getState>["imageEdits"];
+    newFields: ReturnType<typeof useFormStore.getState>["newFields"];
+  },
 ): Promise<void> {
   const docStore = useDocumentStore.getState();
   const annStore = useAnnotationStore.getState();
+  const contentStore = useContentEditStore.getState();
+  const formStore = useFormStore.getState();
   const sourceBytes = docStore.basePdfBytes ?? docStore.pdfBytes;
 
   if (!sourceBytes) {
     throw new Error("No document open");
   }
+
+  recordHistory();
 
   docStore.setLoading(true);
   try {
@@ -43,8 +77,15 @@ async function applyPdfMutation(
       pageCount: pdfDoc.numPages,
     });
 
-    if (remapAnnotations) {
-      annStore.setAnnotations(remapAnnotations(annStore.annotations));
+    if (remap) {
+      remapAllPageIndexedState(
+        remap({
+          annotations: annStore.annotations,
+          textEdits: contentStore.textEdits,
+          imageEdits: contentStore.imageEdits,
+          newFields: formStore.newFields,
+        }),
+      );
     }
 
     log.document.info("Page mutation applied", {
@@ -73,7 +114,12 @@ export async function deletePages(pageNumbers: number[]): Promise<void> {
         pdfBase64,
         pageNumbers: sorted,
       }),
-    (annotations) => remapAnnotationsAfterDelete(annotations, sorted),
+    ({ annotations, textEdits, imageEdits, newFields }) => ({
+      annotations: remapAnnotationsAfterDelete(annotations, sorted),
+      textEdits: remapPageIndexedAfterDelete(textEdits, sorted),
+      imageEdits: remapPageIndexedAfterDelete(imageEdits, sorted),
+      newFields: remapPageIndexedAfterDelete(newFields, sorted),
+    }),
   );
 }
 
@@ -104,7 +150,12 @@ export async function insertBlankPages(afterPage: number, count = 1): Promise<vo
         afterPage,
         count,
       }),
-    (annotations) => remapAnnotationsAfterInsert(annotations, afterPage, count),
+    ({ annotations, textEdits, imageEdits, newFields }) => ({
+      annotations: remapAnnotationsAfterInsert(annotations, afterPage, count),
+      textEdits: remapPageIndexedAfterInsert(textEdits, afterPage, count),
+      imageEdits: remapPageIndexedAfterInsert(imageEdits, afterPage, count),
+      newFields: remapPageIndexedAfterInsert(newFields, afterPage, count),
+    }),
   );
 }
 
@@ -115,6 +166,11 @@ export async function reorderPages(newOrder: number[]): Promise<void> {
         pdfBase64,
         newOrder,
       }),
-    (annotations) => remapAnnotationsAfterReorder(annotations, newOrder),
+    ({ annotations, textEdits, imageEdits, newFields }) => ({
+      annotations: remapAnnotationsAfterReorder(annotations, newOrder),
+      textEdits: remapPageIndexedAfterReorder(textEdits, newOrder),
+      imageEdits: remapPageIndexedAfterReorder(imageEdits, newOrder),
+      newFields: remapPageIndexedAfterReorder(newFields, newOrder),
+    }),
   );
 }

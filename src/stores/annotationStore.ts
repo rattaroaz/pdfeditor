@@ -15,6 +15,8 @@ interface AnnotationStore {
   setAnnotations: (annotations: Annotation[]) => void;
   addAnnotation: (annotation: NewAnnotation) => void;
   updateAnnotation: (id: string, patch: Partial<Annotation>) => void;
+  /** Live move/resize while dragging — does not push undo history. */
+  updateAnnotationLayout: (id: string, annotation: Annotation) => void;
   removeAnnotation: (id: string) => void;
   clearAnnotations: () => void;
   getPageAnnotations: (pageIndex: number) => Annotation[];
@@ -61,6 +63,11 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
       ),
     }));
   },
+
+  updateAnnotationLayout: (id, annotation) =>
+    set((state) => ({
+      annotations: state.annotations.map((a) => (a.id === id ? annotation : a)),
+    })),
   removeAnnotation: (id) => {
     recordHistory();
     log.annotation.info("Annotation removed", {

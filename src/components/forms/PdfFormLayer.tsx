@@ -83,6 +83,7 @@ export function PdfFormLayer({ pageNumber, scale, canvasRef }: PdfFormLayerProps
   const addNewField = useFormStore((s) => s.addNewField);
   const updateNewFieldPosition = useFormStore((s) => s.updateNewFieldPosition);
   const activeTool = useAnnotationStore((s) => s.activeTool);
+  const activeFieldName = useFormStore((s) => s.activeFieldName);
   const formInfo = useFormStore((s) => s.formInfo);
 
   const [widgets, setWidgets] = useState<Awaited<ReturnType<typeof getFormWidgetsForPage>>>([]);
@@ -111,6 +112,16 @@ export function PdfFormLayer({ pageNumber, scale, canvasRef }: PdfFormLayerProps
     if (!pdfDoc || appMode !== "forms") return;
     void getFormWidgetsForPage(pdfDoc, pageNumber, scale, rotation).then(setWidgets);
   }, [pdfDoc, pageNumber, scale, rotation, appMode, newFields.length]);
+
+  useEffect(() => {
+    if (appMode !== "forms" || !activeFieldName) return;
+    const newField = pageNewFields.find((f) => f.name === activeFieldName);
+    if (newField) setSelectedFieldId(newField.id);
+    const timer = window.setTimeout(() => {
+      inputRefs.current.get(activeFieldName)?.focus({ preventScroll: true });
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [activeFieldName, appMode, pageNumber, widgets, pageNewFields]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {

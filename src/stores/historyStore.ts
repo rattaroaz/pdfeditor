@@ -12,8 +12,8 @@ interface HistoryStore {
   past: EditHistorySnapshot[];
   future: EditHistorySnapshot[];
   record: () => void;
-  undo: () => boolean;
-  redo: () => boolean;
+  undo: () => Promise<boolean>;
+  redo: () => Promise<boolean>;
   clear: () => void;
   canUndo: () => boolean;
   canRedo: () => boolean;
@@ -37,7 +37,7 @@ export const useHistoryStore = create<HistoryStore>((set, get) => ({
     });
   },
 
-  undo: () => {
+  undo: async () => {
     const { past } = get();
     if (past.length === 0) return false;
     const previous = past[past.length - 1];
@@ -46,11 +46,11 @@ export const useHistoryStore = create<HistoryStore>((set, get) => ({
       past: past.slice(0, -1),
       future: [current, ...get().future],
     });
-    applyEditSnapshot(previous);
+    await applyEditSnapshot(previous);
     return true;
   },
 
-  redo: () => {
+  redo: async () => {
     const { future } = get();
     if (future.length === 0) return false;
     const next = future[0];
@@ -59,7 +59,7 @@ export const useHistoryStore = create<HistoryStore>((set, get) => ({
       future: state.future.slice(1),
       past: [...state.past, current],
     }));
-    applyEditSnapshot(next);
+    await applyEditSnapshot(next);
     return true;
   },
 

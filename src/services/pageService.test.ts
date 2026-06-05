@@ -8,9 +8,14 @@ const PDF_BASE64 = encodeBase64Pdf(PDF_BYTES);
 
 const mockInvokeLogged = vi.hoisted(() => vi.fn());
 const mockLoadPdf = vi.hoisted(() => vi.fn());
+const mockRecordHistory = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/tauriInvoke", () => ({
   invokeLogged: mockInvokeLogged,
+}));
+
+vi.mock("@/stores/historyStore", () => ({
+  recordHistory: mockRecordHistory,
 }));
 
 vi.mock("@/lib/pdf/pdfEngine", () => ({
@@ -38,6 +43,7 @@ describe("pageService", () => {
 
   it("deletePages invokes delete_pdf_pages with sorted page numbers", async () => {
     await deletePages([3, 1]);
+    expect(mockRecordHistory).toHaveBeenCalled();
     expect(mockInvokeLogged).toHaveBeenCalledWith("delete_pdf_pages", {
       pdfBase64: PDF_BASE64,
       pageNumbers: [1, 3],

@@ -7,9 +7,8 @@ import type {
   StampAnnotation,
   TextAnnotation,
 } from "@shared/types";
+import { stampSize } from "@/lib/annotationTransform";
 
-const STAMP_WIDTH = 120;
-const STAMP_HEIGHT = 30;
 const NOTE_RADIUS = 10;
 const HIT_PADDING = 4;
 
@@ -94,7 +93,8 @@ export function hitTestAnnotation(
     }
     if (ann.type === "stamp") {
       const stamp = ann as StampAnnotation;
-      if (pointInRect(x, y, stamp.x, stamp.y, STAMP_WIDTH, STAMP_HEIGHT, HIT_PADDING)) {
+      const { width, height } = stampSize(stamp);
+      if (pointInRect(x, y, stamp.x, stamp.y, width, height, HIT_PADDING)) {
         return ann;
       }
     }

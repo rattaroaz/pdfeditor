@@ -12,7 +12,7 @@ describe("historyStore", () => {
     clearHistory();
   });
 
-  it("undoes and redoes annotation changes", () => {
+  it("undoes and redoes annotation changes", async () => {
     useAnnotationStore.getState().addAnnotation({
       type: "highlight",
       pageIndex: 0,
@@ -22,14 +22,14 @@ describe("historyStore", () => {
     });
     expect(useAnnotationStore.getState().annotations).toHaveLength(1);
 
-    useHistoryStore.getState().undo();
+    await useHistoryStore.getState().undo();
     expect(useAnnotationStore.getState().annotations).toHaveLength(0);
 
-    useHistoryStore.getState().redo();
+    await useHistoryStore.getState().redo();
     expect(useAnnotationStore.getState().annotations).toHaveLength(1);
   });
 
-  it("undoes content and form edits together", () => {
+  it("undoes content and form edits together", async () => {
     useContentEditStore.getState().addTextEdit({
       pageIndex: 0,
       x: 10,
@@ -52,18 +52,18 @@ describe("historyStore", () => {
       height: 20,
     });
 
-    useHistoryStore.getState().undo();
+    await useHistoryStore.getState().undo();
     expect(useContentEditStore.getState().textEdits).toHaveLength(1);
     expect(useFormStore.getState().newFields).toHaveLength(0);
 
-    useHistoryStore.getState().undo();
+    await useHistoryStore.getState().undo();
     expect(useContentEditStore.getState().textEdits).toHaveLength(0);
 
-    useHistoryStore.getState().redo();
+    await useHistoryStore.getState().redo();
     expect(useContentEditStore.getState().textEdits).toHaveLength(1);
     expect(useFormStore.getState().newFields).toHaveLength(0);
 
-    useHistoryStore.getState().redo();
+    await useHistoryStore.getState().redo();
     expect(useFormStore.getState().newFields).toHaveLength(1);
   });
 });

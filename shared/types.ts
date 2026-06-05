@@ -125,6 +125,8 @@ export interface StampAnnotation extends AnnotationBase {
   x: number;
   y: number;
   stamp: StampKind;
+  width?: number;
+  height?: number;
 }
 
 export interface ShapeAnnotation extends AnnotationBase {

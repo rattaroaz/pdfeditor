@@ -432,3 +432,53 @@ export async function getFormWidgetsForPage(
   }
   return widgets;
 }
+
+/** Locate a form field widget anywhere in the document (viewport coords at scale 1). */
+export async function findFormWidgetByName(
+  pdfDoc: PdfDocument,
+  fieldName: string,
+  rotation = 0,
+): Promise<FormWidgetRect | null> {
+  const fieldObjects = await pdfDoc.getFieldObjects();
+  const objs = fieldObjects?.[fieldName];
+  if (!objs?.length) return null;
+
+  for (const obj of objs) {
+    const field = obj as {
+      page?: number;
+      rect?: number[];
+      type?: string;
+      value?: string;
+      options?: string[];
+      items?: Array<string | { exportValue?: string; displayValue?: string }>;
+      required?: boolean;
+      readOnly?: boolean;
+      editable?: boolean;
+    };
+    if (field.page === undefined || !field.rect || field.rect.length < 4) continue;
+
+    const pageIndex = field.page;
+    const pageNumber = pageIndex + 1;
+    const page = await pdfDoc.getPage(pageNumber);
+    const viewport = page.getViewport({ scale: 1, rotation });
+    const [x1, y1, x2, y2] = field.rect;
+    const [vx1, vy1] = viewport.convertToViewportPoint(x1, y1);
+    const [vx2, vy2] = viewport.convertToViewportPoint(x2, y2);
+
+    return {
+      name: fieldName,
+      type: field.type ?? "text",
+      pageIndex,
+      x: Math.min(vx1, vx2),
+      y: Math.min(vy1, vy2),
+      width: Math.abs(vx2 - vx1),
+      height: Math.abs(vy2 - vy1),
+      value: field.value,
+      options: choiceOptionsFromPdfField(field),
+      required: field.required,
+      readOnly: field.readOnly ?? field.editable === false,
+    };
+  }
+
+  return null;
+}

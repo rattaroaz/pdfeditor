@@ -1,7 +1,17 @@
 import { useState, useRef, useEffect } from "react";
 import { useAnnotationStore } from "@/stores/annotationStore";
 import { useUiStore } from "@/stores/uiStore";
+import { recordHistory } from "@/stores/historyStore";
 import { hitTestAnnotation, MARKUP_COLOR, lineMarkupBandY, MARKUP_LINE_THICKNESS, normalizeMarkupRect } from "@/lib/annotationHitTest";
+import { annotationBounds, type PdfBounds } from "@/lib/annotationBounds";
+import {
+  canResizeAnnotation,
+  hitTestResizeHandle,
+  moveAnnotation,
+  resizeAnnotation,
+  RESIZE_HANDLE_PX,
+  stampSize,
+} from "@/lib/annotationTransform";
 import { persistAnnotations } from "@/services/documentService";
 import type {
   FreehandAnnotation,
@@ -15,6 +25,15 @@ import type {
 } from "@shared/types";
 
 const SHAPE_TOOLS: Tool[] = ["rectangle", "ellipse", "line", "arrow"];
+const DRAG_THRESHOLD_PX = 5;
+
+type TransformSession = {
+  id: string;
+  kind: "move" | "resize";
+  startPointer: { x: number; y: number };
+  snapshot: Annotation;
+  anchorBounds: PdfBounds;
+};
 
 const STAMP_LABELS: Record<StampAnnotation["stamp"], string> = {
   approved: "APPROVED",
@@ -41,7 +60,14 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
   const selectedId = useAnnotationStore((s) => s.selectedId);
   const selectAnnotation = useAnnotationStore((s) => s.selectAnnotation);
   const removeAnnotation = useAnnotationStore((s) => s.removeAnnotation);
+  const updateAnnotationLayout = useAnnotationStore((s) => s.updateAnnotationLayout);
   const [drawing, setDrawing] = useState(false);
+  const [transform, setTransform] = useState<TransformSession | null>(null);
+  const [selectCursor, setSelectCursor] = useState<string>("default");
+  const pendingSelectDragRef = useRef<
+    (TransformSession & { startClientX: number; startClientY: number }) | null
+  >(null);
+  const didDragRef = useRef(false);
   const [start, setStart] = useState<{ x: number; y: number } | null>(null);
   const [current, setCurrent] = useState<{ x: number; y: number } | null>(null);
   const [points, setPoints] = useState<Array<{ x: number; y: number }>>([]);
@@ -115,14 +141,15 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
       if (ann.type === "stamp") {
         const stamp = ann as StampAnnotation;
         const label = STAMP_LABELS[stamp.stamp];
+        const { width: sw, height: sh } = stampSize(stamp);
         ctx.font = `bold ${14 * scale}px sans-serif`;
         ctx.fillStyle = stamp.color || "#D32F2F";
         ctx.strokeStyle = stamp.color || "#D32F2F";
         ctx.lineWidth = 2 * scale;
-        const w = ctx.measureText(label).width + 16 * scale;
-        const h = 24 * scale;
         const x = stamp.x * scale;
         const y = stamp.y * scale;
+        const w = sw * scale;
+        const h = sh * scale;
         ctx.strokeRect(x, y, w, h);
         ctx.fillText(label, x + 8 * scale, y + 17 * scale);
         if (selectedId === ann.id) {
@@ -145,6 +172,9 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
       const selected = pageAnnotations.find((a) => a.id === selectedId);
       if (selected && selected.type !== "stamp" && selected.type !== "shape") {
         drawSelectionForAnnotation(ctx, selected, scale);
+      }
+      if (selected && canResizeAnnotation(selected)) {
+        drawResizeHandle(ctx, selected, scale);
       }
     }
 
@@ -286,7 +316,33 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
       ctx.beginPath();
       ctx.arc(note.x * scale, note.y * scale, 12, 0, Math.PI * 2);
       ctx.stroke();
+    } else if (ann.type === "text") {
+      const text = ann as TextAnnotation;
+      ctx.strokeRect(
+        text.x * scale - 2,
+        text.y * scale - 2,
+        text.width * scale + 4,
+        text.height * scale + 4,
+      );
     }
+    ctx.restore();
+  }
+
+  function drawResizeHandle(
+    ctx: CanvasRenderingContext2D,
+    ann: Annotation,
+    scale: number,
+  ) {
+    const b = annotationBounds(ann);
+    const hx = (b.x + b.width) * scale;
+    const hy = (b.y + b.height) * scale;
+    const s = RESIZE_HANDLE_PX;
+    ctx.save();
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "#2196F3";
+    ctx.lineWidth = 1;
+    ctx.fillRect(hx - s / 2, hy - s / 2, s, s);
+    ctx.strokeRect(hx - s / 2, hy - s / 2, s, s);
     ctx.restore();
   }
 
@@ -343,12 +399,12 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
 
   useEffect(() => {
     paint();
-  }, [pageAnnotations, scale, drawing, start, current, points, activeTool, selectedId]);
+  }, [pageAnnotations, scale, drawing, start, current, points, activeTool, selectedId, transform]);
 
   const hitTest = (x: number, y: number): Annotation | null =>
     hitTestAnnotation(annotations, pageIndex, x, y);
 
-  const localCoords = (e: React.MouseEvent) => {
+  const localCoords = (e: { clientX: number; clientY: number }) => {
     const rect = containerRef.current!.getBoundingClientRect();
     return {
       x: (e.clientX - rect.left) / scale,
@@ -356,16 +412,133 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
     };
   };
 
+  useEffect(() => {
+    if (activeTool !== "select") return;
+
+    const onMove = (e: MouseEvent) => {
+      const pt = localCoords(e);
+
+      if (!transform && !pendingSelectDragRef.current) {
+        const hit = hitTest(pt.x, pt.y);
+        if (
+          hit &&
+          canResizeAnnotation(hit) &&
+          hitTestResizeHandle(hit, pt.x, pt.y, scale)
+        ) {
+          setSelectCursor("nwse-resize");
+        } else if (hit) {
+          setSelectCursor("move");
+        } else {
+          setSelectCursor("default");
+        }
+      }
+
+      const pending = pendingSelectDragRef.current;
+      if (pending && !transform) {
+        const dx = e.clientX - pending.startClientX;
+        const dy = e.clientY - pending.startClientY;
+        if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+        recordHistory();
+        const session: TransformSession = {
+          id: pending.id,
+          kind: pending.kind,
+          startPointer: pending.startPointer,
+          snapshot: pending.snapshot,
+          anchorBounds: pending.anchorBounds,
+        };
+        pendingSelectDragRef.current = null;
+        setTransform(session);
+        const next =
+          session.kind === "move"
+            ? moveAnnotation(
+                session.snapshot,
+                pt.x - session.startPointer.x,
+                pt.y - session.startPointer.y,
+              )
+            : resizeAnnotation(
+                session.snapshot,
+                session.anchorBounds,
+                pt.x,
+                pt.y,
+              );
+        updateAnnotationLayout(session.id, next);
+        return;
+      }
+
+      if (!transform) return;
+      const dx = pt.x - transform.startPointer.x;
+      const dy = pt.y - transform.startPointer.y;
+      const next =
+        transform.kind === "move"
+          ? moveAnnotation(transform.snapshot, dx, dy)
+          : resizeAnnotation(
+              transform.snapshot,
+              transform.anchorBounds,
+              pt.x,
+              pt.y,
+            );
+      updateAnnotationLayout(transform.id, next);
+    };
+
+    const onUp = () => {
+      pendingSelectDragRef.current = null;
+      if (transform) {
+        didDragRef.current = true;
+        setTransform(null);
+        void persistAnnotations();
+      }
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [
+    activeTool,
+    pageAnnotations,
+    scale,
+    selectedId,
+    transform,
+    updateAnnotationLayout,
+  ]);
+
   const handleMouseDown = (e: React.MouseEvent) => {
     if (activeTool === "select") {
       e.preventDefault();
       e.stopPropagation();
       const pt = localCoords(e);
       const hit = hitTest(pt.x, pt.y);
+
+      if (
+        hit &&
+        canResizeAnnotation(hit) &&
+        hitTestResizeHandle(hit, pt.x, pt.y, scale)
+      ) {
+        recordHistory();
+        setTransform({
+          id: hit.id,
+          kind: "resize",
+          startPointer: pt,
+          snapshot: hit,
+          anchorBounds: annotationBounds(hit),
+        });
+        selectAnnotation(hit.id);
+        return;
+      }
+
       selectAnnotation(hit?.id ?? null);
-      if (hit && e.detail === 2) {
-        removeAnnotation(hit.id);
-        void persistAnnotations();
+      if (hit) {
+        pendingSelectDragRef.current = {
+          id: hit.id,
+          kind: "move",
+          startPointer: pt,
+          snapshot: hit,
+          anchorBounds: annotationBounds(hit),
+          startClientX: e.clientX,
+          startClientY: e.clientY,
+        };
       }
       return;
     }
@@ -413,6 +586,7 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
+    if (activeTool === "select") return;
     if (!drawing) return;
     const pt = localCoords(e);
     setCurrent(pt);
@@ -540,7 +714,24 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
   };
 
   const handleMouseUp = async (e: React.MouseEvent) => {
+    if (activeTool === "select") return;
     await finishDrawingAt(localCoords(e));
+  };
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    if (activeTool !== "select") return;
+    if (didDragRef.current) {
+      didDragRef.current = false;
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    const pt = localCoords(e);
+    const hit = hitTest(pt.x, pt.y);
+    if (hit) {
+      removeAnnotation(hit.id);
+      void persistAnnotations();
+    }
   };
 
   const drawingMode =
@@ -560,28 +751,29 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
     <div
       ref={containerRef}
       className="absolute inset-0 z-[40]"
-      style={{ pointerEvents: layerInteractive ? "auto" : "none" }}
+      style={{
+        pointerEvents: layerInteractive ? "auto" : "none",
+        cursor: selectMode ? selectCursor : drawingMode ? "crosshair" : undefined,
+      }}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onDoubleClick={handleDoubleClick}
+      onMouseLeave={() => {
+        if (activeTool === "select") return;
+        if (drawing && start && current && !finishingDrawingRef.current) {
+          void finishDrawingAt(current);
+          return;
+        }
+        setDrawing(false);
+        setStart(null);
+        setCurrent(null);
+        setPoints([]);
+      }}
     >
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 h-full w-full touch-none"
-        style={{
-          pointerEvents: layerInteractive ? "auto" : "none",
-          cursor: selectMode ? "default" : drawingMode ? "crosshair" : undefined,
-        }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={() => {
-          if (drawing && start && current && !finishingDrawingRef.current) {
-            void finishDrawingAt(current);
-            return;
-          }
-          setDrawing(false);
-          setStart(null);
-          setCurrent(null);
-          setPoints([]);
-        }}
+        className="pointer-events-none absolute inset-0 h-full w-full touch-none"
       />
       {pageAnnotations
         .filter((a) => a.type === "note")
@@ -591,14 +783,9 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
             <div
               key={ann.id}
               title={note.content}
-              onClick={() => selectAnnotation(ann.id)}
-              onDoubleClick={() => {
-                removeAnnotation(ann.id);
-                void persistAnnotations();
-              }}
-              className={`absolute max-w-48 truncate rounded bg-yellow-400/90 px-1.5 py-0.5 text-[10px] text-black shadow ${
-                selectMode ? "pointer-events-auto cursor-pointer" : "pointer-events-none"
-              } ${selectedId === ann.id ? "ring-2 ring-blue-500" : ""}`}
+              className={`pointer-events-none absolute max-w-48 truncate rounded bg-yellow-400/90 px-1.5 py-0.5 text-[10px] text-black shadow ${
+                selectedId === ann.id ? "ring-2 ring-blue-500" : ""
+              }`}
               style={{
                 left: note.x * scale + 10,
                 top: note.y * scale - 8,
@@ -612,21 +799,20 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
         .filter((a) => a.type === "stamp")
         .map((ann) => {
           const stamp = ann as StampAnnotation;
+          const { width: sw, height: sh } = stampSize(stamp);
           return (
             <button
               key={ann.id}
               type="button"
-              onClick={() => selectAnnotation(ann.id)}
-              onDoubleClick={() => {
-                removeAnnotation(ann.id);
-                void persistAnnotations();
-              }}
-              className={`absolute border-2 px-2 py-1 text-xs font-bold ${
-                selectMode ? "pointer-events-auto cursor-pointer" : "pointer-events-none"
-              } ${selectedId === ann.id ? "ring-2 ring-blue-500" : ""}`}
+              tabIndex={-1}
+              className={`pointer-events-none absolute border-2 px-2 py-1 text-xs font-bold ${
+                selectedId === ann.id ? "ring-2 ring-blue-500" : ""
+              }`}
               style={{
                 left: stamp.x * scale,
                 top: stamp.y * scale,
+                width: sw * scale,
+                height: sh * scale,
                 color: stamp.color,
                 borderColor: stamp.color,
               }}
@@ -642,10 +828,9 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
           return (
             <div
               key={ann.id}
-              onClick={() => selectAnnotation(ann.id)}
-              className={`absolute overflow-hidden rounded border border-zinc-400 bg-white/90 p-1 text-black ${
-                selectMode ? "pointer-events-auto cursor-pointer" : "pointer-events-none"
-              } ${selectedId === ann.id ? "ring-2 ring-blue-500" : ""}`}
+              className={`pointer-events-none absolute overflow-hidden rounded border border-zinc-400 bg-white/90 p-1 text-black ${
+                selectedId === ann.id ? "ring-2 ring-blue-500" : ""
+              }`}
               style={{
                 left: text.x * scale,
                 top: text.y * scale,

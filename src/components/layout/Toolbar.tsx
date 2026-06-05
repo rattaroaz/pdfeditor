@@ -1,6 +1,4 @@
 import { ZOOM_MAX, ZOOM_MIN, ZOOM_STEP } from "@/lib/constants";
-import { logUserAction } from "@/lib/logging";
-import { openPdfFromDialog, savePdf } from "@/services/documentService";
 import { undoEdit, redoEdit } from "@/services/historyService";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useHistoryStore } from "@/stores/historyStore";
@@ -20,30 +18,6 @@ export function Toolbar() {
 
   return (
     <div className="flex items-center gap-2 border-b border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm">
-      <button
-        type="button"
-        className="rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-500"
-        onClick={() => {
-          logUserAction("open", "Open PDF from toolbar");
-          void openPdfFromDialog();
-        }}
-      >
-        Open
-      </button>
-      <button
-        type="button"
-        className="rounded px-2 py-1 hover:bg-zinc-800 disabled:opacity-40"
-        disabled={!hasDocument}
-        onClick={() => {
-          logUserAction("save", "Save PDF from toolbar");
-          void savePdf(false);
-        }}
-      >
-        Save
-      </button>
-
-      <span className="mx-1 h-4 w-px bg-zinc-700" />
-
       <button
         type="button"
         title="Undo (Ctrl+Z)"

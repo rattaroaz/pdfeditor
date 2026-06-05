@@ -15,7 +15,7 @@ describe("edit history snapshots", () => {
     useFormStore.getState().clearFormState();
   });
 
-  it("capture and apply round-trip annotations and form state", () => {
+  it("capture and apply round-trip annotations and form state", async () => {
     useFormStore.getState().setFieldValue("email", "a@b.com", "text");
     useFormStore.getState().addNewField({
       pageIndex: 0,
@@ -32,7 +32,7 @@ describe("edit history snapshots", () => {
 
     const snap = captureEditSnapshot();
     useFormStore.getState().clearFormState();
-    applyEditSnapshot(snap);
+    await applyEditSnapshot(snap);
 
     expect(useFormStore.getState().values.email?.value).toBe("a@b.com");
     expect(useFormStore.getState().newFields).toHaveLength(1);

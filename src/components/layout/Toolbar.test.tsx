@@ -4,16 +4,9 @@ import userEvent from "@testing-library/user-event";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useHistoryStore } from "@/stores/historyStore";
 
-const { mockOpen, mockSave, mockUndo, mockRedo } = vi.hoisted(() => ({
-  mockOpen: vi.fn(),
-  mockSave: vi.fn(),
+const { mockUndo, mockRedo } = vi.hoisted(() => ({
   mockUndo: vi.fn(),
   mockRedo: vi.fn(),
-}));
-
-vi.mock("@/services/documentService", () => ({
-  openPdfFromDialog: mockOpen,
-  savePdf: mockSave,
 }));
 
 vi.mock("@/services/historyService", () => ({
@@ -35,9 +28,14 @@ describe("Toolbar", () => {
     });
   });
 
-  it("disables save and undo when no document is open", () => {
+  it("does not show open or save buttons", () => {
     render(<Toolbar />);
-    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Open" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+  });
+
+  it("disables undo when no document is open", () => {
+    render(<Toolbar />);
     expect(screen.getByRole("button", { name: "Undo" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Redo" })).toBeDisabled();
   });
@@ -53,20 +51,31 @@ describe("Toolbar", () => {
     expect(screen.getByRole("button", { name: "Undo" })).not.toBeDisabled();
   });
 
-  it("calls open and save handlers", async () => {
+  it("calls undo handler", async () => {
     const user = userEvent.setup();
     useDocumentStore.setState({
       pdfDoc: { numPages: 1 } as never,
       metadata: { pageCount: 1, fileSize: 100 },
-      filePath: "/doc.pdf",
-      pdfBytes: new Uint8Array(4),
     });
+    useHistoryStore.getState().record();
 
     render(<Toolbar />);
-    await user.click(screen.getByRole("button", { name: "Open" }));
-    expect(mockOpen).toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Undo" }));
+    expect(mockUndo).toHaveBeenCalled();
+  });
 
-    await user.click(screen.getByRole("button", { name: "Save" }));
-    expect(mockSave).toHaveBeenCalledWith(false);
+  it("calls redo when redo is available", async () => {
+    const user = userEvent.setup();
+    useDocumentStore.setState({
+      pdfDoc: { numPages: 1 } as never,
+      metadata: { pageCount: 1, fileSize: 100 },
+    });
+    useHistoryStore.getState().record();
+    useHistoryStore.getState().record();
+    useHistoryStore.getState().undo();
+
+    render(<Toolbar />);
+    await user.click(screen.getByRole("button", { name: "Redo" }));
+    expect(mockRedo).toHaveBeenCalled();
   });
 });

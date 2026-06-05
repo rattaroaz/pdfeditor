@@ -18,9 +18,6 @@ import { useDocumentStore } from "@/stores/documentStore";
 
 import { useUiStore } from "@/stores/uiStore";
 
-import { useHistoryStore } from "@/stores/historyStore";
-
-import { undoEdit, redoEdit } from "@/services/historyService";
 import {
   protectDocumentOnNextSave,
   removeDocumentPasswordProtection,
@@ -44,9 +41,6 @@ export function MenuBar() {
 
   const toggleSearch = useUiStore((s) => s.toggleSearch);
   const toggleLogViewer = useUiStore((s) => s.toggleLogViewer);
-
-  const pastLength = useHistoryStore((s) => s.past.length);
-  const futureLength = useHistoryStore((s) => s.future.length);
 
 
 
@@ -191,48 +185,6 @@ export function MenuBar() {
 
       <MenuDropdown
 
-        label="Edit"
-
-        open={openMenu === "edit"}
-
-        onToggle={() => setOpenMenu((m) => (m === "edit" ? null : "edit"))}
-
-      >
-
-        <MenuItem
-
-          disabled={pastLength === 0}
-
-          onClick={() => run(() => undoEdit())}
-
-        >
-
-          Undo
-
-        </MenuItem>
-
-        <MenuItem
-
-          disabled={futureLength === 0}
-
-          onClick={() => run(() => redoEdit())}
-
-        >
-
-          Redo
-
-        </MenuItem>
-
-        <MenuItem disabled={!hasDocument} onClick={() => run(toggleSearch)}>
-
-          Find…
-
-        </MenuItem>
-
-      </MenuDropdown>
-
-      <MenuDropdown
-
         label="View"
 
         menuTestId="menu-view"
@@ -242,6 +194,14 @@ export function MenuBar() {
         onToggle={() => setOpenMenu((m) => (m === "view" ? null : "view"))}
 
       >
+
+        <MenuItem testId="menu-find" disabled={!hasDocument} onClick={() => run(toggleSearch)}>
+
+          Find…
+
+        </MenuItem>
+
+        <div className="my-1 border-t border-zinc-700" />
 
         <MenuItem
 
