@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { PdfDocument } from "@/lib/pdf/pdfEngine";
 import type { PdfMetadata, SidebarTab, ViewMode, ZoomMode } from "@shared/types";
-import { DEFAULT_ZOOM, ZOOM_MAX, ZOOM_MIN } from "@/lib/constants";
+import { DEFAULT_ZOOM, SIDEBAR_WIDTH_DEFAULT, SIDEBAR_WIDTH_MAX, SIDEBAR_WIDTH_MIN, ZOOM_MAX, ZOOM_MIN } from "@/lib/constants";
 import { v4 as uuidv4 } from "uuid";
 
 export type PageRotation = 0 | 90 | 180 | 270;
@@ -26,6 +26,7 @@ interface DocumentStore {
   viewMode: ViewMode;
   rotation: PageRotation;
   showSidebar: boolean;
+  sidebarWidth: number;
   sidebarTab: SidebarTab;
   presentationMode: boolean;
   setLoading: (loading: boolean) => void;
@@ -49,6 +50,8 @@ interface DocumentStore {
   rotateClockwise: () => void;
   rotateCounterClockwise: () => void;
   toggleSidebar: () => void;
+  setShowSidebar: (show: boolean) => void;
+  setSidebarWidth: (width: number) => void;
   setSidebarTab: (tab: SidebarTab) => void;
   togglePresentationMode: () => void;
   updatePdfBytes: (bytes: Uint8Array) => void;
@@ -96,6 +99,7 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
   viewMode: "continuous",
   rotation: 0,
   showSidebar: true,
+  sidebarWidth: SIDEBAR_WIDTH_DEFAULT,
   sidebarTab: "pages",
   presentationMode: false,
   statusMessage: null,
@@ -186,6 +190,14 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
       zoomMode: "custom",
     })),
   toggleSidebar: () => set((s) => ({ showSidebar: !s.showSidebar })),
+  setShowSidebar: (showSidebar) => set({ showSidebar }),
+  setSidebarWidth: (sidebarWidth) =>
+    set({
+      sidebarWidth: Math.min(
+        SIDEBAR_WIDTH_MAX,
+        Math.max(SIDEBAR_WIDTH_MIN, Math.round(sidebarWidth)),
+      ),
+    }),
   setSidebarTab: (sidebarTab) => set({ sidebarTab, showSidebar: true }),
   togglePresentationMode: () =>
     set((s) => ({ presentationMode: !s.presentationMode })),

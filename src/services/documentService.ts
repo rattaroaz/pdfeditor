@@ -1,4 +1,5 @@
-import { open, save } from "@tauri-apps/plugin-dialog";
+import { errorMessage } from "@/lib/parseInvokeError";
+import { ask, open, save } from "@tauri-apps/plugin-dialog";
 import { invokeLogged } from "@/lib/tauriInvoke";
 import { createCorrelationId, log, reportError, startTimer } from "@/lib/logging";
 import { loadPdfFromBytes, decodeBase64Pdf, PdfPasswordRequiredError } from "@/lib/pdf/pdfEngine";
@@ -324,6 +325,31 @@ export async function persistAnnotations(): Promise<void> {
   } catch (err) {
     showError(err);
   }
+}
+
+export async function closeDocument(): Promise<void> {
+  const docStore = useDocumentStore.getState();
+  if (!docStore.pdfDoc) return;
+
+  if (docStore.isDirty) {
+    const discard = await ask(
+      "You have unsaved changes. Close without saving?",
+      { title: "PDF Editor", kind: "warning" },
+    );
+    if (!discard) return;
+  }
+
+  useAnnotationStore.getState().clearAnnotations();
+  useContentEditStore.getState().clearEdits();
+  useFormStore.getState().clearFormState();
+  clearHistory();
+  useUiStore.setState({
+    showSearch: false,
+    searchQuery: "",
+    searchMatches: [],
+    activeMatchIndex: 0,
+  });
+  docStore.clearDocument();
 }
 
 export async function revertToSaved(): Promise<void> {

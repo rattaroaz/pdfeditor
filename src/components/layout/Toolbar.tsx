@@ -11,6 +11,8 @@ export function Toolbar() {
   const setCurrentPage = useDocumentStore((s) => s.setCurrentPage);
   const metadata = useDocumentStore((s) => s.metadata);
   const hasDocument = useDocumentStore((s) => !!s.pdfDoc);
+  const showSidebar = useDocumentStore((s) => s.showSidebar);
+  const setShowSidebar = useDocumentStore((s) => s.setShowSidebar);
   const canUndo = useHistoryStore((s) => s.past.length > 0);
   const canRedo = useHistoryStore((s) => s.future.length > 0);
 
@@ -72,6 +74,18 @@ export function Toolbar() {
 
       <button
         type="button"
+        data-testid="toolbar-toggle-sidebar"
+        title={showSidebar ? "Hide sidebar" : "Show sidebar"}
+        className={`rounded px-2 py-1 hover:bg-zinc-800 ${showSidebar ? "text-zinc-100" : "text-zinc-500"}`}
+        onClick={() => setShowSidebar(!showSidebar)}
+      >
+        Sidebar
+      </button>
+
+      <span className="mx-1 h-4 w-px bg-zinc-700" />
+
+      <button
+        type="button"
         className="rounded px-2 py-1 hover:bg-zinc-800 disabled:opacity-40"
         disabled={!hasDocument}
         onClick={() => setZoom(Math.max(ZOOM_MIN, zoom - ZOOM_STEP))}
@@ -102,15 +116,6 @@ export function Toolbar() {
         onClick={() => setZoomMode("fit-page")}
       >
         Fit page
-      </button>
-      <button
-        type="button"
-        className="rounded px-2 py-1 hover:bg-zinc-800 disabled:opacity-40"
-        disabled={!hasDocument}
-        onClick={() => useDocumentStore.getState().rotateClockwise()}
-        title="Rotate clockwise"
-      >
-        ↻
       </button>
     </div>
   );

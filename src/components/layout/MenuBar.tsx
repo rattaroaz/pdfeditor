@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { openPdfFromDialog, savePdf, revertToSaved } from "@/services/documentService";
-import { applyContentEdits } from "@/services/contentEditService";
+import { closeDocument, openPdfFromDialog, savePdf, revertToSaved } from "@/services/documentService";
 import {
   applyFormChanges,
   exportFormDataCsv,
@@ -41,35 +40,23 @@ export function MenuBar() {
 
   const toggleSearch = useUiStore((s) => s.toggleSearch);
   const toggleLogViewer = useUiStore((s) => s.toggleLogViewer);
+  const showSidebar = useDocumentStore((s) => s.showSidebar);
+  const setShowSidebar = useDocumentStore((s) => s.setShowSidebar);
 
 
 
   useEffect(() => {
-
-    const onPointerDown = (e: PointerEvent) => {
-
-      if (!navRef.current?.contains(e.target as Node)) {
-
-        setOpenMenu(null);
-
-      }
-
+    const onMouseDown = (e: MouseEvent) => {
+      if (navRef.current?.contains(e.target as Node)) return;
+      setOpenMenu(null);
     };
-
-    window.addEventListener("pointerdown", onPointerDown);
-
-    return () => window.removeEventListener("pointerdown", onPointerDown);
-
+    window.addEventListener("mousedown", onMouseDown);
+    return () => window.removeEventListener("mousedown", onMouseDown);
   }, []);
 
-
-
   const run = (action: () => void) => {
-
-    setOpenMenu(null);
-
     action();
-
+    setOpenMenu(null);
   };
 
 
@@ -102,6 +89,14 @@ export function MenuBar() {
 
           Save As…
 
+        </MenuItem>
+
+        <MenuItem
+          testId="menu-close"
+          disabled={!hasDocument}
+          onClick={() => run(() => void closeDocument())}
+        >
+          Close
         </MenuItem>
 
         <MenuItem
@@ -163,9 +158,6 @@ export function MenuBar() {
         open={openMenu === "tools"}
         onToggle={() => setOpenMenu((m) => (m === "tools" ? null : "tools"))}
       >
-        <MenuItem disabled={!hasDocument} onClick={() => run(() => void applyContentEdits())}>
-          Apply content edits
-        </MenuItem>
         <MenuItem disabled={!hasDocument} onClick={() => run(() => void applyFormChanges())}>
           Save form field values
         </MenuItem>
@@ -237,10 +229,11 @@ export function MenuBar() {
 
         </MenuItem>
 
-        <MenuItem onClick={() => run(() => useDocumentStore.getState().toggleSidebar())}>
-
-          Toggle sidebar
-
+        <MenuItem
+          testId="menu-toggle-sidebar"
+          onClick={() => run(() => setShowSidebar(!showSidebar))}
+        >
+          {showSidebar ? "✓ Hide sidebar" : "Show sidebar"}
         </MenuItem>
 
         <MenuItem
@@ -348,13 +341,12 @@ function MenuDropdown({
       </button>
 
       {open && (
-
-        <div className="absolute left-0 top-full z-30 min-w-40 rounded border border-zinc-700 bg-zinc-900 py-1 shadow-lg">
-
+        <div
+          className="absolute left-0 top-full z-30 min-w-40 rounded border border-zinc-700 bg-zinc-900 py-1 shadow-lg"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           {children}
-
         </div>
-
       )}
 
     </div>
@@ -396,9 +388,10 @@ function MenuItem({
       data-testid={testId}
 
       disabled={disabled}
-
-      onClick={onClick}
-
+      onClick={() => {
+        if (disabled) return;
+        onClick?.();
+      }}
       className="block w-full px-3 py-1.5 text-left text-zinc-300 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
 
     >
