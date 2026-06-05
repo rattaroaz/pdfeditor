@@ -828,7 +828,7 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
           return (
             <div
               key={ann.id}
-              className={`pointer-events-none absolute overflow-hidden rounded border border-zinc-400 bg-white/90 p-1 text-black ${
+              className={`pointer-events-none absolute flex items-center overflow-hidden rounded border border-zinc-400 bg-white/90 px-1 text-black ${
                 selectedId === ann.id ? "ring-2 ring-blue-500" : ""
               }`}
               style={{

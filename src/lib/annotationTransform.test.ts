@@ -38,7 +38,7 @@ describe("annotationTransform", () => {
     expect(moved.y).toBe(17);
   });
 
-  it("resizeAnnotation updates text box size", () => {
+  it("resizeAnnotation updates text box size symmetrically around vertical center", () => {
     const ann: TextAnnotation = {
       ...base,
       type: "text",
@@ -53,7 +53,9 @@ describe("annotationTransform", () => {
     const anchor = annotationBounds(ann);
     const resized = resizeAnnotation(ann, anchor, 80, 60) as TextAnnotation;
     expect(resized.width).toBe(70);
-    expect(resized.height).toBe(40);
+    expect(resized.height).toBe(60);
+    expect(resized.y).toBe(0);
+    expect(resized.y + resized.height / 2).toBe(ann.y + ann.height / 2);
   });
 
   it("moveAnnotation shifts freehand points", () => {

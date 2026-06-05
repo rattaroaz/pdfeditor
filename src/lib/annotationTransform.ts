@@ -100,8 +100,10 @@ export function resizeAnnotation(
   switch (ann.type) {
     case "text": {
       const width = Math.max(MIN_ANNOTATION_SIZE, pointerX - anchor.x);
-      const height = Math.max(MIN_ANNOTATION_SIZE, pointerY - anchor.y);
-      return { ...(ann as TextAnnotation), x: anchor.x, y: anchor.y, width, height };
+      const centerY = anchor.y + anchor.height / 2;
+      const height = Math.max(MIN_ANNOTATION_SIZE, 2 * (pointerY - centerY));
+      const y = centerY - height / 2;
+      return { ...(ann as TextAnnotation), x: anchor.x, y, width, height };
     }
     case "stamp": {
       const width = Math.max(MIN_ANNOTATION_SIZE, pointerX - anchor.x);

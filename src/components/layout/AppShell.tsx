@@ -5,8 +5,6 @@ import { openPdfFromPath } from "@/services/documentService";
 import { MenuBar } from "./MenuBar";
 import { Toolbar } from "./Toolbar";
 import { StatusBar } from "./StatusBar";
-import { ModeToolbar } from "./ModeToolbar";
-import { ToolPalette } from "@/components/annotations/ToolPalette";
 import { Sidebar } from "@/components/viewer/Sidebar";
 import { PdfViewer } from "@/components/viewer/PdfViewer";
 import { SearchBar } from "@/components/search/SearchBar";
@@ -91,8 +89,6 @@ export function AppShell() {
     <div className="flex h-screen flex-col bg-zinc-950 text-zinc-100">
       <MenuBar />
       <Toolbar />
-      <ModeToolbar />
-      {appMode === "markup" && <ToolPalette />}
       {appMode === "edit" && reflowWarnings.length > 0 && (
         <div className="border-b border-amber-800 bg-amber-950/50 px-3 py-1.5 text-xs text-amber-200">
           {reflowWarnings.map((w, i) => (

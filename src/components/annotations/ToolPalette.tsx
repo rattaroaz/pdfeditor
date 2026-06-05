@@ -24,14 +24,20 @@ const STAMPS: { id: StampKind; label: string }[] = [
   { id: "not-approved", label: "Not Approved" },
 ];
 
-export function ToolPalette() {
+export function ToolPalette({ embedded = false }: { embedded?: boolean }) {
   const activeTool = useAnnotationStore((s) => s.activeTool);
   const setActiveTool = useAnnotationStore((s) => s.setActiveTool);
   const activeStamp = useAnnotationStore((s) => s.activeStamp);
   const setActiveStamp = useAnnotationStore((s) => s.setActiveStamp);
 
   return (
-    <div className="flex flex-wrap items-center gap-1 border-b border-zinc-700 bg-zinc-900 px-2 py-1.5">
+    <div
+      className={
+        embedded
+          ? "flex flex-wrap items-center gap-1 px-2 py-1.5"
+          : "flex flex-wrap items-center gap-1 border-b border-zinc-700 bg-zinc-900 px-2 py-1.5"
+      }
+    >
       {TOOLS.map((tool) => (
         <button
           key={tool.id}
