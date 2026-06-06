@@ -1,6 +1,6 @@
 # PDF Editor
 
-Production-oriented desktop PDF editor built with **Tauri 2**, **React**, **TypeScript**, and **Rust**. Covers the MVP roadmap: open/view PDFs, zoom & navigation, text search, annotations, save, structured logging, and automated tests.
+Production-oriented desktop PDF editor built with **Tauri 2**, **React**, **TypeScript**, and **Rust**. Version **1.0** — open/view PDFs, zoom & navigation, text search, markup and content editing, forms, page tools, save, structured logging, and automated tests.
 
 ## Prerequisites
 

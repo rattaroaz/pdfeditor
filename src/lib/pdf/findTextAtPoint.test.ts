@@ -28,6 +28,9 @@ describe("textItemViewportRect", () => {
         transform: [12, 0, 0, 12, 100, 700],
         width: 48,
         height: 12,
+        dir: "ltr",
+        fontName: "Helvetica",
+        hasEOL: false,
       },
       viewport,
     );

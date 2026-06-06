@@ -22,7 +22,8 @@ describe("DropdownOptionsEditor", () => {
     render(<DropdownOptionsEditor options={["A", "B"]} onChange={onChange} />);
 
     fireEvent.change(screen.getByLabelText("Number of options"), { target: { value: "3" } });
-    const lastCall = onChange.mock.calls.at(-1)?.[0] as string[];
+    const calls = onChange.mock.calls;
+    const lastCall = calls[calls.length - 1]?.[0] as string[];
     expect(lastCall).toHaveLength(3);
   });
 });

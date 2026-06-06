@@ -76,7 +76,7 @@ Add these fields under `bundle.windows` in `tauri.conf.json`. Signing is not req
 Icons live in `src-tauri/icons/`. To regenerate from the project artwork:
 
 ```powershell
-npx tauri icon scripts/app-icon.svg
+npx tauri icon scripts/app-icon.png
 ```
 
 ## Troubleshooting
