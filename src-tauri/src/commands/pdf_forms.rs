@@ -280,7 +280,7 @@ pub fn apply_form_values_in_pdf(pdf_bytes: &[u8], values: &[FieldValueDto]) -> R
             if let Some((x1, y1, x2, y2)) = rect {
               let width = (x2 - x1).abs();
               let height = (y2 - y1).abs();
-              let _ = attach_text_appearance(&mut doc, w_id, width, height, &dto.value, helv_id);
+              let _ = attach_dropdown_appearance(&mut doc, w_id, width, height, &dto.value, helv_id);
             }
           }
         }
@@ -353,6 +353,75 @@ struct NewFieldDto {
 /// Default appearance for variable-text fields (`/DA`). Uses the standard AcroForm
 /// font alias `Helv` defined in `/DR`.
 const FORM_DA: &str = "/Helv 12 Tf 0 g";
+
+const MIN_TEXT_FONT_SIZE: f64 = 6.0;
+const MAX_TEXT_FONT_SIZE: f64 = 144.0;
+const TEXT_BOX_TOP_PAD: f64 = 2.0;
+const TEXT_BOX_BOTTOM_PAD: f64 = 5.0;
+const DESCENDER_RATIO: f64 = 0.28;
+const DROPDOWN_EXTRA_BOTTOM_PAD: f64 = 2.0;
+const DROPDOWN_MIN_DESCENDER_PAD: f64 = 2.0;
+
+fn descender_padding(font_size: f64) -> f64 {
+  (font_size * DESCENDER_RATIO)
+    .ceil()
+    .max(TEXT_BOX_BOTTOM_PAD)
+}
+
+fn dropdown_descender_padding(font_size: f64) -> f64 {
+  (font_size * DESCENDER_RATIO)
+    .ceil()
+    .max(DROPDOWN_MIN_DESCENDER_PAD)
+    + DROPDOWN_EXTRA_BOTTOM_PAD
+}
+
+fn font_size_from_box_height(height: f64) -> f64 {
+  let raw = ((height - TEXT_BOX_TOP_PAD) / (1.0 + DESCENDER_RATIO)).round();
+  let mut size = raw.clamp(MIN_TEXT_FONT_SIZE, MAX_TEXT_FONT_SIZE);
+  while size < MAX_TEXT_FONT_SIZE && box_height_from_font_size(size + 1.0) <= height {
+    size += 1.0;
+  }
+  while size > MIN_TEXT_FONT_SIZE && box_height_from_font_size(size) > height {
+    size -= 1.0;
+  }
+  size
+}
+
+fn box_height_from_font_size(font_size: f64) -> f64 {
+  TEXT_BOX_TOP_PAD + font_size + descender_padding(font_size)
+}
+
+fn dropdown_font_size_from_box_height(height: f64) -> f64 {
+  let raw = ((height - TEXT_BOX_TOP_PAD) / (1.0 + DESCENDER_RATIO)).round();
+  let mut size = raw.clamp(MIN_TEXT_FONT_SIZE, MAX_TEXT_FONT_SIZE);
+  while size < MAX_TEXT_FONT_SIZE && dropdown_box_height_from_font_size(size + 1.0) <= height {
+    size += 1.0;
+  }
+  while size > MIN_TEXT_FONT_SIZE && dropdown_box_height_from_font_size(size) > height {
+    size -= 1.0;
+  }
+  size
+}
+
+fn dropdown_box_height_from_font_size(font_size: f64) -> f64 {
+  TEXT_BOX_TOP_PAD + font_size + dropdown_descender_padding(font_size)
+}
+
+fn text_field_baseline_y(_height: f64, font_size: f64) -> f64 {
+  descender_padding(font_size) + font_size * 0.22
+}
+
+fn dropdown_field_baseline_y(_height: f64, font_size: f64) -> f64 {
+  dropdown_descender_padding(font_size) + font_size * 0.22
+}
+
+fn form_da_from_height(height: f64) -> String {
+  format!("/Helv {:.2} Tf 0 g", font_size_from_box_height(height))
+}
+
+fn form_da_from_dropdown_height(height: f64) -> String {
+  format!("/Helv {:.2} Tf 0 g", dropdown_font_size_from_box_height(height))
+}
 
 fn helvetica_font_dict() -> Dictionary {
   Dictionary::from_iter(vec![
@@ -491,11 +560,19 @@ fn decorate_widget(
   field_type: &str,
   flags: i64,
   value: Object,
+  height: f64,
 ) {
   widget.set("Ff", Object::Integer(flags));
   // Print flag — standard for visible form widgets.
   widget.set("F", Object::Integer(4));
-  widget.set("DA", Object::string_literal(FORM_DA));
+  let da = if field_type == "checkbox" {
+    FORM_DA.to_string()
+  } else if field_type == "dropdown" {
+    form_da_from_dropdown_height(height)
+  } else {
+    form_da_from_height(height)
+  };
+  widget.set("DA", Object::string_literal(da));
   widget.set("V", value.clone());
 
   match field_type {
@@ -576,8 +653,38 @@ fn text_field_appearance(
   value: &str,
   helv_id: ObjectId,
 ) -> ObjectId {
-  let font_size = (height - 4.0).clamp(6.0, 14.0);
-  let baseline_y = (height - font_size) / 2.0 + font_size * 0.25;
+  let font_size = font_size_from_box_height(height);
+  text_like_field_appearance(doc, width, height, value, helv_id, font_size, text_field_baseline_y(height, font_size))
+}
+
+fn dropdown_field_appearance(
+  doc: &mut Document,
+  width: f64,
+  height: f64,
+  value: &str,
+  helv_id: ObjectId,
+) -> ObjectId {
+  let font_size = dropdown_font_size_from_box_height(height);
+  text_like_field_appearance(
+    doc,
+    width,
+    height,
+    value,
+    helv_id,
+    font_size,
+    dropdown_field_baseline_y(height, font_size),
+  )
+}
+
+fn text_like_field_appearance(
+  doc: &mut Document,
+  width: f64,
+  height: f64,
+  value: &str,
+  helv_id: ObjectId,
+  font_size: f64,
+  baseline_y: f64,
+) -> ObjectId {
   let escaped = escape_pdf_string(value);
   let mut content = Vec::new();
   content.extend_from_slice(b"/Tx BMC\nq\nBT\n");
@@ -641,6 +748,24 @@ fn attach_text_appearance(
   helv_id: ObjectId,
 ) -> Result<(), AppError> {
   let stream_id = text_field_appearance(doc, width, height, value, helv_id);
+  let mut n_dict = Dictionary::new();
+  n_dict.set("N", Object::Reference(stream_id));
+  let widget = doc
+    .get_dictionary_mut(widget_id)
+    .map_err(|e| AppError::Pdf(e.to_string()))?;
+  widget.set("AP", Object::Dictionary(n_dict));
+  Ok(())
+}
+
+fn attach_dropdown_appearance(
+  doc: &mut Document,
+  widget_id: ObjectId,
+  width: f64,
+  height: f64,
+  value: &str,
+  helv_id: ObjectId,
+) -> Result<(), AppError> {
+  let stream_id = dropdown_field_appearance(doc, width, height, value, helv_id);
   let mut n_dict = Dictionary::new();
   n_dict.set("N", Object::Reference(stream_id));
   let widget = doc
@@ -868,7 +993,8 @@ pub fn create_form_fields_in_pdf(pdf_bytes: &[u8], fields: &[NewFieldDto]) -> Re
         }
       }
     }
-    decorate_widget(&mut widget, &field.field_type, flags, field_value.clone());
+    let height_pt = rect[3] - rect[1];
+    decorate_widget(&mut widget, &field.field_type, flags, field_value.clone(), height_pt);
     let field_id = doc.add_object(Object::Dictionary(widget));
     let widget_id = field_id;
 
@@ -891,7 +1017,7 @@ pub fn create_form_fields_in_pdf(pdf_bytes: &[u8], fields: &[NewFieldDto]) -> Re
             .filter(|s| !s.is_empty())
             .or_else(|| field.options.as_ref()?.first().map(String::as_str))
             .unwrap_or("");
-          attach_text_appearance(&mut doc, widget_id, width_pt, height_pt, initial, helv_id)?;
+          attach_dropdown_appearance(&mut doc, widget_id, width_pt, height_pt, initial, helv_id)?;
         }
       }
       _ => {
@@ -1144,6 +1270,13 @@ mod tests {
           .map(|b| String::from_utf8_lossy(b).into_owned())
       })
       .collect()
+  }
+
+  #[test]
+  fn dropdown_layout_matches_frontend() {
+    assert_eq!(dropdown_descender_padding(12.0), 6.0);
+    assert_eq!(dropdown_box_height_from_font_size(12.0), 20.0);
+    assert_eq!(dropdown_font_size_from_box_height(20.0), 12.0);
   }
 
   #[test]

@@ -70,6 +70,7 @@ export async function applyEditSnapshot(snapshot: EditHistorySnapshot): Promise<
     values: clone(snapshot.formValues),
     newFields: clone(snapshot.newFields),
     activeFieldName: null,
+    renamingNewFieldId: null,
     validationErrors: {},
   });
 

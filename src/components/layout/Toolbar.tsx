@@ -9,10 +9,10 @@ import { ToolPalette } from "@/components/annotations/ToolPalette";
 import type { AppMode, Tool } from "@shared/types";
 
 const MODES: { id: AppMode; label: string }[] = [
+  { id: "document", label: "Standard" },
   { id: "markup", label: "Markup" },
   { id: "edit", label: "Edit" },
   { id: "forms", label: "Forms" },
-  { id: "document", label: "Document" },
 ];
 
 const EDIT_TOOLS: { id: Tool; label: string; icon: string }[] = [
@@ -37,14 +37,10 @@ function selectAppMode(mode: AppMode) {
     metadata: { mode },
   });
 
-  if (mode === "edit") setActiveTool("add-text-block");
+  if (mode === "edit") setActiveTool("edit-text");
   if (mode === "forms") {
     setActiveTool("select");
     useDocumentStore.getState().setSidebarTab("forms");
-  }
-  if (mode === "document") {
-    setActiveTool("select");
-    useDocumentStore.getState().setSidebarTab("document");
   }
   if (mode === "markup") setActiveTool("select");
 }

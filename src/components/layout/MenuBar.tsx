@@ -106,7 +106,11 @@ export function MenuBar() {
           {flattenOnSave ? "✓ Flatten markup on save" : "Flatten markup on save"}
         </MenuItem>
 
-        <MenuItem disabled={!hasDocument} onClick={() => run(protectDocumentOnNextSave)}>
+        <MenuItem
+          testId="menu-protect-password"
+          disabled={!hasDocument}
+          onClick={() => run(protectDocumentOnNextSave)}
+        >
           Protect with Password…
         </MenuItem>
 
@@ -118,15 +122,11 @@ export function MenuBar() {
         </MenuItem>
 
         <MenuItem
-
+          testId="menu-revert"
           disabled={!hasDocument}
-
           onClick={() => run(() => void revertToSaved())}
-
         >
-
           Revert to Saved
-
         </MenuItem>
 
       </MenuDropdown>

@@ -6,7 +6,7 @@ import {
   viewportRectToPdfRect,
 } from "@/lib/pdf/pdfEngine";
 import type { PdfBytesResult } from "@/lib/pdf/pdfBinary";
-import type { TextContentEdit } from "@shared/types";
+import type { ImageContentEdit, TextContentEdit } from "@shared/types";
 import { useContentEditStore } from "@/stores/contentEditStore";
 import { useDocumentStore } from "@/stores/documentStore";
 import { log, reportError } from "@/lib/logging";
@@ -18,6 +18,7 @@ export async function textEditsPayload(edits: TextContentEdit[]) {
 
   const payload = [];
   for (const edit of edits) {
+    if (!edit.coverOld && !edit.newText.trim()) continue;
     const page = await pdfDoc.getPage(edit.pageIndex + 1);
     const pad = edit.coverOld ? TEXT_COVER_H_PAD : 0;
     const vPad = edit.coverOld ? TEXT_COVER_V_PAD : 0;
@@ -40,10 +41,43 @@ export async function textEditsPayload(edits: TextContentEdit[]) {
       pdfY1,
       pdfX2,
       pdfY2,
-      newText: edit.newText,
+      newText: edit.newText.trim(),
       fontSize: edit.fontSize,
       color: edit.color,
       coverOld: edit.coverOld,
+    });
+  }
+  return payload;
+}
+
+export async function imageEditsPayload(edits: ImageContentEdit[]) {
+  const { pdfDoc, rotation } = useDocumentStore.getState();
+  if (!pdfDoc) return [];
+
+  const payload = [];
+  for (const edit of edits) {
+    const page = await pdfDoc.getPage(edit.pageIndex + 1);
+    const [pdfX1, pdfY1, pdfX2, pdfY2] = viewportRectToPdfRect(
+      page,
+      edit.x,
+      edit.y,
+      edit.width,
+      edit.height,
+      rotation,
+    );
+
+    payload.push({
+      pageIndex: edit.pageIndex,
+      x: edit.x,
+      y: edit.y,
+      width: edit.width,
+      height: edit.height,
+      pdfX1,
+      pdfY1,
+      pdfX2,
+      pdfY2,
+      imageBase64: edit.imageBase64,
+      mimeType: edit.mimeType,
     });
   }
   return payload;
@@ -59,20 +93,11 @@ export async function applyContentEdits(): Promise<boolean> {
   docStore.setLoading(true);
   try {
     const textEdits = await textEditsPayload(editStore.textEdits);
+    const imageEdits = await imageEditsPayload(editStore.imageEdits);
     const result = await invokeLogged<PdfBytesResult>("apply_content_edits", {
       pdfBase64: encodeBase64Pdf(sourceBytes),
       textEditsJson: JSON.stringify(textEdits),
-      imageEditsJson: JSON.stringify(
-        editStore.imageEdits.map((e) => ({
-          pageIndex: e.pageIndex,
-          x: e.x,
-          y: e.y,
-          width: e.width,
-          height: e.height,
-          imageBase64: e.imageBase64,
-          mimeType: e.mimeType,
-        })),
-      ),
+      imageEditsJson: JSON.stringify(imageEdits),
     });
 
     const newBytes = decodeBase64Pdf(result.dataBase64);

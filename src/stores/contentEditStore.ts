@@ -13,6 +13,8 @@ interface ContentEditStore {
     id: string,
     patch: Partial<Pick<TextContentEdit, "newText" | "width" | "height">>,
   ) => void;
+  /** Live typing sync — no undo history; keeps save/Standard view in sync. */
+  updateTextEditContent: (id: string, newText: string) => void;
   /** Live resize while typing — does not push undo history. */
   updateTextEditLayout: (
     id: string,
@@ -61,6 +63,11 @@ export const useContentEditStore = create<ContentEditStore>((set, get) => ({
     }));
   },
 
+  updateTextEditContent: (id, newText) =>
+    set((s) => ({
+      textEdits: s.textEdits.map((e) => (e.id === id ? { ...e, newText } : e)),
+    })),
+
   updateTextEditLayout: (id, patch) =>
     set((s) => ({
       textEdits: s.textEdits.map((e) => {
@@ -91,11 +98,13 @@ export const useContentEditStore = create<ContentEditStore>((set, get) => ({
   removeTextEdit: (id) => {
     recordHistory();
     set((s) => ({ textEdits: s.textEdits.filter((e) => e.id !== id) }));
+    log.content.info("Text content edit removed", { userAction: "remove_text_edit", metadata: { id } });
   },
 
   removeImageEdit: (id) => {
     recordHistory();
     set((s) => ({ imageEdits: s.imageEdits.filter((e) => e.id !== id) }));
+    log.content.info("Image content edit removed", { userAction: "remove_image_edit", metadata: { id } });
   },
 
   updateTextEditPosition: (id, x, y) =>
@@ -117,5 +126,11 @@ export const useContentEditStore = create<ContentEditStore>((set, get) => ({
 
   setReflowWarnings: (reflowWarnings) => set({ reflowWarnings }),
 
-  hasEdits: () => get().textEdits.length > 0 || get().imageEdits.length > 0,
+  hasEdits: () => {
+    const { textEdits, imageEdits } = get();
+    return (
+      imageEdits.length > 0 ||
+      textEdits.some((e) => e.coverOld || e.newText.trim().length > 0)
+    );
+  },
 }));

@@ -9,6 +9,8 @@ const E2E_PDF_PATH = "e2e://minimal.pdf";
 export interface PdfEditorE2eBridge {
   readonly enabled: true;
   getLogEntries(): readonly LogEntry[];
+  getInvokeLog(): readonly string[];
+  clearInvokeLog(): void;
   reportTestError(message?: string): AppErrorPayload;
   openFixtureDocument(): Promise<void>;
   openLogViewer(): void;
@@ -28,6 +30,8 @@ export function registerE2eBridge(): void {
     window.__PDFEDITOR_E2E__ = {
       enabled: true,
       getLogEntries: () => getLogEntries(),
+      getInvokeLog: () => handlers.getE2eInvokeLog(),
+      clearInvokeLog: () => handlers.clearE2eInvokeLog(),
       reportTestError: (message = "E2E test error") =>
         reportError(new Error(message), {
           category: "app",

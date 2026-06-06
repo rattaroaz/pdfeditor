@@ -53,6 +53,7 @@ export function DropdownOptionsEditor({
               type="text"
               value={label}
               placeholder={`Option ${index + 1}`}
+              data-testid={`dropdown-option-${index}`}
               onChange={(e) => setLabel(index, e.target.value)}
               className="min-w-0 flex-1 rounded border border-zinc-600 bg-zinc-800 px-2 py-1 text-xs text-zinc-100"
             />

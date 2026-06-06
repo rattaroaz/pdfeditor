@@ -32,7 +32,7 @@ interface UiStore {
 }
 
 export const useUiStore = create<UiStore>((set) => ({
-  appMode: "markup",
+  appMode: "document",
   searchQuery: "",
   searchMatches: [],
   activeMatchIndex: 0,

@@ -1,4 +1,4 @@
-import { writeFile } from "@tauri-apps/plugin-fs";
+import { readFile, writeFile } from "@tauri-apps/plugin-fs";
 import { invokeLogged } from "@/lib/tauriInvoke";
 import { encodeBase64Pdf } from "@/lib/pdf/pdfBinary";
 import { log } from "@/lib/logging";
@@ -32,4 +32,17 @@ export async function writePdfBytes(
     path,
     dataBase64: encodeBase64Pdf(bytes),
   });
+}
+
+export async function writeTextFile(path: string, text: string): Promise<void> {
+  await writeFile(path, new TextEncoder().encode(text));
+  log.document.info("Wrote text file", {
+    userAction: "write_text_file",
+    metadata: { path, bytes: text.length },
+  });
+}
+
+export async function readTextFile(path: string): Promise<string> {
+  const bytes = await readFile(path);
+  return new TextDecoder().decode(bytes);
 }

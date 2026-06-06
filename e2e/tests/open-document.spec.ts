@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { waitForE2eBridge, getSessionLogs, openFixtureDocument } from "../helpers/bridge";
-import { openDocumentFromMenu } from "../helpers/ui";
+import { openDocumentFromMenu, waitForPageReady } from "../helpers/ui";
 
 test.describe("open document", () => {
   test("opens fixture PDF from File menu", async ({ page }) => {
@@ -8,11 +8,15 @@ test.describe("open document", () => {
     await waitForE2eBridge(page);
 
     await openDocumentFromMenu(page);
-    await expect(page.getByTestId("pdf-viewer")).toBeVisible({ timeout: 30_000 });
+    await waitForPageReady(page);
 
     const logs = await getSessionLogs(page);
-    const openLogs = logs.filter((e) => e.context.userAction === "open");
-    expect(openLogs.length).toBeGreaterThan(0);
+    const opened = logs.some(
+      (e) =>
+        e.context.userAction === "open" ||
+        e.message.toLowerCase().includes("document opened"),
+    );
+    expect(opened).toBe(true);
   });
 
   test("bridge can open fixture without dialog", async ({ page }) => {

@@ -45,6 +45,26 @@ describe("contentEditStore", () => {
     expect(useContentEditStore.getState().textEdits[0]?.newText).toBe("Updated");
   });
 
+  it("syncs live text without counting empty placeholders as edits", () => {
+    const id = useContentEditStore.getState().addTextEdit({
+      pageIndex: 0,
+      x: 10,
+      y: 20,
+      width: 100,
+      height: 12,
+      newText: "",
+      fontSize: 12,
+      fontFamily: "Helvetica",
+      color: "#000000",
+      coverOld: false,
+    });
+    expect(useContentEditStore.getState().hasEdits()).toBe(false);
+
+    useContentEditStore.getState().updateTextEditContent(id, "Draft");
+    expect(useContentEditStore.getState().hasEdits()).toBe(true);
+    expect(useContentEditStore.getState().textEdits[0]?.newText).toBe("Draft");
+  });
+
   it("adds reflow warning when replacement text is much longer", () => {
     useContentEditStore.getState().addTextEdit({
       pageIndex: 0,

@@ -7,10 +7,12 @@ import { useUiStore } from "@/stores/uiStore";
 const PDF_BYTES = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34]);
 const PDF_BASE64 = encodeBase64Pdf(PDF_BYTES);
 
-const { mockInvokeLogged, mockLoadPdf, mockViewportRect } = vi.hoisted(() => ({
+const { mockInvokeLogged, mockLoadPdf, mockViewportRect, mockWriteTextFile, mockReadTextFile } = vi.hoisted(() => ({
   mockInvokeLogged: vi.fn(),
   mockLoadPdf: vi.fn(),
   mockViewportRect: vi.fn(() => [41, 114, 266, 138] as [number, number, number, number]),
+  mockWriteTextFile: vi.fn(),
+  mockReadTextFile: vi.fn(),
 }));
 
 vi.mock("@/lib/tauriInvoke", () => ({
@@ -18,14 +20,25 @@ vi.mock("@/lib/tauriInvoke", () => ({
   AppInvokeError: class AppInvokeError extends Error {},
 }));
 
+vi.mock("@/lib/pdf/pdfStorage", () => ({
+  writeTextFile: mockWriteTextFile,
+  readTextFile: mockReadTextFile,
+}));
+
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  save: vi.fn().mockResolvedValue("C:\\export\\form-data.csv"),
+  open: vi.fn().mockResolvedValue("C:\\import\\form-data.csv"),
+}));
+
 vi.mock("@/lib/pdf/pdfEngine", () => ({
   encodeBase64Pdf: (bytes: Uint8Array) => encodeBase64Pdf(bytes),
   decodeBase64Pdf: () => PDF_BYTES.slice(),
   loadPdfFromBytes: mockLoadPdf,
   viewportRectToPdfRect: mockViewportRect,
+  collectFormFieldValuesFromPdf: vi.fn().mockResolvedValue({}),
 }));
 
-import { applyFormChanges, inspectDocumentForms } from "./formService";
+import { applyFormChanges, exportFormDataCsv, importFormDataCsv, inspectDocumentForms } from "./formService";
 
 const mockPdfDoc = {
   numPages: 2,
@@ -48,6 +61,8 @@ describe("formService", () => {
     });
 
     mockLoadPdf.mockResolvedValue(mockPdfDoc);
+    mockWriteTextFile.mockResolvedValue(undefined);
+    mockReadTextFile.mockResolvedValue('name,value,type\n"name","Jane","text"\n');
     mockInvokeLogged.mockImplementation(async (command: string) => {
       if (command === "create_form_fields" || command === "apply_form_values") {
         return { dataBase64: PDF_BASE64 };
@@ -66,13 +81,10 @@ describe("formService", () => {
   });
 
   it("returns false when required fields are empty", async () => {
+    useFormStore.getState().setValuesFromPdf({
+      name: { name: "name", value: "Jane", type: "text", required: true },
+    });
     useFormStore.getState().setFieldValue("name", "", "text");
-    useFormStore.setState((s) => ({
-      values: {
-        ...s.values,
-        name: { name: "name", value: "", type: "text", required: true },
-      },
-    }));
 
     const ok = await applyFormChanges();
     expect(ok).toBe(false);
@@ -132,17 +144,30 @@ describe("formService", () => {
     expect(payload[0]?.options).toEqual(["Red", "Green", "Blue"]);
   });
 
-  it("invokes apply_form_values when values are present", async () => {
-    useFormStore.getState().setFieldValue("existing", "hello", "text");
+  it("invokes apply_form_values only for changed values", async () => {
+    useFormStore.getState().setValuesFromPdf({
+      existing: { name: "existing", value: "hello", type: "text" },
+    });
+    useFormStore.getState().setFieldValue("existing", "changed", "text");
 
     const ok = await applyFormChanges();
     expect(ok).toBe(true);
     expect(mockInvokeLogged).toHaveBeenCalledWith(
       "apply_form_values",
       expect.objectContaining({
-        valuesJson: expect.stringContaining("existing"),
+        valuesJson: expect.stringContaining("changed"),
       }),
     );
+  });
+
+  it("skips apply_form_values when values match baseline", async () => {
+    useFormStore.getState().setValuesFromPdf({
+      existing: { name: "existing", value: "hello", type: "text" },
+    });
+
+    const ok = await applyFormChanges();
+    expect(ok).toBe(true);
+    expect(mockInvokeLogged).not.toHaveBeenCalled();
   });
 
   it("inspectDocumentForms updates the form store", async () => {
@@ -153,5 +178,21 @@ describe("formService", () => {
       "inspect_pdf_forms",
       expect.objectContaining({ pdfBase64: PDF_BASE64 }),
     );
+  });
+
+  it("exports form data as CSV via text file writer", async () => {
+    useFormStore.getState().setFieldValue("name", "Jane", "text");
+    await exportFormDataCsv();
+    expect(mockWriteTextFile).toHaveBeenCalledWith(
+      "C:\\export\\form-data.csv",
+      expect.stringContaining('"name","Jane","text"'),
+    );
+    expect(mockInvokeLogged).not.toHaveBeenCalledWith("write_pdf_file", expect.anything());
+  });
+
+  it("imports form data from CSV via text file reader", async () => {
+    await importFormDataCsv();
+    expect(mockReadTextFile).toHaveBeenCalledWith("C:\\import\\form-data.csv");
+    expect(useFormStore.getState().values.name?.value).toBe("Jane");
   });
 });

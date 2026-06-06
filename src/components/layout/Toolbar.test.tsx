@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useAnnotationStore } from "@/stores/annotationStore";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useHistoryStore } from "@/stores/historyStore";
 import { useUiStore } from "@/stores/uiStore";
@@ -93,7 +94,8 @@ describe("Toolbar", () => {
     await user.click(screen.getByTestId("toolbar-mode-edit"));
     expect(useUiStore.getState().appMode).toBe("edit");
     expect(screen.getByTestId("tool-add-text-block")).toBeInTheDocument();
-    expect(screen.queryByTestId("tool-highlight")).not.toBeInTheDocument();
+    expect(screen.getByTestId("tool-edit-text")).toBeInTheDocument();
+    expect(useAnnotationStore.getState().activeTool).toBe("edit-text");
   });
 
   it("hides mode tools row in document mode", async () => {

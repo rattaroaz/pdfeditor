@@ -1,18 +1,176 @@
+import type { CSSProperties } from "react";
+
 /** Extra PDF-point width so the box stays slightly wider than measured glyphs. */
 export const TEXT_BOX_WIDTH_BUFFER = 2;
 /** Horizontal padding for PDF white-out cover (PDF points). */
 export const TEXT_COVER_H_PAD = 1;
 /** Vertical padding for PDF white-out cover (PDF points). */
 export const TEXT_COVER_V_PAD = 0.5;
+/** Padding above text in markup/form boxes (PDF points). Matches Rust `TEXT_BOX_TOP_PAD`. */
+export const TEXT_BOX_TOP_PAD = 2;
+/** Minimum bottom padding (PDF points); larger fonts get more via {@link DESCENDER_RATIO}. */
+export const TEXT_BOX_BOTTOM_PAD = 5;
+/** Fraction of font size reserved below the baseline for descenders (g, j, p, y). */
+export const DESCENDER_RATIO = 0.28;
+/** @deprecated Use TEXT_BOX_TOP_PAD + descender padding */
+export const TEXT_BOX_V_PAD = TEXT_BOX_TOP_PAD;
 
 export const DEFAULT_TEXT_FONT_SIZE = 12;
 export const MIN_TEXT_FONT_SIZE = 6;
 export const MAX_TEXT_FONT_SIZE = 144;
 
-/** Map a dragged text-box height (PDF points) to a font size. */
+/** Extra bottom padding for dropdown/combobox fields (PDF points). */
+export const DROPDOWN_EXTRA_BOTTOM_PAD = 2;
+/** Minimum descender padding for dropdown fields (PDF points). */
+export const DROPDOWN_MIN_DESCENDER_PAD = 2;
+
+/** Bottom padding for dropdowns: scaled to font size plus a small fixed buffer for descenders. */
+export function dropdownDescenderPadding(fontSize: number): number {
+  return (
+    Math.max(DROPDOWN_MIN_DESCENDER_PAD, Math.ceil(fontSize * DESCENDER_RATIO)) +
+    DROPDOWN_EXTRA_BOTTOM_PAD
+  );
+}
+
+/** Map dropdown box height to font size. */
+export function dropdownFontSizeFromBoxHeight(boxHeight: number): number {
+  const raw = Math.round((boxHeight - TEXT_BOX_TOP_PAD) / (1 + DESCENDER_RATIO));
+  let size = Math.min(MAX_TEXT_FONT_SIZE, Math.max(MIN_TEXT_FONT_SIZE, raw));
+  while (size < MAX_TEXT_FONT_SIZE && dropdownBoxHeightFromFontSize(size + 1) <= boxHeight) {
+    size += 1;
+  }
+  while (size > MIN_TEXT_FONT_SIZE && dropdownBoxHeightFromFontSize(size) > boxHeight) {
+    size -= 1;
+  }
+  return size;
+}
+
+/** Dropdown box height for a font size with tight descender room. */
+export function dropdownBoxHeightFromFontSize(fontSize: number): number {
+  return TEXT_BOX_TOP_PAD + fontSize + dropdownDescenderPadding(fontSize);
+}
+
+/** Normalize a dragged dropdown height to font size and matching box height. */
+export function layoutDropdownFromDrag(dragHeight: number): { fontSize: number; height: number } {
+  const fontSize = dropdownFontSizeFromBoxHeight(dragHeight);
+  return { fontSize, height: dropdownBoxHeightFromFontSize(fontSize) };
+}
+
+/** CSS for dropdown labels: tight padding, no scrollbars. */
+export function dropdownTextContentStyle(fontSize: number, scale = 1): CSSProperties {
+  const fontPx = fontSize * scale;
+  return {
+    boxSizing: "border-box",
+    height: "100%",
+    width: "100%",
+    lineHeight: `${fontPx}px`,
+    paddingTop: TEXT_BOX_TOP_PAD * scale,
+    paddingBottom: dropdownDescenderPadding(fontSize) * scale,
+    paddingLeft: 0,
+    paddingRight: 0,
+    margin: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  };
+}
+
+/** Full field style for dropdown controls (closed state + sizing from box height). */
+export function dropdownFieldTextStyle(fieldHeight: number, scale = 1): CSSProperties {
+  const fontSize = dropdownFontSizeFromBoxHeight(fieldHeight);
+  return {
+    fontFamily: "Helvetica, Arial, sans-serif",
+    fontSize: fontSize * scale,
+    ...dropdownTextContentStyle(fontSize, scale),
+    paddingRight: 18 * scale,
+  };
+}
+
+/** Row style for open dropdown option buttons. */
+export function dropdownOptionRowStyle(fontSize: number, scale = 1): CSSProperties {
+  const fontPx = fontSize * scale;
+  return {
+    fontFamily: "Helvetica, Arial, sans-serif",
+    fontSize: fontPx,
+    lineHeight: `${fontPx}px`,
+    height: "auto",
+    width: "100%",
+    paddingTop: 2 * scale,
+    paddingBottom: dropdownDescenderPadding(fontSize) * scale,
+    paddingLeft: 0,
+    paddingRight: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  };
+}
+
+/** Bottom padding scaled to font size so descenders fit at any box height. */
+export function descenderPadding(fontSize: number): number {
+  return Math.max(TEXT_BOX_BOTTOM_PAD, Math.ceil(fontSize * DESCENDER_RATIO));
+}
+
+/** Map a text-box height (PDF points) to font size; taller boxes yield larger text. */
 export function fontSizeFromBoxHeight(boxHeight: number): number {
-  const size = Math.round(boxHeight);
+  const raw = Math.round((boxHeight - TEXT_BOX_TOP_PAD) / (1 + DESCENDER_RATIO));
+  let size = Math.min(MAX_TEXT_FONT_SIZE, Math.max(MIN_TEXT_FONT_SIZE, raw));
+  while (size < MAX_TEXT_FONT_SIZE && boxHeightFromFontSize(size + 1) <= boxHeight) {
+    size += 1;
+  }
+  while (size > MIN_TEXT_FONT_SIZE && boxHeightFromFontSize(size) > boxHeight) {
+    size -= 1;
+  }
+  return size;
+}
+
+/** Box height for a given font size including proportional room for descenders. */
+export function boxHeightFromFontSize(fontSize: number): number {
+  return TEXT_BOX_TOP_PAD + fontSize + descenderPadding(fontSize);
+}
+
+/** CSS for text boxes: padding + line-height so descenders stay inside the box. */
+export function textBoxContentStyle(fontSize: number, scale = 1): CSSProperties {
+  const fontPx = fontSize * scale;
+  return {
+    boxSizing: "border-box",
+    height: "100%",
+    width: "100%",
+    lineHeight: `${fontPx}px`,
+    paddingTop: TEXT_BOX_TOP_PAD * scale,
+    paddingBottom: descenderPadding(fontSize) * scale,
+    paddingLeft: 0,
+    paddingRight: 0,
+    margin: 0,
+    overflowX: "auto",
+    overflowY: "hidden",
+  };
+}
+
+/** Markup text boxes: fixed padding, no height override (used on sized annotation divs). */
+export function markupTextBoxStyle(scale = 1): CSSProperties {
+  return {
+    boxSizing: "border-box",
+    lineHeight: 1,
+    paddingTop: TEXT_BOX_TOP_PAD * scale,
+    paddingBottom: TEXT_BOX_BOTTOM_PAD * scale,
+  };
+}
+
+/** Markup font size from box height (fixed top/bottom padding, not proportional). */
+export function markupFontSizeFromBoxHeight(boxHeight: number): number {
+  const size = Math.round(boxHeight - TEXT_BOX_TOP_PAD - TEXT_BOX_BOTTOM_PAD);
   return Math.min(MAX_TEXT_FONT_SIZE, Math.max(MIN_TEXT_FONT_SIZE, size));
+}
+
+/** Markup box height for a font size (fixed padding). */
+export function markupBoxHeightFromFontSize(fontSize: number): number {
+  return fontSize + TEXT_BOX_TOP_PAD + TEXT_BOX_BOTTOM_PAD;
+}
+
+/** Normalize a dragged markup box height to font size and matching box height. */
+export function layoutTextBoxFromDrag(dragHeight: number): { fontSize: number; height: number } {
+  const fontSize = markupFontSizeFromBoxHeight(dragHeight);
+  return { fontSize, height: markupBoxHeightFromFontSize(fontSize) };
 }
 
 let measureCtx: CanvasRenderingContext2D | null = null;
@@ -58,11 +216,61 @@ let measureMirror: HTMLDivElement | null = null;
  * Measure text box size from a live textarea so width/height match rendered glyphs
  * (canvas measureText can lag behind the actual control, especially while typing).
  */
+export function coverRegionFromHit(hit: {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}): { x: number; y: number; width: number; height: number } {
+  return {
+    x: hit.x - TEXT_COVER_H_PAD,
+    y: hit.y - TEXT_COVER_V_PAD,
+    width: hit.width + TEXT_COVER_H_PAD * 2,
+    height: hit.height + TEXT_COVER_V_PAD * 2,
+  };
+}
+
+export function coverLayoutMinimums(
+  edit: {
+    coverOld: boolean;
+    coverWidth?: number;
+    coverHeight?: number;
+    oldText?: string;
+    fontSize: number;
+  },
+  newText = "",
+): { minWidth?: number; minHeight?: number } {
+  if (!edit.coverOld) return {};
+  const contentWidth =
+    measureTextWidth(newText, edit.fontSize) + TEXT_COVER_H_PAD * 2 + TEXT_BOX_WIDTH_BUFFER;
+  const originalWidth =
+    measureTextWidth(edit.oldText ?? "", edit.fontSize) + TEXT_COVER_H_PAD * 2 + TEXT_BOX_WIDTH_BUFFER;
+  const textMinWidth = Math.max(contentWidth, originalWidth);
+  const lines = newText.split("\n").length || 1;
+  const textMinHeight = lines * edit.fontSize + TEXT_COVER_V_PAD * 2;
+  return {
+    // Width stays at least the original cover so shorter replacements still white-out old text.
+    minWidth: Math.max(edit.coverWidth ?? 0, textMinWidth),
+    // Height follows content only so the box does not overlap lines above/below.
+    minHeight: textMinHeight,
+  };
+}
+
+/** Size a replacement edit to the measured text, positioned over the clicked hit. */
+export function layoutCoverTextEdit(
+  text: string,
+  fontSize: number,
+  hit: { x: number; y: number; width: number; height: number },
+): { x: number; y: number; width: number; height: number } {
+  const tight = computeTextEditBox(text, fontSize, { coverOld: true });
+  return alignBoxToHit(hit, tight, true);
+}
+
 export function measureTextBoxFromTextarea(
   el: HTMLTextAreaElement,
   fontSize: number,
   scale: number,
-  opts?: { coverOld?: boolean; minWidth?: number },
+  opts?: { coverOld?: boolean; minWidth?: number; minHeight?: number },
 ): { width: number; height: number } {
   if (typeof document === "undefined" || scale <= 0) {
     return computeTextEditBox(el.value, fontSize, opts);
@@ -98,25 +306,34 @@ export function measureTextBoxFromTextarea(
   const measuredHeight = heightPx / scale + vPad * 2;
 
   const width = Math.max(opts?.minWidth ?? 4, measuredWidth + TEXT_BOX_WIDTH_BUFFER);
-  const height = Math.max(fontSize + vPad * 2, measuredHeight);
+  const defaultMinHeight = opts?.coverOld
+    ? fontSize + vPad * 2
+    : boxHeightFromFontSize(fontSize);
+  const height = Math.max(opts?.minHeight ?? defaultMinHeight, measuredHeight);
 
   return {
     width: Number.isFinite(width) ? width : opts?.minWidth ?? 4,
-    height: Number.isFinite(height) ? height : fontSize + vPad * 2,
+    height: Number.isFinite(height) ? height : opts?.minHeight ?? fontSize + vPad * 2,
   };
 }
 
 export function computeTextEditBox(
   text: string,
   fontSize: number,
-  opts?: { coverOld?: boolean; minWidth?: number },
+  opts?: { coverOld?: boolean; minWidth?: number; minHeight?: number },
 ): { width: number; height: number } {
   const hPad = opts?.coverOld ? TEXT_COVER_H_PAD : 0;
   const vPad = opts?.coverOld ? TEXT_COVER_V_PAD : 0;
   const lines = text.split("\n");
   const measured = measureMultilineWidth(text, fontSize);
   const width = Math.max(opts?.minWidth ?? 4, measured + hPad * 2 + TEXT_BOX_WIDTH_BUFFER);
-  const height = Math.max(fontSize + vPad * 2, lines.length * fontSize + vPad * 2);
+  const defaultMinHeight = opts?.coverOld
+    ? fontSize + vPad * 2
+    : boxHeightFromFontSize(fontSize);
+  const lineBlockHeight = opts?.coverOld
+    ? lines.length * fontSize + vPad * 2
+    : TEXT_BOX_TOP_PAD + lines.length * fontSize + descenderPadding(fontSize);
+  const height = Math.max(opts?.minHeight ?? defaultMinHeight, lineBlockHeight);
   return { width, height };
 }
 

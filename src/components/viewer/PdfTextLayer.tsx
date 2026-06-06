@@ -18,7 +18,7 @@ export function PdfTextLayer({ pageNumber, scale }: TextLayerProps) {
   const appMode = useUiStore((s) => s.appMode);
 
   useEffect(() => {
-    if (!pdfDoc || !containerRef.current) return;
+    if (!pdfDoc || !containerRef.current || appMode === "edit") return;
     const controller = new AbortController();
     let textLayer: Awaited<ReturnType<typeof renderTextLayer>> | null = null;
 
@@ -42,14 +42,16 @@ export function PdfTextLayer({ pageNumber, scale }: TextLayerProps) {
       controller.abort();
       textLayer?.cancel();
     };
-  }, [pdfDoc, pageNumber, scale, rotation]);
+  }, [pdfDoc, pageNumber, scale, rotation, appMode]);
 
   const selectable = appMode === "markup" && activeTool === "select";
+
+  if (appMode === "edit") return null;
 
   return (
     <div
       ref={containerRef}
-      className="textLayer absolute left-0 top-0 z-[35]"
+      className={`textLayer absolute left-0 top-0 z-[35] ${selectable ? "" : "[&_*]:pointer-events-none"}`}
       style={{ pointerEvents: selectable ? "auto" : "none" }}
     />
   );

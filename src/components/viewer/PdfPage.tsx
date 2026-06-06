@@ -73,7 +73,7 @@ export function PdfPage({ pageNumber, scale, onVisible }: PdfPageProps) {
       <PdfTextLayer pageNumber={pageNumber} scale={scale} />
       <SearchHighlightLayer pageNumber={pageNumber} scale={scale} />
       <LinkLayer pageNumber={pageNumber} scale={scale} />
-      <PdfFormLayer pageNumber={pageNumber} scale={scale} canvasRef={canvasRef} />
+      <PdfFormLayer pageNumber={pageNumber} scale={scale} />
       {rendering && (
         <div className="absolute inset-0 flex items-center justify-center bg-white/50 text-xs text-zinc-500">
           Rendering…

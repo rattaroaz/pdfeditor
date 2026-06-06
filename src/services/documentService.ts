@@ -1,14 +1,16 @@
 import { errorMessage } from "@/lib/parseInvokeError";
 import { ask, open, save } from "@tauri-apps/plugin-dialog";
+import { flushSync } from "react-dom";
 import { invokeLogged } from "@/lib/tauriInvoke";
 import { createCorrelationId, createErrorReporter, log, startTimer } from "@/lib/logging";
-import { loadPdfFromBytes, decodeBase64Pdf, PdfPasswordRequiredError } from "@/lib/pdf/pdfEngine";
+import { loadPdfFromBytes, decodeBase64Pdf, PdfPasswordRequiredError, documentHasExtractableText } from "@/lib/pdf/pdfEngine";
 import {
   ensurePdfExtension,
   encodeBase64Pdf,
   fileNameFromPath,
   type PdfBytesResult,
 } from "@/lib/pdf/pdfBinary";
+import { writePdfBytes } from "@/lib/pdf/pdfStorage";
 import { APP_NAME } from "@/lib/constants";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useAnnotationStore } from "@/stores/annotationStore";
@@ -138,6 +140,12 @@ export async function openPdfFromPath(filePath: string): Promise<void> {
       pdfBytes: viewBytes,
       metadata,
     });
+    const openedDocId = useDocumentStore.getState().documentId;
+    void documentHasExtractableText(pdfDoc).then((hasText) => {
+      if (useDocumentStore.getState().documentId === openedDocId) {
+        useDocumentStore.getState().setHasExtractableText(hasText);
+      }
+    });
     useDocumentStore.setState({
       basePdfBytes: baseBytes.slice(),
       documentPassword: password ?? null,
@@ -205,6 +213,12 @@ export async function savePdf(saveAs = false): Promise<void> {
   docStore.setStatusMessage("Saving…");
 
   try {
+    if (useUiStore.getState().appMode === "edit") {
+      flushSync(() => {
+        useUiStore.getState().setAppMode("document");
+      });
+    }
+
     if (useContentEditStore.getState().hasEdits()) {
       log.document.info("Applying content edits before save", { userAction: "save" });
       const ok = await applyContentEdits();
@@ -215,14 +229,12 @@ export async function savePdf(saveAs = false): Promise<void> {
     }
 
     const formStore = useFormStore.getState();
-    const hasNewFormFields = formStore.newFields.length > 0;
-    const hasFormValues = Object.keys(formStore.values).length > 0;
-    if (hasNewFormFields || hasFormValues) {
+    if (formStore.hasPendingFormChanges()) {
       log.document.info("Applying form changes before save", {
         userAction: "save",
         metadata: {
-          newFields: hasNewFormFields,
-          hasValues: hasFormValues,
+          newFields: formStore.newFields.length > 0,
+          changedValues: formStore.getChangedValuesArray().length,
         },
       });
       const ok = await applyFormChanges();
@@ -247,10 +259,7 @@ export async function savePdf(saveAs = false): Promise<void> {
     const securityStore = useDocumentStore.getState();
     if (securityStore.pendingSavePassword || securityStore.removePasswordOnSave) {
       newBytes = await applySecurityOnSaveBytes(newBytes);
-      await invokeLogged("write_pdf_file", {
-        path: targetPath,
-        dataBase64: encodeBase64Pdf(newBytes),
-      });
+      await writePdfBytes(targetPath, newBytes);
     }
 
     const updatedDoc = useDocumentStore.getState();
@@ -264,6 +273,7 @@ export async function savePdf(saveAs = false): Promise<void> {
     });
     useDocumentStore.setState({
       basePdfBytes: newBytes.slice(),
+      savedPdfBytes: newBytes.slice(),
       metadata: updatedDoc.metadata
         ? {
             ...updatedDoc.metadata,
@@ -352,6 +362,10 @@ export async function closeDocument(): Promise<void> {
     searchMatches: [],
     activeMatchIndex: 0,
   });
+  log.document.info("Closing document", {
+    userAction: "close",
+    metadata: { filePath: docStore.filePath, wasDirty: docStore.isDirty },
+  });
   docStore.clearDocument();
 }
 
@@ -367,7 +381,8 @@ export async function revertToSaved(): Promise<void> {
 
   docStore.setLoading(true);
   try {
-    const pdfDoc = await loadPdfFromBytes(savedPdfBytes);
+    const reloadPassword = docStore.documentPassword ?? undefined;
+    const pdfDoc = await loadPdfFromBytes(savedPdfBytes, reloadPassword);
     const fileName = fileNameFromPath(filePath);
     const metadata = await fetchMetadata(
       filePath,
@@ -381,6 +396,12 @@ export async function revertToSaved(): Promise<void> {
       pdfDoc,
       pdfBytes: savedPdfBytes.slice(),
       metadata,
+    });
+    const openedDocId = useDocumentStore.getState().documentId;
+    void documentHasExtractableText(pdfDoc).then((hasText) => {
+      if (useDocumentStore.getState().documentId === openedDocId) {
+        useDocumentStore.getState().setHasExtractableText(hasText);
+      }
     });
 
     try {
@@ -411,6 +432,10 @@ export async function revertToSaved(): Promise<void> {
 
     log.document.info("Document reverted to saved", { userAction: "revert" });
   } catch (err) {
+    log.document.error("Revert to saved failed", {
+      userAction: "revert",
+      metadata: { filePath, error: String(err) },
+    });
     showError(err);
   } finally {
     docStore.setLoading(false);

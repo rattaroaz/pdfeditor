@@ -7,6 +7,7 @@ import type {
   TextAnnotation,
 } from "@shared/types";
 import { annotationBounds, type PdfBounds } from "@/lib/annotationBounds";
+import { markupBoxHeightFromFontSize, markupFontSizeFromBoxHeight } from "@/lib/textEditBox";
 
 export const STAMP_DEFAULT_WIDTH = 120;
 export const STAMP_DEFAULT_HEIGHT = 30;
@@ -101,9 +102,11 @@ export function resizeAnnotation(
     case "text": {
       const width = Math.max(MIN_ANNOTATION_SIZE, pointerX - anchor.x);
       const centerY = anchor.y + anchor.height / 2;
-      const height = Math.max(MIN_ANNOTATION_SIZE, 2 * (pointerY - centerY));
+      const rawHeight = Math.max(MIN_ANNOTATION_SIZE, 2 * (pointerY - centerY));
+      const fontSize = markupFontSizeFromBoxHeight(rawHeight);
+      const height = markupBoxHeightFromFontSize(fontSize);
       const y = centerY - height / 2;
-      return { ...(ann as TextAnnotation), x: anchor.x, y, width, height };
+      return { ...(ann as TextAnnotation), x: anchor.x, y, width, height, fontSize };
     }
     case "stamp": {
       const width = Math.max(MIN_ANNOTATION_SIZE, pointerX - anchor.x);

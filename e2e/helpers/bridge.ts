@@ -35,3 +35,13 @@ export async function setFailNextCommand(page: Page, command: string): Promise<v
     window.__PDFEDITOR_E2E__!.setFailNextCommand(cmd);
   }, command);
 }
+
+export async function getInvokeLog(page: Page): Promise<string[]> {
+  return page.evaluate(() => [...(window.__PDFEDITOR_E2E__?.getInvokeLog() ?? [])]);
+}
+
+export async function clearInvokeLog(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    window.__PDFEDITOR_E2E__?.clearInvokeLog();
+  });
+}

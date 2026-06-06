@@ -1,12 +1,14 @@
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { invokeLogged } from "@/lib/tauriInvoke";
 import {
+  collectFormFieldValuesFromPdf,
   decodeBase64Pdf,
   encodeBase64Pdf,
   loadPdfFromBytes,
   viewportRectToPdfRect,
 } from "@/lib/pdf/pdfEngine";
 import type { PdfBytesResult } from "@/lib/pdf/pdfBinary";
+import { readTextFile, writeTextFile } from "@/lib/pdf/pdfStorage";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useFormStore } from "@/stores/formStore";
 import { createErrorReporter, log } from "@/lib/logging";
@@ -33,23 +35,33 @@ export async function loadFormFieldsFromPdf(pdfDoc: PdfDocument): Promise<void> 
   }
 
   const fieldObjects = await pdfDoc.getFieldObjects();
-  if (!fieldObjects) {
-    useFormStore.setState({ values: {} });
+  if (fieldObjects && Object.keys(fieldObjects).length > 0) {
+    const values: Record<string, FormFieldValue> = {};
+    for (const [name, objs] of Object.entries(fieldObjects)) {
+      const first = objs[0] as { type?: string; value?: string; required?: boolean };
+      const kind = mapFieldType(first?.type);
+      values[name] = {
+        name,
+        value: first?.value ?? "",
+        type: kind,
+        required: !!first?.required,
+      };
+    }
+    useFormStore.getState().setValuesFromPdf(values);
     return;
   }
 
+  const fromAnnotations = await collectFormFieldValuesFromPdf(pdfDoc);
   const values: Record<string, FormFieldValue> = {};
-  for (const [name, objs] of Object.entries(fieldObjects)) {
-    const first = objs[0] as { type?: string; value?: string; required?: boolean };
-    const kind = mapFieldType(first?.type);
-    values[name] = {
-      name,
-      value: first?.value ?? "",
-      type: kind,
-      required: !!first?.required,
+  for (const entry of Object.values(fromAnnotations)) {
+    values[entry.name] = {
+      name: entry.name,
+      value: entry.value,
+      type: mapFieldType(entry.type),
+      required: entry.required,
     };
   }
-  useFormStore.setState({ values });
+  useFormStore.getState().setValuesFromPdf(values);
 }
 
 function mapFieldType(type?: string): FormFieldDefinition["kind"] {
@@ -57,8 +69,10 @@ function mapFieldType(type?: string): FormFieldDefinition["kind"] {
     case "checkbox":
       return "checkbox";
     case "radiobutton":
+    case "radio":
       return "radio";
     case "combobox":
+    case "dropdown":
       return "dropdown";
     case "listbox":
       return "listbox";
@@ -73,8 +87,7 @@ export async function applyFormChanges(): Promise<boolean> {
   if (!sourceBytes) return true;
 
   const pendingFields = useFormStore.getState().newFields;
-  const values = useFormStore.getState().getValuesArray();
-  if (pendingFields.length === 0 && values.length === 0) return true;
+  if (!useFormStore.getState().hasPendingFormChanges()) return true;
 
   if (!useFormStore.getState().validateRequired()) {
     showError(new Error("Please fill all required form fields."));
@@ -131,10 +144,13 @@ export async function applyFormChanges(): Promise<boolean> {
       base64 = createResult.dataBase64;
     }
 
-    if (values.length > 0) {
+    const changedValues = useFormStore.getState().getChangedValuesArray();
+    if (changedValues.length > 0) {
       const valueResult = await invokeLogged<PdfBytesResult>("apply_form_values", {
         pdfBase64: base64,
-        valuesJson: JSON.stringify(values.map((v) => ({ name: v.name, value: v.value, type: v.type }))),
+        valuesJson: JSON.stringify(
+          changedValues.map((v) => ({ name: v.name, value: v.value, type: v.type })),
+        ),
       });
       base64 = valueResult.dataBase64;
     }
@@ -194,7 +210,11 @@ export async function exportFormDataCsv(): Promise<void> {
 
   const header = "name,value,type\n";
   const rows = values.map((v) => `"${v.name}","${v.value.replace(/"/g, '""')}","${v.type}"`).join("\n");
-  await invokeLogged("write_pdf_file", { path, dataBase64: btoa(header + rows) });
+  await writeTextFile(path, header + rows);
+  log.form.info("Form data exported to CSV", {
+    userAction: "export_form_csv",
+    metadata: { path, fieldCount: values.length },
+  });
   useDocumentStore.getState().setStatusMessage("Form data exported");
 }
 
@@ -205,8 +225,7 @@ export async function importFormDataCsv(): Promise<void> {
   });
   if (!selected || Array.isArray(selected)) return;
 
-  const result = await invokeLogged<{ dataBase64: string }>("read_pdf_file", { path: selected });
-  const text = atob(result.dataBase64);
+  const text = await readTextFile(selected);
   const formStore = useFormStore.getState();
 
   for (const line of text.split(/\r?\n/).slice(1)) {
@@ -215,6 +234,7 @@ export async function importFormDataCsv(): Promise<void> {
       formStore.setFieldValue(match[1], match[2], mapFieldType(match[3]));
     }
   }
+  log.form.info("Form data imported from CSV", { userAction: "import_form_csv", metadata: { path: selected } });
   useDocumentStore.getState().setDirty(true);
 }
 
@@ -230,7 +250,11 @@ export async function exportFormDataFdfFile(): Promise<void> {
     filters: [{ name: "XFDF", extensions: ["xfdf", "xml"] }],
   });
   if (!path) return;
-  await invokeLogged("write_pdf_file", { path, dataBase64: btoa(xfdf) });
+  await writeTextFile(path, xfdf);
+  log.form.info("Form data exported to XFDF", {
+    userAction: "export_form_xfdf",
+    metadata: { path, fieldCount: values.length },
+  });
 }
 
 function escapeXml(s: string): string {

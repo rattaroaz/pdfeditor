@@ -42,4 +42,20 @@ describe("documentStore", () => {
     useDocumentStore.getState().setSidebarWidth(50);
     expect(useDocumentStore.getState().sidebarWidth).toBe(SIDEBAR_WIDTH_MIN);
   });
+
+  it("preserves rotation when PDF structure changes", () => {
+    useDocumentStore.setState({
+      rotation: 90,
+      metadata: { pageCount: 3, fileSize: 1000 },
+      currentPage: 2,
+    });
+    const bytes = new Uint8Array([0x25, 0x50, 0x44, 0x46]);
+    useDocumentStore.getState().applyPdfStructureChange({
+      pdfDoc: {} as never,
+      pdfBytes: bytes,
+      pageCount: 5,
+    });
+    expect(useDocumentStore.getState().rotation).toBe(90);
+    expect(useDocumentStore.getState().currentPage).toBe(2);
+  });
 });

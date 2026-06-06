@@ -20,6 +20,7 @@ export function AppShell() {
   const presentationMode = useDocumentStore((s) => s.presentationMode);
   const appMode = useUiStore((s) => s.appMode);
   const reflowWarnings = useContentEditStore((s) => s.reflowWarnings);
+  const hasExtractableText = useDocumentStore((s) => s.hasExtractableText);
   const showLogViewer = useUiStore((s) => s.showLogViewer);
   const toggleLogViewer = useUiStore((s) => s.toggleLogViewer);
   const forceClosingRef = useRef(false);
@@ -90,6 +91,14 @@ export function AppShell() {
     <div className="flex h-screen flex-col bg-zinc-950 text-zinc-100">
       <MenuBar />
       <Toolbar />
+      {appMode === "edit" && hasExtractableText === false && (
+        <div className="border-b border-sky-800 bg-sky-950/60 px-3 py-2 text-xs text-sky-100">
+          This PDF has no selectable text layer (scanned or image-only pages).{" "}
+          <span className="font-medium text-white">Edit text</span> cannot change existing
+          wording — use <span className="font-medium text-white">Add text (T+)</span> to place
+          new text boxes on the page, then save.
+        </div>
+      )}
       {appMode === "edit" && reflowWarnings.length > 0 && (
         <div className="border-b border-amber-800 bg-amber-950/50 px-3 py-1.5 text-xs text-amber-200">
           {reflowWarnings.map((w, i) => (

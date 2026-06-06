@@ -25,3 +25,16 @@ export function normalizeDropdownOptions(options: string[]): string[] {
   if (trimmed.length === 0) return defaultDropdownOptions(2);
   return trimmed.slice(0, MAX_DROPDOWN_OPTIONS);
 }
+
+/** Keep the same choice when option labels change (match by index, then by exact label). */
+export function resolveDropdownValueAfterOptionsChange(
+  oldOptions: string[],
+  newOptions: string[],
+  currentValue: string,
+): string {
+  if (!newOptions.length) return currentValue;
+  if (currentValue && newOptions.includes(currentValue)) return currentValue;
+  const idx = oldOptions.indexOf(currentValue);
+  if (idx >= 0 && idx < newOptions.length) return newOptions[idx] ?? newOptions[0] ?? "";
+  return newOptions[0] ?? "";
+}

@@ -2,8 +2,17 @@ import type { AppErrorPayload } from "@shared/types";
 import { E2E_PDF_PATH, MINIMAL_PDF_BASE64 } from "./fixturePdf";
 
 const e2eLogLines: string[] = [];
+const invokeLog: string[] = [];
 
 let failNextCommand: string | null = null;
+
+export function getE2eInvokeLog(): readonly string[] {
+  return invokeLog;
+}
+
+export function clearE2eInvokeLog(): void {
+  invokeLog.length = 0;
+}
 
 export function setFailNextCommand(command: string | null): void {
   failNextCommand = command;
@@ -30,6 +39,7 @@ export async function handleInvoke<T>(
   args?: Record<string, unknown>,
 ): Promise<T> {
   takeFail(command);
+  invokeLog.push(command);
 
   switch (command) {
     case "read_pdf_file": {
@@ -79,7 +89,17 @@ export async function handleInvoke<T>(
       } as T;
     case "save_annotations":
     case "write_pdf_file":
+    case "add_recent_file":
       return undefined as T;
+    case "apply_content_edits":
+      return { dataBase64: String(args?.pdfBase64 ?? MINIMAL_PDF_BASE64) } as T;
+    case "create_form_fields":
+    case "apply_form_values":
+    case "flatten_pdf_forms":
+      return { dataBase64: String(args?.pdfBase64 ?? MINIMAL_PDF_BASE64) } as T;
+    case "encrypt_pdf":
+    case "decrypt_pdf":
+      return { dataBase64: String(args?.pdfBase64 ?? MINIMAL_PDF_BASE64) } as T;
     default:
       console.warn(`[e2e-mock] unhandled invoke: ${command}`, args);
       return {} as T;

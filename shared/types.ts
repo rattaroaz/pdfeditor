@@ -58,14 +58,6 @@ export interface PdfMetadata {
   isPasswordProtected?: boolean;
 }
 
-export interface DocumentState {
-  id: string;
-  filePath: string | null;
-  fileName: string;
-  isDirty: boolean;
-  metadata: PdfMetadata | null;
-}
-
 export type ViewMode = "continuous" | "single" | "spread";
 export type ZoomMode = "custom" | "fit-page" | "fit-width" | "actual";
 
@@ -191,6 +183,10 @@ export interface TextContentEdit {
   fontFamily: string;
   color: string;
   coverOld: boolean;
+  /** Minimum width (PDF pts) to white-out the original text; never shrinks while editing. */
+  coverWidth?: number;
+  /** Minimum height (PDF pts) to white-out the original text; never shrinks while editing. */
+  coverHeight?: number;
 }
 
 export interface ImageContentEdit {

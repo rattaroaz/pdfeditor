@@ -1,10 +1,13 @@
 use crate::commands::pdf_pages::save_doc;
 use crate::error::{map_err, AppError, CommandResult};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
+use flate2::write::ZlibEncoder;
+use flate2::Compression;
 use lopdf::content::{Content, Operation};
 use lopdf::{Dictionary, Document, Object, ObjectId, Stream};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::io::Write;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -221,8 +224,147 @@ struct ImageEditDto {
   y: f64,
   width: f64,
   height: f64,
+  pdf_x1: Option<f64>,
+  pdf_y1: Option<f64>,
+  pdf_x2: Option<f64>,
+  pdf_y2: Option<f64>,
   image_base64: String,
   mime_type: String,
+}
+
+fn image_pdf_placement(edit: &ImageEditDto, page_height: f64) -> (f64, f64, f64, f64) {
+  if let (Some(x1), Some(y1), Some(x2), Some(y2)) =
+    (edit.pdf_x1, edit.pdf_y1, edit.pdf_x2, edit.pdf_y2)
+  {
+    return (x1, y1, (x2 - x1).abs(), (y2 - y1).abs());
+  }
+  let [x1, y1, x2, y2] = pdf_rect(edit.x, edit.y, edit.width, edit.height, page_height);
+  (x1, y1, x2 - x1, y2 - y1)
+}
+
+fn png_dimensions(data: &[u8]) -> Option<(i64, i64)> {
+  if data.len() < 24 || &data[0..8] != b"\x89PNG\r\n\x1a\n" {
+    return None;
+  }
+  let width = u32::from_be_bytes([data[16], data[17], data[18], data[19]]) as i64;
+  let height = u32::from_be_bytes([data[20], data[21], data[22], data[23]]) as i64;
+  if width > 0 && height > 0 {
+    Some((width, height))
+  } else {
+    None
+  }
+}
+
+fn jpeg_dimensions(data: &[u8]) -> Option<(i64, i64)> {
+  if data.len() < 4 || data[0] != 0xFF || data[1] != 0xD8 {
+    return None;
+  }
+  let mut i = 2usize;
+  while i + 9 < data.len() {
+    if data[i] != 0xFF {
+      i += 1;
+      continue;
+    }
+    let marker = data[i + 1];
+    if marker == 0xD9 || marker == 0xDA {
+      break;
+    }
+    let len = u16::from_be_bytes([data[i + 2], data[i + 3]]) as usize;
+    if len < 2 || i + 2 + len > data.len() {
+      break;
+    }
+    if (0xC0..=0xC3).contains(&marker) || (0xC5..=0xC7).contains(&marker) || (0xC9..=0xCB).contains(&marker)
+    {
+      let height = u16::from_be_bytes([data[i + 5], data[i + 6]]) as i64;
+      let width = u16::from_be_bytes([data[i + 7], data[i + 8]]) as i64;
+      if width > 0 && height > 0 {
+        return Some((width, height));
+      }
+    }
+    i += 2 + len;
+  }
+  None
+}
+
+fn image_dimensions(data: &[u8], mime_type: &str) -> (i64, i64) {
+  let mime = mime_type.to_ascii_lowercase();
+  if mime.contains("png") {
+    if let Some(d) = png_dimensions(data) {
+      return d;
+    }
+  }
+  if mime.contains("jpeg") || mime.contains("jpg") {
+    if let Some(d) = jpeg_dimensions(data) {
+      return d;
+    }
+  }
+  if let Ok(img) = image::ImageReader::new(std::io::Cursor::new(data))
+    .with_guessed_format()
+    .map_err(|e| e.to_string())
+    .and_then(|r| r.decode().map_err(|e| e.to_string()))
+  {
+    return (img.width() as i64, img.height() as i64);
+  }
+  (1, 1)
+}
+
+struct PdfImageSamples {
+  width: i64,
+  height: i64,
+  rgb: Vec<u8>,
+  alpha: Option<Vec<u8>>,
+}
+
+fn decode_image_for_pdf(data: &[u8], mime_type: &str) -> Result<PdfImageSamples, AppError> {
+  let mime = mime_type.to_ascii_lowercase();
+  if (mime.contains("jpeg") || mime.contains("jpg")) && jpeg_dimensions(data).is_some() {
+    let (width, height) = jpeg_dimensions(data).unwrap_or((1, 1));
+    return Ok(PdfImageSamples {
+      width,
+      height,
+      rgb: data.to_vec(),
+      alpha: None,
+    });
+  }
+
+  let img = image::ImageReader::new(std::io::Cursor::new(data))
+    .with_guessed_format()
+    .map_err(|e| AppError::InvalidInput(e.to_string()))?
+    .decode()
+    .map_err(|e| AppError::InvalidInput(format!("Unsupported or corrupt image: {e}")))?;
+
+  let width = img.width() as i64;
+  let height = img.height() as i64;
+  let rgba = img.to_rgba8();
+  let pixels = rgba.as_raw();
+  let mut rgb = Vec::with_capacity((width * height * 3) as usize);
+  let mut alpha = Vec::with_capacity((width * height) as usize);
+  let mut has_alpha = false;
+  for chunk in pixels.chunks(4) {
+    rgb.extend_from_slice(&chunk[0..3]);
+    let a = chunk[3];
+    alpha.push(a);
+    if a != 255 {
+      has_alpha = true;
+    }
+  }
+
+  Ok(PdfImageSamples {
+    width,
+    height,
+    rgb,
+    alpha: if has_alpha { Some(alpha) } else { None },
+  })
+}
+
+fn zlib_compress(data: &[u8]) -> Result<Vec<u8>, AppError> {
+  let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+  encoder
+    .write_all(data)
+    .map_err(|e| AppError::InvalidInput(e.to_string()))?;
+  encoder
+    .finish()
+    .map_err(|e| AppError::InvalidInput(e.to_string()))
 }
 
 fn edit_pdf_rect(edit: &TextEditDto, page_height: f64) -> [f64; 4] {
@@ -317,27 +459,51 @@ pub fn apply_content_edits_in_pdf(
       .copied()
       .ok_or_else(|| AppError::InvalidInput(format!("invalid page index {}", edit.page_index)))?;
     let ph = page_height(&doc, page_id);
-    let [x1, y1, _, _y2] = pdf_rect(edit.x, edit.y, edit.width, edit.height, ph);
+    let (x1, y1, draw_w, draw_h) = image_pdf_placement(edit, ph);
     let img_bytes = STANDARD
       .decode(&edit.image_base64)
       .map_err(|e| AppError::InvalidInput(e.to_string()))?;
+    let decoded = decode_image_for_pdf(&img_bytes, &edit.mime_type)?;
+    let is_jpeg = edit.mime_type.contains("jpeg") || edit.mime_type.contains("jpg");
 
-    let filter = if edit.mime_type.contains("jpeg") || edit.mime_type.contains("jpg") {
+    let filter = if is_jpeg && decoded.alpha.is_none() {
       b"DCTDecode".to_vec()
     } else {
       b"FlateDecode".to_vec()
     };
 
+    let stream_bytes = if is_jpeg && decoded.alpha.is_none() {
+      img_bytes
+    } else {
+      zlib_compress(&decoded.rgb)?
+    };
+
     let mut img_dict = Dictionary::new();
     img_dict.set("Type", Object::Name(b"XObject".to_vec()));
     img_dict.set("Subtype", Object::Name(b"Image".to_vec()));
-    img_dict.set("Width", Object::Integer(100));
-    img_dict.set("Height", Object::Integer(100));
+    img_dict.set("Width", Object::Integer(decoded.width));
+    img_dict.set("Height", Object::Integer(decoded.height));
     img_dict.set("ColorSpace", Object::Name(b"DeviceRGB".to_vec()));
     img_dict.set("BitsPerComponent", Object::Integer(8));
     img_dict.set("Filter", Object::Name(filter));
 
-    let img_stream = Stream::new(img_dict, img_bytes);
+    if let Some(alpha) = decoded.alpha {
+      let mut mask_dict = Dictionary::new();
+      mask_dict.set("Type", Object::Name(b"XObject".to_vec()));
+      mask_dict.set("Subtype", Object::Name(b"Image".to_vec()));
+      mask_dict.set("Width", Object::Integer(decoded.width));
+      mask_dict.set("Height", Object::Integer(decoded.height));
+      mask_dict.set("ColorSpace", Object::Name(b"DeviceGray".to_vec()));
+      mask_dict.set("BitsPerComponent", Object::Integer(8));
+      mask_dict.set("Filter", Object::Name(b"FlateDecode".to_vec()));
+      let mask_id = doc.add_object(Object::Stream(Stream::new(
+        mask_dict,
+        zlib_compress(&alpha)?,
+      )));
+      img_dict.set("SMask", Object::Reference(mask_id));
+    }
+
+    let img_stream = Stream::new(img_dict, stream_bytes);
     let img_id = doc.add_object(Object::Stream(img_stream));
     let img_name = format!("Img{}", img_id.0);
 
@@ -349,10 +515,10 @@ pub fn apply_content_edits_in_pdf(
       Operation::new(
         "cm",
         vec![
-          edit.width.into(),
+          draw_w.into(),
           0.into(),
           0.into(),
-          edit.height.into(),
+          draw_h.into(),
           x1.into(),
           y1.into(),
         ],
@@ -486,6 +652,41 @@ mod tests {
     let output = apply_content_edits_in_pdf(&input, &edits, &[]).unwrap();
     let doc = Document::load_mem(&output).unwrap();
     assert_eq!(doc.get_pages().len(), 1);
+  }
+
+  #[test]
+  fn applies_image_edit_with_pdf_coordinates() {
+    let input = one_page_pdf();
+    // 1x1 PNG
+    let png = STANDARD
+      .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+      .unwrap();
+    let edits = vec![ImageEditDto {
+      page_index: 0,
+      x: 72.0,
+      y: 96.0,
+      width: 120.0,
+      height: 80.0,
+      pdf_x1: Some(72.0),
+      pdf_y1: Some(616.0),
+      pdf_x2: Some(192.0),
+      pdf_y2: Some(696.0),
+      image_base64: STANDARD.encode(&png),
+      mime_type: "image/png".into(),
+    }];
+    let output = apply_content_edits_in_pdf(&input, &[], &edits).unwrap();
+    let doc = Document::load_mem(&output).unwrap();
+    assert_eq!(doc.get_pages().len(), 1);
+    assert!(output.len() > input.len());
+  }
+
+  #[test]
+  fn reads_png_and_jpeg_dimensions() {
+    let png = STANDARD
+      .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+      .unwrap();
+    assert_eq!(png_dimensions(&png), Some((1, 1)));
+    assert_eq!(image_dimensions(&png, "image/png"), (1, 1));
   }
 
   /// Build a PDF whose page has an inline /Resources dict containing an

@@ -30,6 +30,7 @@ interface DocumentStore {
   sidebarWidth: number;
   sidebarTab: SidebarTab;
   presentationMode: boolean;
+  hasExtractableText: boolean | null;
   setLoading: (loading: boolean) => void;
   setLoadError: (error: string | null) => void;
   setDocument: (args: {
@@ -66,6 +67,7 @@ interface DocumentStore {
     pageCount: number;
   }) => void;
   setStatusMessage: (message: string | null) => void;
+  setHasExtractableText: (value: boolean | null) => void;
   statusMessage: string | null;
   isPasswordProtected: boolean;
   documentPassword: string | null;
@@ -101,6 +103,7 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
   sidebarWidth: SIDEBAR_WIDTH_DEFAULT,
   sidebarTab: "pages",
   presentationMode: false,
+  hasExtractableText: null,
   statusMessage: null,
   isPasswordProtected: false,
   documentPassword: null,
@@ -129,6 +132,7 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
       documentPassword: null,
       pendingSavePassword: null,
       removePasswordOnSave: false,
+      hasExtractableText: null,
     }),
   clearDocument: () =>
     set({
@@ -150,6 +154,7 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
       documentPassword: null,
       pendingSavePassword: null,
       removePasswordOnSave: false,
+      hasExtractableText: null,
     }),
   setDirty: (isDirty) => set({ isDirty }),
   setCurrentPage: (page, options) => {
@@ -207,6 +212,7 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
       fileName: fileNameFromPath(filePath, get().fileName),
       pdfDoc,
       pdfBytes,
+      basePdfBytes: pdfBytes.slice(),
       savedPdfBytes: pdfBytes.slice(),
       isDirty: false,
       statusMessage: "Saved",
@@ -225,10 +231,11 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
       isDirty: true,
       currentPage,
       scrollToPage: currentPage,
-      rotation: 0,
+      rotation: s.rotation,
     }));
   },
   setStatusMessage: (statusMessage) => set({ statusMessage }),
+  setHasExtractableText: (hasExtractableText) => set({ hasExtractableText }),
   setPasswordProtected: (isPasswordProtected) =>
     set((s) => ({
       isPasswordProtected,

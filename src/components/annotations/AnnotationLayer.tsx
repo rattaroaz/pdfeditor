@@ -13,6 +13,7 @@ import {
   stampSize,
 } from "@/lib/annotationTransform";
 import { persistAnnotations } from "@/services/documentService";
+import { layoutTextBoxFromDrag, markupTextBoxStyle } from "@/lib/textEditBox";
 import type {
   FreehandAnnotation,
   NoteAnnotation,
@@ -630,6 +631,7 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
     if (width < 8 || height < 8) return;
     const content = window.prompt("Text box content:");
     if (!content?.trim()) return;
+    const { fontSize, height: boxHeight } = layoutTextBoxFromDrag(height);
     addAnnotation({
       type: "text",
       pageIndex,
@@ -638,9 +640,9 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
       x,
       y,
       width,
-      height,
+      height: boxHeight,
       content: content.trim(),
-      fontSize: 12,
+      fontSize,
     });
     await persistAnnotations();
   };
@@ -743,6 +745,27 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
     return (
       <div ref={containerRef} className="pointer-events-none absolute inset-0">
         <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
+        {pageAnnotations
+          .filter((a) => a.type === "text")
+          .map((ann) => {
+            const text = ann as TextAnnotation;
+            return (
+              <div
+                key={ann.id}
+                className="pointer-events-none absolute overflow-hidden rounded border border-zinc-400 bg-white/90 px-1 text-black leading-none"
+                style={{
+                  left: text.x * scale,
+                  top: text.y * scale,
+                  width: text.width * scale,
+                  height: text.height * scale,
+                  fontSize: text.fontSize * scale,
+                  ...markupTextBoxStyle(scale),
+                }}
+              >
+                {text.content}
+              </div>
+            );
+          })}
       </div>
     );
   }
@@ -828,7 +851,7 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
           return (
             <div
               key={ann.id}
-              className={`pointer-events-none absolute flex items-center overflow-hidden rounded border border-zinc-400 bg-white/90 px-1 text-black ${
+              className={`pointer-events-none absolute overflow-hidden rounded border border-zinc-400 bg-white/90 px-1 text-black leading-none ${
                 selectedId === ann.id ? "ring-2 ring-blue-500" : ""
               }`}
               style={{
@@ -837,6 +860,7 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
                 width: text.width * scale,
                 height: text.height * scale,
                 fontSize: text.fontSize * scale,
+                ...markupTextBoxStyle(scale),
               }}
             >
               {text.content}

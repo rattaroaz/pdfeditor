@@ -54,6 +54,7 @@ describe("annotationTransform", () => {
     const resized = resizeAnnotation(ann, anchor, 80, 60) as TextAnnotation;
     expect(resized.width).toBe(70);
     expect(resized.height).toBe(60);
+    expect(resized.fontSize).toBe(53);
     expect(resized.y).toBe(0);
     expect(resized.y + resized.height / 2).toBe(ann.y + ann.height / 2);
   });

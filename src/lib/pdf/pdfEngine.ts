@@ -197,18 +197,13 @@ export async function getPageSearchHighlights(
     const mEnd = mStart + match[0].length;
     for (const span of spans) {
       if (span.end <= mStart || span.start >= mEnd) continue;
-      const item = span.item;
-      if (!("str" in item) || !item.str) continue;
-      const tx = item.transform[4];
-      const ty = item.transform[5];
-      const h = item.height || Math.abs(item.transform[3]) || 12;
-      const w = item.width || item.str.length * 6;
-      const [vx, vy] = viewport.convertToViewportPoint(tx, ty);
+      const rect = textItemViewportRect(span.item, viewport);
+      if (!rect) continue;
       rects.push({
-        x: vx,
-        y: vy - h,
-        width: w,
-        height: h,
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
       });
     }
     if (match[0].length === 0) regex.lastIndex++;
@@ -303,6 +298,70 @@ export interface TextHit {
   fontSize: number;
 }
 
+type TextContentItem = Awaited<ReturnType<PdfPage["getTextContent"]>>["items"][number];
+
+interface TextItemRect {
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fontSize: number;
+  baselineY: number;
+}
+
+/** Viewport rect for a pdf.js text item (scale 1, top-left origin). */
+export function textItemViewportRect(
+  item: TextContentItem,
+  viewport: ReturnType<PdfPage["getViewport"]>,
+): TextItemRect | null {
+  if (!("str" in item) || !item.str) return null;
+
+  const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+  const fontSize = item.height || Math.hypot(tx[2], tx[3]) || 12;
+  const width = item.width || item.str.length * fontSize * 0.52;
+
+  return {
+    text: item.str,
+    x: tx[4],
+    y: tx[5] - fontSize,
+    width,
+    height: fontSize,
+    fontSize,
+    baselineY: tx[5],
+  };
+}
+
+function pointInRect(
+  x: number,
+  y: number,
+  rect: Pick<TextItemRect, "x" | "y" | "width" | "height">,
+  pad = 3,
+): boolean {
+  return (
+    x >= rect.x - pad &&
+    x <= rect.x + rect.width + pad &&
+    y >= rect.y - pad &&
+    y <= rect.y + rect.height + pad
+  );
+}
+
+function mergeLineItems(items: TextItemRect[]): TextHit {
+  const sorted = [...items].sort((a, b) => a.x - b.x);
+  const x = sorted[0]!.x;
+  const y = Math.min(...sorted.map((i) => i.y));
+  const right = Math.max(...sorted.map((i) => i.x + i.width));
+  const bottom = Math.max(...sorted.map((i) => i.y + i.height));
+  return {
+    text: sorted.map((i) => i.text).join(""),
+    x,
+    y,
+    width: right - x,
+    height: bottom - y,
+    fontSize: sorted[0]!.fontSize,
+  };
+}
+
 export async function findTextAtPoint(
   page: PdfPage,
   x: number,
@@ -312,29 +371,98 @@ export async function findTextAtPoint(
   const content = await page.getTextContent();
   const viewport = page.getViewport({ scale: 1, rotation });
 
+  const items: TextItemRect[] = [];
   for (const item of content.items) {
-    if (!("str" in item) || !item.str?.trim()) continue;
-    const tx = item.transform[4];
-    const ty = item.transform[5];
-    const h = item.height || Math.abs(item.transform[3]) || 12;
-    const w = item.width || item.str.length * 6;
-    const [vx, vy] = viewport.convertToViewportPoint(tx, ty);
-    const rect = { x: vx, y: vy - h, width: w, height: h };
-    if (x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height) {
-      return {
-        text: item.str,
-        x: rect.x,
-        y: rect.y,
-        width: rect.width,
-        height: rect.height,
-        fontSize: h,
-      };
+    const rect = textItemViewportRect(item, viewport);
+    if (rect?.text.trim()) items.push(rect);
+  }
+  if (items.length === 0) return null;
+
+  let primary: TextItemRect | null = null;
+  let bestDist = Infinity;
+
+  for (const item of items) {
+    if (pointInRect(x, y, item)) {
+      const cx = item.x + item.width / 2;
+      const cy = item.y + item.height / 2;
+      const dist = Math.hypot(x - cx, y - cy);
+      if (dist < bestDist) {
+        bestDist = dist;
+        primary = item;
+      }
     }
   }
-  return null;
+
+  if (!primary) {
+    for (const item of items) {
+      const cx = item.x + item.width / 2;
+      const cy = item.y + item.height / 2;
+      const dist = Math.hypot(x - cx, y - cy);
+      if (dist < Math.max(12, item.fontSize) && dist < bestDist) {
+        bestDist = dist;
+        primary = item;
+      }
+    }
+  }
+
+  if (!primary) return null;
+
+  return mergeContiguousFromPrimary(primary, items);
+}
+
+/** Merge the clicked item with horizontally adjacent fragments on the same line (not the whole line). */
+function mergeContiguousFromPrimary(primary: TextItemRect, items: TextItemRect[]): TextHit {
+  const lineTolerance = Math.max(2, primary.fontSize * 0.2);
+  const gap = Math.max(2, primary.fontSize * 0.15);
+  const lineItems = items
+    .filter((item) => Math.abs(item.baselineY - primary.baselineY) <= lineTolerance)
+    .sort((a, b) => a.x - b.x);
+
+  let startIdx = lineItems.indexOf(primary);
+  if (startIdx < 0) {
+    return {
+      text: primary.text,
+      x: primary.x,
+      y: primary.y,
+      width: primary.width,
+      height: primary.height,
+      fontSize: primary.fontSize,
+    };
+  }
+
+  let start = startIdx;
+  let end = startIdx;
+  while (start > 0) {
+    const prev = lineItems[start - 1]!;
+    const cur = lineItems[start]!;
+    if (cur.x - (prev.x + prev.width) > gap) break;
+    start--;
+  }
+  while (end < lineItems.length - 1) {
+    const cur = lineItems[end]!;
+    const next = lineItems[end + 1]!;
+    if (next.x - (cur.x + cur.width) > gap) break;
+    end++;
+  }
+
+  return mergeLineItems(lineItems.slice(start, end + 1));
+}
+
+/** True if the document exposes at least one non-empty text item via pdf.js. */
+export async function documentHasExtractableText(doc: PdfDocument): Promise<boolean> {
+  for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
+    const page = await doc.getPage(pageNum);
+    const content = await page.getTextContent();
+    if (content.items.some((item) => "str" in item && !!item.str?.trim())) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export interface FormWidgetRect {
+  /** pdf.js annotation id (unique per widget; radio groups share a name). */
+  id?: string;
   name: string;
   type: string;
   pageIndex: number;
@@ -346,6 +474,160 @@ export interface FormWidgetRect {
   options?: string[];
   required?: boolean;
   readOnly?: boolean;
+}
+
+/** pdf.js AnnotationType.WIDGET */
+const PDF_ANNOTATION_TYPE_WIDGET = 20;
+
+type PdfWidgetAnnotation = {
+  annotationType?: number;
+  id?: string;
+  fieldName?: string;
+  fieldType?: string;
+  fieldValue?: string | string[];
+  rect?: number[];
+  checkBox?: boolean;
+  radioButton?: boolean;
+  combo?: boolean;
+  options?: Array<{ displayValue?: string; exportValue?: string } | string>;
+  readOnly?: boolean;
+  required?: boolean;
+  hidden?: boolean;
+  exportValue?: string;
+  buttonValue?: string;
+  items?: Array<string | { exportValue?: string; displayValue?: string }>;
+  editable?: boolean;
+};
+
+function widgetTypeFromAnnotation(ann: PdfWidgetAnnotation): string {
+  if (ann.checkBox) return "checkbox";
+  if (ann.radioButton) return "radio";
+  if (ann.fieldType === "Ch") return ann.combo !== false ? "combobox" : "listbox";
+  if (ann.fieldType === "Btn") return "checkbox";
+  return "text";
+}
+
+function widgetValueFromAnnotation(ann: PdfWidgetAnnotation, type: string): string | undefined {
+  if (type === "checkbox") {
+    const v = ann.fieldValue;
+    const on =
+      v === ann.exportValue ||
+      v === "Yes" ||
+      v === "On" ||
+      String(v).toLowerCase() === "true";
+    return on ? "Yes" : "Off";
+  }
+  if (type === "radio") {
+    if (typeof ann.fieldValue === "string") return ann.fieldValue;
+    if (Array.isArray(ann.fieldValue)) return ann.fieldValue[0];
+    return ann.buttonValue;
+  }
+  if (type === "combobox" || type === "listbox" || type === "dropdown") {
+    if (Array.isArray(ann.fieldValue)) return ann.fieldValue[0] ?? "";
+    return ann.fieldValue ?? "";
+  }
+  if (Array.isArray(ann.fieldValue)) return ann.fieldValue.join("\n");
+  return ann.fieldValue ?? "";
+}
+
+function widgetFromAnnotation(
+  ann: PdfWidgetAnnotation,
+  name: string,
+  pageIndex: number,
+  viewport: ReturnType<PdfPage["getViewport"]>,
+): FormWidgetRect | null {
+  if (!ann.rect || ann.rect.length < 4 || ann.hidden) return null;
+  const type = widgetTypeFromAnnotation(ann);
+  const [x1, y1, x2, y2] = ann.rect;
+  const [vx1, vy1] = viewport.convertToViewportPoint(x1, y1);
+  const [vx2, vy2] = viewport.convertToViewportPoint(x2, y2);
+  return {
+    id: ann.id,
+    name,
+    type,
+    pageIndex,
+    x: Math.min(vx1, vx2),
+    y: Math.min(vy1, vy2),
+    width: Math.abs(vx2 - vx1),
+    height: Math.abs(vy2 - vy1),
+    value: widgetValueFromAnnotation(ann, type),
+    options: choiceOptionsFromPdfField({ options: undefined, items: ann.options ?? ann.items }),
+    required: ann.required,
+    readOnly: ann.readOnly ?? ann.editable === false,
+  };
+}
+
+function widgetsFromFieldObjects(
+  fieldObjects: Record<string, Array<object>>,
+  pageIndex: number,
+  viewport: ReturnType<PdfPage["getViewport"]>,
+): FormWidgetRect[] {
+  const widgets: FormWidgetRect[] = [];
+  for (const [name, objs] of Object.entries(fieldObjects)) {
+    for (const obj of objs) {
+      const field = obj as {
+        id?: string;
+        page?: number;
+        rect?: number[];
+        type?: string;
+        value?: string;
+        options?: string[];
+        items?: Array<string | { exportValue?: string; displayValue?: string }>;
+        required?: boolean;
+        readOnly?: boolean;
+        editable?: boolean;
+      };
+      if (field.page !== pageIndex || !field.rect || field.rect.length < 4) continue;
+      const [x1, y1, x2, y2] = field.rect;
+      const [vx1, vy1] = viewport.convertToViewportPoint(x1, y1);
+      const [vx2, vy2] = viewport.convertToViewportPoint(x2, y2);
+      widgets.push({
+        id: field.id,
+        name,
+        type: field.type ?? "text",
+        pageIndex,
+        x: Math.min(vx1, vx2),
+        y: Math.min(vy1, vy2),
+        width: Math.abs(vx2 - vx1),
+        height: Math.abs(vy2 - vy1),
+        value: field.value,
+        options: choiceOptionsFromPdfField(field),
+        required: field.required,
+        readOnly: field.readOnly ?? field.editable === false,
+      });
+    }
+  }
+  return widgets;
+}
+
+/** Collect field values from widget annotations on every page (fallback when getFieldObjects is empty). */
+export async function collectFormFieldValuesFromPdf(
+  pdfDoc: PdfDocument,
+): Promise<Record<string, { name: string; value: string; type: string; required: boolean }>> {
+  const values: Record<string, { name: string; value: string; type: string; required: boolean }> =
+    {};
+
+  for (let pageNumber = 1; pageNumber <= pdfDoc.numPages; pageNumber++) {
+    const page = await pdfDoc.getPage(pageNumber);
+    const annotations = await page.getAnnotations({ intent: "display" });
+    for (const raw of annotations) {
+      const ann = raw as PdfWidgetAnnotation;
+      if (ann.annotationType !== PDF_ANNOTATION_TYPE_WIDGET || !ann.fieldName) continue;
+      const type = widgetTypeFromAnnotation(ann);
+      const value = widgetValueFromAnnotation(ann, type) ?? "";
+      const existing = values[ann.fieldName];
+      if (!existing || (value && !existing.value)) {
+        values[ann.fieldName] = {
+          name: ann.fieldName,
+          value,
+          type,
+          required: !!ann.required,
+        };
+      }
+    }
+  }
+
+  return values;
 }
 
 /** pdf.js choice fields expose `items`; some producers use plain `options`. */
@@ -387,50 +669,30 @@ export function viewportRectToPdfRect(
 export async function getFormWidgetsForPage(
   pdfDoc: PdfDocument,
   pageNumber: number,
-  scale: number,
+  _scale: number,
   rotation = 0,
 ): Promise<FormWidgetRect[]> {
-  const fieldObjects = await pdfDoc.getFieldObjects();
-  if (!fieldObjects) return [];
-
   const page = await pdfDoc.getPage(pageNumber);
-  const viewport = page.getViewport({ scale, rotation });
+  // Always compute in unscaled (scale-1) viewport coords; the form layer applies
+  // the current zoom scale itself (same convention as newly-placed fields).
+  const viewport = page.getViewport({ scale: 1, rotation });
   const pageIndex = pageNumber - 1;
-  const widgets: FormWidgetRect[] = [];
 
-  for (const [name, objs] of Object.entries(fieldObjects)) {
-    for (const obj of objs) {
-      const field = obj as {
-        page?: number;
-        rect?: number[];
-        type?: string;
-        value?: string;
-        options?: string[];
-        items?: Array<string | { exportValue?: string; displayValue?: string }>;
-        required?: boolean;
-        readOnly?: boolean;
-        editable?: boolean;
-      };
-      if (field.page !== pageIndex || !field.rect || field.rect.length < 4) continue;
-      const [x1, y1, x2, y2] = field.rect;
-      const [vx1, vy1] = viewport.convertToViewportPoint(x1, y1);
-      const [vx2, vy2] = viewport.convertToViewportPoint(x2, y2);
-      widgets.push({
-        name,
-        type: field.type ?? "text",
-        pageIndex,
-        x: Math.min(vx1, vx2),
-        y: Math.min(vy1, vy2),
-        width: Math.abs(vx2 - vx1),
-        height: Math.abs(vy2 - vy1),
-        value: field.value,
-        options: choiceOptionsFromPdfField(field),
-        required: field.required,
-        readOnly: field.readOnly ?? field.editable === false,
-      });
+  const annotations = await page.getAnnotations({ intent: "display" });
+  const fromAnnotations: FormWidgetRect[] = [];
+  for (const raw of annotations) {
+    const ann = raw as PdfWidgetAnnotation;
+    if (ann.annotationType !== PDF_ANNOTATION_TYPE_WIDGET || !ann.fieldName) continue;
+    const widget = widgetFromAnnotation(ann, ann.fieldName, pageIndex, viewport);
+    if (widget && widget.width > 0 && widget.height > 0) {
+      fromAnnotations.push(widget);
     }
   }
-  return widgets;
+  if (fromAnnotations.length > 0) return fromAnnotations;
+
+  const fieldObjects = await pdfDoc.getFieldObjects();
+  if (!fieldObjects) return [];
+  return widgetsFromFieldObjects(fieldObjects, pageIndex, viewport);
 }
 
 /** Locate a form field widget anywhere in the document (viewport coords at scale 1). */
@@ -439,46 +701,10 @@ export async function findFormWidgetByName(
   fieldName: string,
   rotation = 0,
 ): Promise<FormWidgetRect | null> {
-  const fieldObjects = await pdfDoc.getFieldObjects();
-  const objs = fieldObjects?.[fieldName];
-  if (!objs?.length) return null;
-
-  for (const obj of objs) {
-    const field = obj as {
-      page?: number;
-      rect?: number[];
-      type?: string;
-      value?: string;
-      options?: string[];
-      items?: Array<string | { exportValue?: string; displayValue?: string }>;
-      required?: boolean;
-      readOnly?: boolean;
-      editable?: boolean;
-    };
-    if (field.page === undefined || !field.rect || field.rect.length < 4) continue;
-
-    const pageIndex = field.page;
-    const pageNumber = pageIndex + 1;
-    const page = await pdfDoc.getPage(pageNumber);
-    const viewport = page.getViewport({ scale: 1, rotation });
-    const [x1, y1, x2, y2] = field.rect;
-    const [vx1, vy1] = viewport.convertToViewportPoint(x1, y1);
-    const [vx2, vy2] = viewport.convertToViewportPoint(x2, y2);
-
-    return {
-      name: fieldName,
-      type: field.type ?? "text",
-      pageIndex,
-      x: Math.min(vx1, vx2),
-      y: Math.min(vy1, vy2),
-      width: Math.abs(vx2 - vx1),
-      height: Math.abs(vy2 - vy1),
-      value: field.value,
-      options: choiceOptionsFromPdfField(field),
-      required: field.required,
-      readOnly: field.readOnly ?? field.editable === false,
-    };
+  for (let pageNumber = 1; pageNumber <= pdfDoc.numPages; pageNumber++) {
+    const widgets = await getFormWidgetsForPage(pdfDoc, pageNumber, 1, rotation);
+    const match = widgets.find((w) => w.name === fieldName);
+    if (match) return match;
   }
-
   return null;
 }

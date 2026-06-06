@@ -3,3 +3,7 @@ Create a roadmap.txt file and document the phases needed to create this app from
 The phases must have items underneath them, with check boxes next to them.
 It must be created with typescript, and tauri framework.  
 It must be a production level app with full tests and logging. 
+
+
+ewhen filling out text boxes, the box shoul delete after users
+adjust size of drop down after creation

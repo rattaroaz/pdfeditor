@@ -23,12 +23,15 @@ export function StatusBar() {
 
   useEffect(() => {
     if (!statusMessage || statusMessage === "Saving…") return;
-    const timer = setTimeout(() => setStatusMessage(null), 3000);
+    const timer = setTimeout(() => setStatusMessage(null), statusMessage.length > 60 ? 8000 : 4000);
     return () => clearTimeout(timer);
   }, [statusMessage, setStatusMessage]);
 
   return (
-    <footer className="flex items-center justify-between border-t border-zinc-700 bg-zinc-950 px-3 py-1 text-xs text-zinc-400">
+    <footer
+      data-testid="status-bar"
+      className="flex items-center justify-between border-t border-zinc-700 bg-zinc-950 px-3 py-1 text-xs text-zinc-400"
+    >
       <span className="flex items-center gap-2">
         {fileName}
         {isDirty ? " *" : ""}
