@@ -2,7 +2,7 @@
 export function normalizeFieldName(raw: string): string {
   const trimmed = raw.trim().replace(/\s+/g, " ");
   if (!trimmed) return "";
-  return trimmed.replace(/[^\w \-]/g, "").trim();
+  return trimmed.replace(/[^\w -]/g, "").trim();
 }
 
 /** Case- and spacing-insensitive key for duplicate checks. */

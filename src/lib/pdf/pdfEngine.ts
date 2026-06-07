@@ -418,7 +418,7 @@ function mergeContiguousFromPrimary(primary: TextItemRect, items: TextItemRect[]
     .filter((item) => Math.abs(item.baselineY - primary.baselineY) <= lineTolerance)
     .sort((a, b) => a.x - b.x);
 
-  let startIdx = lineItems.indexOf(primary);
+  const startIdx = lineItems.indexOf(primary);
   if (startIdx < 0) {
     return {
       text: primary.text,
