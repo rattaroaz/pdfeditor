@@ -23,6 +23,7 @@ import {
 } from "@/services/securityService";
 import { isLogViewerEnabled } from "@/lib/logging";
 import { openLogDirectory } from "@/services/loggingService";
+import { HELP_MENU_LINKS } from "@/content/helpGuide";
 
 
 
@@ -42,6 +43,7 @@ export function MenuBar() {
   const toggleLogViewer = useUiStore((s) => s.toggleLogViewer);
   const showSidebar = useDocumentStore((s) => s.showSidebar);
   const setShowSidebar = useDocumentStore((s) => s.setShowSidebar);
+  const openHelpGuide = useUiStore((s) => s.openHelpGuide);
 
 
 
@@ -284,6 +286,23 @@ export function MenuBar() {
 
         <MenuItem onClick={() => run(() => void openLogDirectory())}>Open log folder…</MenuItem>
 
+      </MenuDropdown>
+
+      <MenuDropdown
+        label="Help"
+        menuTestId="menu-help"
+        open={openMenu === "help"}
+        onToggle={() => setOpenMenu((m) => (m === "help" ? null : "help"))}
+      >
+        {HELP_MENU_LINKS.map((link, index) => (
+          <MenuItem
+            key={link.sectionId}
+            testId={index === 0 ? "menu-help-guide" : undefined}
+            onClick={() => run(() => openHelpGuide(link.sectionId))}
+          >
+            {link.label}
+          </MenuItem>
+        ))}
       </MenuDropdown>
 
     </nav>

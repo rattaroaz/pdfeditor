@@ -10,6 +10,8 @@ describe("uiStore", () => {
       showLogViewer: false,
       showSearch: false,
       showSplitDialog: false,
+      showHelpGuide: false,
+      helpSectionId: "overview",
     });
   });
 
@@ -49,5 +51,13 @@ describe("uiStore", () => {
     expect(useUiStore.getState().showSplitDialog).toBe(false);
     useUiStore.getState().setFlattenOnSave(true);
     expect(useUiStore.getState().flattenOnSave).toBe(true);
+  });
+
+  it("opens and closes the help guide", () => {
+    useUiStore.getState().openHelpGuide("forms-mode");
+    expect(useUiStore.getState().showHelpGuide).toBe(true);
+    expect(useUiStore.getState().helpSectionId).toBe("forms-mode");
+    useUiStore.getState().closeHelpGuide();
+    expect(useUiStore.getState().showHelpGuide).toBe(false);
   });
 });

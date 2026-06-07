@@ -41,7 +41,23 @@ describe("MenuBar", () => {
       viewMode: "continuous",
       presentationMode: false,
     });
-    useUiStore.setState({ showSearch: false });
+    useUiStore.setState({ showSearch: false, showHelpGuide: false, helpSectionId: "overview" });
+  });
+
+  it("opens the user guide from the Help menu", () => {
+    render(<MenuBar />);
+    fireEvent.click(screen.getByTestId("menu-help"));
+    fireEvent.click(screen.getByTestId("menu-help-guide"));
+    expect(useUiStore.getState().showHelpGuide).toBe(true);
+    expect(useUiStore.getState().helpSectionId).toBe("overview");
+  });
+
+  it("opens a specific help section from the Help menu", () => {
+    render(<MenuBar />);
+    fireEvent.click(screen.getByTestId("menu-help"));
+    fireEvent.click(screen.getByText("Adding text: which tool?"));
+    expect(useUiStore.getState().showHelpGuide).toBe(true);
+    expect(useUiStore.getState().helpSectionId).toBe("adding-text");
   });
 
   it("toggles sidebar visibility from the View menu", () => {

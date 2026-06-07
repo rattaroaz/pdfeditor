@@ -15,6 +15,8 @@ interface UiStore {
   showErrorDialog: boolean;
   showLogViewer: boolean;
   showSplitDialog: boolean;
+  showHelpGuide: boolean;
+  helpSectionId: string;
   setAppMode: (mode: AppMode) => void;
   toggleLogViewer: () => void;
   setSearchQuery: (query: string) => void;
@@ -29,6 +31,8 @@ interface UiStore {
   dismissError: () => void;
   openSplitDialog: () => void;
   closeSplitDialog: () => void;
+  openHelpGuide: (sectionId?: string) => void;
+  closeHelpGuide: () => void;
 }
 
 export const useUiStore = create<UiStore>((set) => ({
@@ -45,6 +49,8 @@ export const useUiStore = create<UiStore>((set) => ({
   showErrorDialog: false,
   showLogViewer: false,
   showSplitDialog: false,
+  showHelpGuide: false,
+  helpSectionId: "overview",
 
   setAppMode: (appMode) => set({ appMode }),
   toggleLogViewer: () => set((s) => ({ showLogViewer: !s.showLogViewer })),
@@ -61,4 +67,7 @@ export const useUiStore = create<UiStore>((set) => ({
   dismissError: () => set({ showErrorDialog: false }),
   openSplitDialog: () => set({ showSplitDialog: true }),
   closeSplitDialog: () => set({ showSplitDialog: false }),
+  openHelpGuide: (sectionId = "overview") =>
+    set({ showHelpGuide: true, helpSectionId: sectionId }),
+  closeHelpGuide: () => set({ showHelpGuide: false }),
 }));

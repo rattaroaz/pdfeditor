@@ -2,6 +2,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { ErrorDialog } from "@/components/common/ErrorDialog";
 import { SplitPdfDialog } from "@/components/document/SplitPdfDialog";
+import { HelpGuideDialog } from "@/components/help/HelpGuideDialog";
 import { useUiStore } from "@/stores/uiStore";
 import { useDocumentStore } from "@/stores/documentStore";
 import "./index.css";
@@ -25,6 +26,7 @@ function App() {
       <AppShell />
       <ErrorDialog />
       <SplitPdfDialog />
+      <HelpGuideDialog />
     </ErrorBoundary>
     </div>
   );
