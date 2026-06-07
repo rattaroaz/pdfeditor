@@ -9,6 +9,7 @@ pub enum AppError {
     #[error("PDF error: {0}")]
     Pdf(String),
     #[error("Not found: {0}")]
+    #[allow(dead_code)]
     NotFound(String),
     #[error("Invalid input: {0}")]
     InvalidInput(String),
@@ -62,6 +63,13 @@ mod tests {
         assert_eq!(resp.code.as_deref(), Some("INVALID_INPUT"));
         assert!(!resp.error_id.is_empty());
         assert!(resp.message.contains("bad page"));
+    }
+
+    #[test]
+    fn to_response_maps_not_found() {
+        let resp = AppError::NotFound("missing file".into()).to_response();
+        assert_eq!(resp.code.as_deref(), Some("NOT_FOUND"));
+        assert!(resp.message.contains("missing file"));
     }
 
     #[test]

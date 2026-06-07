@@ -339,8 +339,7 @@ fn embed_one(
       // Visible text box (FreeText) + sticky-note icon (Text) for compatibility.
       let free_text_id = embed_text_note(doc, page_id, ph, x, y, content, color);
       add_annot_to_page(doc, page_id, free_text_id);
-      let icon_id = embed_sticky_note_icon(doc, page_id, ph, x, y, content, color);
-      icon_id
+      embed_sticky_note_icon(doc, page_id, ph, x, y, content, color)
     }
     "freehand" => {
       let points = ann
@@ -527,7 +526,7 @@ pub fn strip_annotations_from_pdf(pdf_bytes: &[u8]) -> Result<Vec<u8>, AppError>
           .get_object(*id)
           .ok()
           .and_then(|o| o.as_array().ok())
-          .map(|arr| arr.clone()),
+          .cloned(),
         _ => None,
       }
     };

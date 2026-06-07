@@ -196,10 +196,10 @@ struct FieldValueDto {
   name: String,
   value: String,
   #[serde(rename = "type")]
-  field_type: String,
+  _field_type: String,
 }
 
-pub fn apply_form_values_in_pdf(pdf_bytes: &[u8], values: &[FieldValueDto]) -> Result<Vec<u8>, AppError> {
+fn apply_form_values_in_pdf(pdf_bytes: &[u8], values: &[FieldValueDto]) -> Result<Vec<u8>, AppError> {
   let _span = tracing::info_span!(
     "apply_form_values_in_pdf",
     value_count = values.len(),
@@ -905,7 +905,7 @@ fn remove_stale_usage_rights(doc: &mut Document, cat_id: ObjectId, af_id: Object
   Ok(())
 }
 
-pub fn create_form_fields_in_pdf(pdf_bytes: &[u8], fields: &[NewFieldDto]) -> Result<Vec<u8>, AppError> {
+fn create_form_fields_in_pdf(pdf_bytes: &[u8], fields: &[NewFieldDto]) -> Result<Vec<u8>, AppError> {
   let _span = tracing::info_span!(
     "create_form_fields_in_pdf",
     field_count = fields.len(),
@@ -1392,7 +1392,7 @@ mod tests {
       &[FieldValueDto {
         name: "Size".into(),
         value: "Medium".into(),
-        field_type: "dropdown".into(),
+        _field_type: "dropdown".into(),
       }],
     )
     .unwrap();
@@ -1447,7 +1447,7 @@ mod tests {
       &[FieldValueDto {
         name: "Choice".into(),
         value: "B".into(),
-        field_type: "dropdown".into(),
+        _field_type: "dropdown".into(),
       }],
     )
     .unwrap();
@@ -1597,7 +1597,7 @@ mod tests {
     let values = vec![FieldValueDto {
       name: "Agree".into(),
       value: "Yes".into(),
-      field_type: "checkbox".into(),
+      _field_type: "checkbox".into(),
     }];
     let toggled = apply_form_values_in_pdf(&pdf_with_field, &values).unwrap();
     let doc = Document::load_mem(&toggled).unwrap();

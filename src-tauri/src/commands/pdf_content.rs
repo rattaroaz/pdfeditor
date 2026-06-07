@@ -116,7 +116,7 @@ fn resolve_page_resources_id(
     cursor_id = parent.get(b"Parent").ok().and_then(|p| p.as_reference().ok());
   }
 
-  let dict = inherited.unwrap_or_else(Dictionary::new);
+  let dict = inherited.unwrap_or_default();
   let id = doc.add_object(Object::Dictionary(dict));
   let page = doc
     .get_dictionary_mut(page_id)
@@ -242,6 +242,7 @@ fn image_pdf_placement(edit: &ImageEditDto, page_height: f64) -> (f64, f64, f64,
   (x1, y1, x2 - x1, y2 - y1)
 }
 
+#[cfg(test)]
 fn png_dimensions(data: &[u8]) -> Option<(i64, i64)> {
   if data.len() < 24 || &data[0..8] != b"\x89PNG\r\n\x1a\n" {
     return None;
@@ -286,6 +287,7 @@ fn jpeg_dimensions(data: &[u8]) -> Option<(i64, i64)> {
   None
 }
 
+#[cfg(test)]
 fn image_dimensions(data: &[u8], mime_type: &str) -> (i64, i64) {
   let mime = mime_type.to_ascii_lowercase();
   if mime.contains("png") {
@@ -424,7 +426,7 @@ fn text_edit_operations(edit: &TextEditDto, page_height: f64) -> Vec<Operation> 
   ops
 }
 
-pub fn apply_content_edits_in_pdf(
+fn apply_content_edits_in_pdf(
   pdf_bytes: &[u8],
   text_edits: &[TextEditDto],
   image_edits: &[ImageEditDto],
