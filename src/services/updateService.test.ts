@@ -43,14 +43,26 @@ describe("updateService", () => {
 
     await checkForUpdatesAndApply();
 
-    expect(mockCheck).toHaveBeenCalled();
+    expect(mockCheck).toHaveBeenCalledWith({ allowDowngrades: false });
     expect(useUiStore.getState().updatePhase).toBe("up_to_date");
     expect(useUiStore.getState().updateMessage).toContain("up to date");
     const entry = getLogEntries().find((e) => e.context?.category === "update");
     expect(entry?.context?.userAction).toBe("check_for_updates");
   });
 
-  it("downloads, installs, and relaunches when an update is available", async () => {
+  it("does not download when the remote version is not newer", async () => {
+    mockCheck.mockResolvedValue({
+      version: "1.1.3",
+      downloadAndInstall: mockDownloadAndInstall,
+    });
+
+    await checkForUpdatesAndApply();
+
+    expect(mockDownloadAndInstall).not.toHaveBeenCalled();
+    expect(useUiStore.getState().updatePhase).toBe("up_to_date");
+  });
+
+  it("downloads, installs, and relaunches when a newer version is available", async () => {
     mockCheck.mockResolvedValue({
       version: "1.2.0",
       downloadAndInstall: mockDownloadAndInstall,

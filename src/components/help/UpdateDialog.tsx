@@ -40,8 +40,8 @@ export function UpdateDialog() {
         {busy && (
           <p className="mt-2 text-xs text-zinc-500">
             {phase === "checking"
-              ? "Checking the update server for a newer signed build."
-              : "Downloading and applying the update in the background. The app will restart when finished."}
+              ? "Comparing the published app version with your installed version."
+              : "Downloading and applying the newer version in the background. The app will restart when finished."}
           </p>
         )}
         {!busy && (

@@ -3,6 +3,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { APP_NAME, APP_VERSION } from "@/lib/constants";
 import { log } from "@/lib/logging";
+import { isVersionNewer } from "@/lib/semver";
 import { toAppErrorPayload } from "@/lib/reportError";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useUiStore } from "@/stores/uiStore";
@@ -28,7 +29,7 @@ function upToDateMessage(): string {
 }
 
 const UPDATE_FEED_UNAVAILABLE_MESSAGE =
-  "No update feed is published yet. Push a version tag (for example v1.1.1) after adding TAURI_SIGNING_PRIVATE_KEY to GitHub Actions secrets so the Release workflow can upload latest.json.";
+  "No update feed is published yet. Bump the app version and push a matching tag (for example v1.1.3) after adding TAURI_SIGNING_PRIVATE_KEY to GitHub Actions secrets so the Release workflow can upload latest.json.";
 
 function isUpdateFeedUnavailable(message: string): boolean {
   const lower = message.toLowerCase();
@@ -85,15 +86,23 @@ export async function checkForUpdatesAndApply(
     setUpdatePhase("checking", "Checking for updates…");
   }
 
-  log.update.info("Checking for updates", { userAction });
+  log.update.info("Checking for a newer app version", {
+    userAction,
+    metadata: { installedVersion: APP_VERSION },
+  });
 
   try {
-    const update = await check();
+    const update = await check({ allowDowngrades: false });
 
-    if (!update) {
+    if (!update || !isVersionNewer(update.version, APP_VERSION)) {
+      const remoteVersion = update?.version ?? null;
       log.update.info(upToDateMessage(), {
         userAction,
-        metadata: { status: "up_to_date", version: APP_VERSION },
+        metadata: {
+          status: "up_to_date",
+          installedVersion: APP_VERSION,
+          remoteVersion,
+        },
       });
       if (silentIfUpToDate) {
         return;
@@ -102,9 +111,13 @@ export async function checkForUpdatesAndApply(
       return;
     }
 
-    log.update.info(`Update ${update.version} is available`, {
+    log.update.info(`Newer version ${update.version} is available (installed ${APP_VERSION})`, {
       userAction,
-      metadata: { status: "update_available", remoteVersion: update.version },
+      metadata: {
+        status: "update_available",
+        installedVersion: APP_VERSION,
+        remoteVersion: update.version,
+      },
     });
 
     if (silentIfUpToDate) {

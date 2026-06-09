@@ -1,6 +1,6 @@
 # PDF Editor
 
-Production-oriented desktop PDF editor built with **Tauri 2**, **React**, **TypeScript**, and **Rust**. Version **1.1.1** — open/view PDFs, zoom & navigation, text search, markup and content editing, forms, page tools, save, structured logging, and automated tests.
+Production-oriented desktop PDF editor built with **Tauri 2**, **React**, **TypeScript**, and **Rust**. Version **1.1.3** — open/view PDFs, zoom & navigation, text search, markup and content editing, forms, page tools, save, structured logging, and automated tests.
 
 ## Prerequisites
 
@@ -54,7 +54,7 @@ The installer is created under `src-tauri/target/release/bundle/nsis/`. See [doc
 
 ### In-app updates (automatic)
 
-The app uses the **Tauri updater**: on startup (and via **Help → Check for updates**) it reads a signed `latest.json` from GitHub Releases, downloads the update in the background, installs it with a passive progress window, and restarts — similar to Chrome or Edge.
+The app uses the **Tauri updater**: on startup (and via **Help → Check for updates**) it reads a signed `latest.json` from GitHub Releases and **only updates when the published version number is newer** than the installed app (for example `1.1.2` over `1.1.1`). Code changes without a version bump do not trigger an update.
 
 **First-time install** still uses the NSIS `.exe` or MSI. After that, updates are applied in place.
 
@@ -67,8 +67,8 @@ The app uses the **Tauri updater**: on startup (and via **Help → Check for upd
 2. Tag and push:
 
 ```bash
-git tag v1.1.1
-git push origin v1.1.1
+git tag v1.1.3
+git push origin v1.1.3
 ```
 
 The [Release workflow](.github/workflows/release.yml) builds signed update artifacts, uploads `latest.json`, and attaches full installers for new users.
