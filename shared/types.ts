@@ -283,7 +283,12 @@ export interface PdfInfoResult {
   metadata: PdfMetadata;
 }
 
-export type UpdateStatus = "up_to_date" | "update_available" | "error";
+export type UpdateStatus =
+  | "up_to_date"
+  | "update_available"
+  | "no_release"
+  | "no_installer"
+  | "error";
 
 export type UpdateDialogPhase =
   | "idle"

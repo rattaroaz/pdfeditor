@@ -54,15 +54,20 @@ export async function checkForUpdatesAndApply(): Promise<void> {
       return;
     }
 
-    if (!result.installerUrl || !result.installerName) {
-      const extra = result.releaseUrl
-        ? ` Visit ${result.releaseUrl} to download the latest installer manually.`
-        : "";
-      log.update.warn("Update available but no installer asset found", {
+    if (
+      result.status === "no_release" ||
+      result.status === "no_installer" ||
+      !result.installerUrl ||
+      !result.installerName
+    ) {
+      log.update.warn("Update available but installer not ready", {
         userAction: "check_for_updates",
-        metadata: { releaseUrl: result.releaseUrl },
+        metadata: {
+          status: result.status,
+          releaseUrl: result.releaseUrl,
+        },
       });
-      setUpdatePhase("error", `${result.message}${extra}`);
+      setUpdatePhase("error", result.message);
       return;
     }
 

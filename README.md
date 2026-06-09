@@ -52,6 +52,19 @@ npm run build:installer
 
 The installer is created under `src-tauri/target/release/bundle/nsis/`. See [docs/install-windows.md](docs/install-windows.md) for MSI builds, code signing, and troubleshooting.
 
+### In-app updates (Help → Check for updates)
+
+Updates compare your local build to `main` on GitHub and download the **NSIS setup** from the [latest GitHub Release](https://github.com/rattaroaz/pdfeditor/releases). If no release exists yet, the app reports that installers are not published.
+
+To publish a release with Windows installers:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The [Release workflow](.github/workflows/release.yml) builds NSIS + MSI and attaches them to the GitHub release.
+
 ## Architecture
 
 - **Frontend (`src/`)** — React UI, pdf.js rendering, Zustand state

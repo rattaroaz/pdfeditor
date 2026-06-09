@@ -83,16 +83,16 @@ fn fetch_latest_commit_sha(client: &reqwest::blocking::Client) -> Result<String,
     Ok(commit.sha)
 }
 
-fn fetch_latest_release(client: &reqwest::blocking::Client) -> Result<Option<GitHubReleaseResponse>, AppError> {
-    let url = github_api_url("/releases/latest");
+fn releases_page_url() -> String {
+    format!("https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases")
+}
+
+fn fetch_all_releases(client: &reqwest::blocking::Client) -> Result<Vec<GitHubReleaseResponse>, AppError> {
+    let url = github_api_url("/releases?per_page=20");
     let response = client
         .get(url)
         .send()
         .map_err(|e| AppError::Pdf(format!("Failed to reach GitHub releases: {e}")))?;
-
-    if response.status() == reqwest::StatusCode::NOT_FOUND {
-        return Ok(None);
-    }
 
     if !response.status().is_success() {
         return Err(AppError::Pdf(format!(
@@ -101,11 +101,20 @@ fn fetch_latest_release(client: &reqwest::blocking::Client) -> Result<Option<Git
         )));
     }
 
-    let release: GitHubReleaseResponse = response
+    let releases: Vec<GitHubReleaseResponse> = response
         .json()
         .map_err(|e| AppError::Pdf(format!("Invalid GitHub release response: {e}")))?;
 
-    Ok(Some(release))
+    Ok(releases)
+}
+
+fn find_release_with_installer<'a>(
+    releases: &'a [GitHubReleaseResponse],
+) -> Option<(&'a GitHubReleaseResponse, &'a GitHubReleaseAsset)> {
+    releases.iter().find_map(|release| {
+        pick_installer_asset(&release.assets)
+            .map(|asset| (release, asset))
+    })
 }
 
 pub fn commits_match(local: &str, remote: &str) -> bool {
@@ -213,45 +222,69 @@ pub fn check_for_updates() -> CommandResult<UpdateCheckResult> {
     let client = http_client().map_err(map_err)?;
 
     let remote_commit = fetch_latest_commit_sha(&client).map_err(map_err)?;
-    let release = fetch_latest_release(&client).map_err(map_err)?;
+    let releases = fetch_all_releases(&client).map_err(map_err)?;
+    let release_with_installer = find_release_with_installer(&releases);
 
-    let (remote_version, release_url, installer_url, installer_name) = match release {
-        Some(release) => {
-            let asset = pick_installer_asset(&release.assets);
-            (
-                Some(release.tag_name),
-                Some(release.html_url),
-                asset.map(|a| a.browser_download_url.clone()),
-                asset.map(|a| a.name.clone()),
-            )
-        }
-        None => (None, None, None, None),
-    };
+    let (remote_version, release_url, installer_url, installer_name) =
+        match release_with_installer {
+            Some((release, asset)) => (
+                Some(release.tag_name.clone()),
+                Some(release.html_url.clone()),
+                Some(asset.browser_download_url.clone()),
+                Some(asset.name.clone()),
+            ),
+            None => (
+                releases
+                    .first()
+                    .map(|release| release.tag_name.clone()),
+                Some(releases_page_url()),
+                None,
+                None,
+            ),
+        };
 
-    let update_available = !commits_match(&local_commit, &remote_commit);
+    let main_ahead = !commits_match(&local_commit, &remote_commit);
+    let has_installer = installer_url.is_some();
+    let has_any_release = !releases.is_empty();
 
-    let status = if update_available {
-        "update_available"
-    } else {
-        "up_to_date"
-    };
-
-    let message = if update_available {
-        if installer_url.is_some() {
+    let (status, message) = if main_ahead && has_installer {
+        (
+            "update_available",
             format!(
-                "A newer build is available on GitHub ({}). The app will download and install it now.",
-                short_sha(&remote_commit)
-            )
-        } else {
+                "A newer build is available ({}). The app will download and install {} now.",
+                short_sha(&remote_commit),
+                installer_name.as_deref().unwrap_or("the update")
+            ),
+        )
+    } else if main_ahead && !has_any_release {
+        (
+            "no_release",
             format!(
-                "A newer build is available on GitHub ({}), but no Windows installer was found in the latest release.",
-                short_sha(&remote_commit)
-            )
-        }
+                "A newer build exists on GitHub ({}), but no GitHub release has been published yet. \
+                 Open {} after a maintainer publishes a Windows installer, or build locally with \
+                 `npm run build:installer`.",
+                short_sha(&remote_commit),
+                releases_page_url()
+            ),
+        )
+    } else if main_ahead && !has_installer {
+        (
+            "no_installer",
+            format!(
+                "A newer build exists on GitHub ({}), but the latest release ({}) has no Windows \
+                 installer (.exe or .msi). Open {} to download manually once an installer is attached.",
+                short_sha(&remote_commit),
+                remote_version.as_deref().unwrap_or("unknown"),
+                releases_page_url()
+            ),
+        )
     } else {
-        format!(
-            "PDF Editor is up to date (version {local_version}, commit {}).",
-            short_sha(&local_commit)
+        (
+            "up_to_date",
+            format!(
+                "PDF Editor is up to date (version {local_version}, commit {}).",
+                short_sha(&local_commit)
+            ),
         )
     };
 
@@ -260,12 +293,14 @@ pub fn check_for_updates() -> CommandResult<UpdateCheckResult> {
         status = status,
         local_commit = %local_commit,
         remote_commit = %remote_commit,
-        update_available = update_available,
+        main_ahead = main_ahead,
+        has_installer = has_installer,
+        has_any_release = has_any_release,
         "checked for updates"
     );
 
     Ok(UpdateCheckResult {
-        status: status.into(),
+        status: status.to_string(),
         local_version,
         local_commit,
         remote_commit,
@@ -358,5 +393,33 @@ mod tests {
             github_api_url("/commits/main"),
             "https://api.github.com/repos/rattaroaz/pdfeditor/commits/main"
         );
+    }
+
+    #[test]
+    fn find_release_with_installer_skips_empty_releases() {
+        let releases = vec![
+            GitHubReleaseResponse {
+                tag_name: "v0.9.0".into(),
+                html_url: "https://example.com/v0.9.0".into(),
+                target_commitish: None,
+                assets: vec![GitHubReleaseAsset {
+                    name: "notes.txt".into(),
+                    browser_download_url: "https://example.com/notes.txt".into(),
+                }],
+            },
+            GitHubReleaseResponse {
+                tag_name: "v1.0.0".into(),
+                html_url: "https://example.com/v1.0.0".into(),
+                target_commitish: None,
+                assets: vec![GitHubReleaseAsset {
+                    name: "PDF Editor_1.0.0_x64-setup.exe".into(),
+                    browser_download_url: "https://example.com/setup.exe".into(),
+                }],
+            },
+        ];
+
+        let picked = find_release_with_installer(&releases).unwrap();
+        assert_eq!(picked.0.tag_name, "v1.0.0");
+        assert!(picked.1.name.ends_with(".exe"));
     }
 }
