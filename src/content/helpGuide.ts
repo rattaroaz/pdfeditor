@@ -286,7 +286,7 @@ export const HELP_SECTIONS: HelpSection[] = [
       {
         type: "list",
         items: [
-          "Merge PDFs… — combine multiple files into one new document.",
+          "Merge PDFs — combine the open document with other PDFs into one new document.",
           "Append to current… — add another PDF’s pages to the end of the open file.",
           "Split PDF… — save page ranges as new files (also in sidebar Document tab).",
         ],

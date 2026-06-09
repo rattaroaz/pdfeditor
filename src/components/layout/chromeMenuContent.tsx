@@ -150,7 +150,12 @@ export function useMenuContent(onAction: () => void) {
       case "document":
         return (
           <>
-            <MenuItem onClick={() => run(() => void mergePdfFromDialog())}>Merge PDFs…</MenuItem>
+            <MenuItem
+              disabled={!hasDocument}
+              onClick={() => run(() => void mergePdfFromDialog())}
+            >
+              Merge PDFs
+            </MenuItem>
             <MenuItem
               disabled={!hasDocument}
               onClick={() => run(() => void mergeIntoCurrentDocument())}
