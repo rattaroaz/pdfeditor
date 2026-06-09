@@ -76,6 +76,22 @@ describe("MenuBar", () => {
     expect(useDocumentStore.getState().viewMode).toBe("single");
   });
 
+  it("shows only Two-page spread in the View menu when in single-page mode", () => {
+    useDocumentStore.setState({ viewMode: "single" });
+    render(<MenuBar />);
+    fireEvent.click(screen.getByTestId("menu-view"));
+    expect(screen.getByText("Two-page spread")).toBeInTheDocument();
+    expect(screen.queryByText("Single page")).not.toBeInTheDocument();
+  });
+
+  it("shows only Single page in the View menu when in two-page spread mode", () => {
+    useDocumentStore.setState({ viewMode: "spread" });
+    render(<MenuBar />);
+    fireEvent.click(screen.getByTestId("menu-view"));
+    expect(screen.getByText("Single page")).toBeInTheDocument();
+    expect(screen.queryByText("Two-page spread")).not.toBeInTheDocument();
+  });
+
   it("shows check for updates at the bottom of the Help menu", () => {
     render(<MenuBar />);
     fireEvent.click(screen.getByTestId("menu-help"));

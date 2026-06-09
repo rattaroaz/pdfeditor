@@ -88,6 +88,7 @@ export function useMenuContent(onAction: () => void) {
   const showLogViewer = useUiStore((s) => s.showLogViewer);
   const showSidebar = useDocumentStore((s) => s.showSidebar);
   const setShowSidebar = useDocumentStore((s) => s.setShowSidebar);
+  const viewMode = useDocumentStore((s) => s.viewMode);
   const openHelpGuide = useUiStore((s) => s.openHelpGuide);
 
   const run = (action: () => void) => {
@@ -206,17 +207,34 @@ export function useMenuContent(onAction: () => void) {
               Find…
             </MenuItem>
             <div className="my-1 border-t border-zinc-700" />
-            <MenuItem
-              onClick={() => run(() => useDocumentStore.getState().setViewMode("continuous"))}
-            >
-              Continuous scroll
-            </MenuItem>
-            <MenuItem onClick={() => run(() => useDocumentStore.getState().setViewMode("single"))}>
-              Single page
-            </MenuItem>
-            <MenuItem onClick={() => run(() => useDocumentStore.getState().setViewMode("spread"))}>
-              Two-page spread
-            </MenuItem>
+            {viewMode === "continuous" && (
+              <>
+                <MenuItem
+                  onClick={() => run(() => useDocumentStore.getState().setViewMode("single"))}
+                >
+                  Single page
+                </MenuItem>
+                <MenuItem
+                  onClick={() => run(() => useDocumentStore.getState().setViewMode("spread"))}
+                >
+                  Two-page spread
+                </MenuItem>
+              </>
+            )}
+            {viewMode === "single" && (
+              <MenuItem
+                onClick={() => run(() => useDocumentStore.getState().setViewMode("spread"))}
+              >
+                Two-page spread
+              </MenuItem>
+            )}
+            {viewMode === "spread" && (
+              <MenuItem
+                onClick={() => run(() => useDocumentStore.getState().setViewMode("single"))}
+              >
+                Single page
+              </MenuItem>
+            )}
             <MenuItem
               testId="menu-toggle-sidebar"
               onClick={() => run(() => setShowSidebar(!showSidebar))}
