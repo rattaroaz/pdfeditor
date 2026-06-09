@@ -232,11 +232,6 @@ export function useMenuContent(onAction: () => void) {
               Rotate clockwise
             </MenuItem>
             <MenuItem
-              onClick={() => run(() => useDocumentStore.getState().rotateCounterClockwise())}
-            >
-              Rotate counter-clockwise
-            </MenuItem>
-            <MenuItem
               onClick={() => run(() => useDocumentStore.getState().togglePresentationMode())}
             >
               Presentation mode

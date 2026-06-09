@@ -309,7 +309,7 @@ export const HELP_SECTIONS: HelpSection[] = [
       },
       {
         type: "tip",
-        text: "View → Rotate clockwise/counter-clockwise, or the toolbar ↺ / ↻ buttons, rotate the view for reading. View rotation is temporary and does not change the saved PDF.",
+        text: "View → Rotate clockwise, or the toolbar ↺ / ↻ buttons, rotate the view for reading. View rotation is temporary and does not change the saved PDF.",
       },
     ],
   },
