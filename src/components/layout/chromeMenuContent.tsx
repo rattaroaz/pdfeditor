@@ -207,7 +207,7 @@ export function useMenuContent(onAction: () => void) {
               Find…
             </MenuItem>
             <div className="my-1 border-t border-zinc-700" />
-            {viewMode === "continuous" && (
+            {viewMode === "continuous" && hasDocument && (
               <>
                 <MenuItem
                   onClick={() => run(() => useDocumentStore.getState().setViewMode("single"))}
@@ -221,14 +221,14 @@ export function useMenuContent(onAction: () => void) {
                 </MenuItem>
               </>
             )}
-            {viewMode === "single" && (
+            {(viewMode === "single" || !hasDocument) && (
               <MenuItem
                 onClick={() => run(() => useDocumentStore.getState().setViewMode("spread"))}
               >
                 Two-page spread
               </MenuItem>
             )}
-            {viewMode === "spread" && (
+            {viewMode === "spread" && hasDocument && (
               <MenuItem
                 onClick={() => run(() => useDocumentStore.getState().setViewMode("single"))}
               >

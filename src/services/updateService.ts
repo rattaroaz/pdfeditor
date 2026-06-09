@@ -27,6 +27,19 @@ function upToDateMessage(): string {
   return `PDF Editor is up to date (version ${APP_VERSION}).`;
 }
 
+const UPDATE_FEED_UNAVAILABLE_MESSAGE =
+  "No update feed is published yet. Push a version tag (for example v1.1.0) after adding TAURI_SIGNING_PRIVATE_KEY to GitHub Actions secrets so the Release workflow can upload latest.json.";
+
+function isUpdateFeedUnavailable(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("could not fetch a valid release json") ||
+    lower.includes("failed to fetch") ||
+    lower.includes("404") ||
+    lower.includes("not found")
+  );
+}
+
 async function confirmDiscardUnsavedChanges(): Promise<boolean> {
   const { isDirty } = useDocumentStore.getState();
   if (!isDirty) return true;
@@ -128,6 +141,19 @@ export async function checkForUpdatesAndApply(
     await relaunch();
   } catch (err) {
     const payload = toAppErrorPayload(err);
+
+    if (isUpdateFeedUnavailable(payload.message)) {
+      log.update.info("Update feed not published yet — automatic check skipped", {
+        userAction,
+        metadata: { status: "no_update_feed" },
+      });
+      if (silentIfUpToDate) {
+        return;
+      }
+      setUpdatePhase("error", UPDATE_FEED_UNAVAILABLE_MESSAGE);
+      return;
+    }
+
     log.update.error(payload.message, {
       userAction,
       errorId: payload.errorId,
@@ -136,9 +162,6 @@ export async function checkForUpdatesAndApply(
     if (silentIfUpToDate) {
       return;
     }
-    setUpdatePhase(
-      "error",
-      `${payload.message}\n\nIf this is the first install, publish a signed release (see README).`,
-    );
+    setUpdatePhase("error", payload.message);
   }
 }

@@ -94,4 +94,31 @@ describe("updateService", () => {
     expect(useUiStore.getState().updatePhase).toBe("error");
     expect(useUiStore.getState().updateMessage).toContain("Failed to reach update server");
   });
+
+  it("treats a missing release feed as non-fatal on silent startup", async () => {
+    mockCheck.mockRejectedValue(
+      new Error("Could not fetch a valid release JSON from the remote"),
+    );
+
+    await checkForUpdatesAndApply({ silentIfUpToDate: true, source: "startup" });
+
+    expect(useUiStore.getState().showUpdateDialog).toBe(false);
+    expect(
+      getLogEntries().some((entry) => entry.message.includes("Update feed not published yet")),
+    ).toBe(true);
+    expect(
+      getLogEntries().some((entry) => entry.level === "error" && entry.context?.category === "update"),
+    ).toBe(false);
+  });
+
+  it("shows setup guidance when the release feed is missing from the Help menu", async () => {
+    mockCheck.mockRejectedValue(
+      new Error("Could not fetch a valid release JSON from the remote"),
+    );
+
+    await checkForUpdatesAndApply();
+
+    expect(useUiStore.getState().updatePhase).toBe("error");
+    expect(useUiStore.getState().updateMessage).toContain("No update feed is published yet");
+  });
 });

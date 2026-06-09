@@ -325,7 +325,7 @@ export const HELP_SECTIONS: HelpSection[] = [
         type: "list",
         items: [
           "Find… (Ctrl+F) — search bar across document text and optionally comment text.",
-          "Single page / Two-page spread — switch reading layout (View menu shows the other mode when one is active). Continuous scroll is the default layout.",
+          "Single page (default) / Two-page spread — switch reading layout (View menu shows the other mode when one is active).",
           "Show or hide sidebar — toggle the left panel; drag its right edge to resize.",
           "Bookmarks / outline — jump via the PDF outline tree (sidebar Outline tab).",
           "Rotate view — temporary on-screen rotation for reading.",

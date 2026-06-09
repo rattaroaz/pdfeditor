@@ -97,7 +97,7 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
   scrollTarget: null,
   zoom: DEFAULT_ZOOM,
   zoomMode: "custom",
-  viewMode: "continuous",
+  viewMode: "single",
   rotation: 0,
   showSidebar: true,
   sidebarWidth: SIDEBAR_WIDTH_DEFAULT,
@@ -133,6 +133,7 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
       pendingSavePassword: null,
       removePasswordOnSave: false,
       hasExtractableText: null,
+      viewMode: "single",
     }),
   clearDocument: () =>
     set({
@@ -155,6 +156,7 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
       pendingSavePassword: null,
       removePasswordOnSave: false,
       hasExtractableText: null,
+      viewMode: "single",
     }),
   setDirty: (isDirty) => set({ isDirty }),
   setCurrentPage: (page, options) => {

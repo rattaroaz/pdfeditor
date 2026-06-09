@@ -36,7 +36,7 @@ describe("MenuBar", () => {
     useDocumentStore.setState({
       pdfDoc: {} as never,
       showSidebar: true,
-      viewMode: "continuous",
+      viewMode: "single",
       presentationMode: false,
     });
     useUiStore.setState({ showSearch: false, showHelpGuide: false, helpSectionId: "overview" });
@@ -72,8 +72,16 @@ describe("MenuBar", () => {
   it("changes view mode from the View menu", () => {
     render(<MenuBar />);
     fireEvent.click(screen.getByTestId("menu-view"));
-    fireEvent.click(screen.getByText("Single page"));
-    expect(useDocumentStore.getState().viewMode).toBe("single");
+    fireEvent.click(screen.getByText("Two-page spread"));
+    expect(useDocumentStore.getState().viewMode).toBe("spread");
+  });
+
+  it("shows only Two-page spread in the View menu when no document is open", () => {
+    useDocumentStore.setState({ pdfDoc: null, viewMode: "single" });
+    render(<MenuBar />);
+    fireEvent.click(screen.getByTestId("menu-view"));
+    expect(screen.getByText("Two-page spread")).toBeInTheDocument();
+    expect(screen.queryByText("Single page")).not.toBeInTheDocument();
   });
 
   it("shows only Two-page spread in the View menu when in single-page mode", () => {
