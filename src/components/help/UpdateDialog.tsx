@@ -39,7 +39,9 @@ export function UpdateDialog() {
         <p className="mt-3 text-sm text-zinc-300">{message}</p>
         {busy && (
           <p className="mt-2 text-xs text-zinc-500">
-            Comparing your local build with the latest commit on GitHub.
+            {phase === "checking"
+              ? "Checking the update server for a newer signed build."
+              : "Downloading and applying the update in the background. The app will restart when finished."}
           </p>
         )}
         {!busy && (

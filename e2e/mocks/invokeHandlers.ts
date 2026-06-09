@@ -100,19 +100,6 @@ export async function handleInvoke<T>(
     case "encrypt_pdf":
     case "decrypt_pdf":
       return { dataBase64: String(args?.pdfBase64 ?? MINIMAL_PDF_BASE64) } as T;
-    case "check_for_updates":
-      return {
-        status: "up_to_date",
-        localVersion: "1.1.0-e2e",
-        localCommit: "e2e-local",
-        remoteCommit: "e2e-local",
-        message: "PDF Editor is up to date (E2E mock).",
-      } as T;
-    case "apply_app_update":
-      return {
-        status: "installing",
-        message: "E2E mock installer launched.",
-      } as T;
     default:
       console.warn(`[e2e-mock] unhandled invoke: ${command}`, args);
       return {} as T;

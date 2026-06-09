@@ -1,6 +1,13 @@
 use std::process::Command;
 
 fn git_commit_sha() -> String {
+    if let Ok(sha) = std::env::var("GIT_COMMIT_SHA") {
+        let sha = sha.trim();
+        if !sha.is_empty() {
+            return sha.to_string();
+        }
+    }
+
     Command::new("git")
         .args(["rev-parse", "HEAD"])
         .output()

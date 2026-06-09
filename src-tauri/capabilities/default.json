@@ -11,12 +11,16 @@
     "opener:default",
     "dialog:default",
     "dialog:allow-message",
+    "dialog:allow-ask",
+    "dialog:allow-confirm",
     "dialog:allow-save",
     "dialog:allow-open",
     "fs:default",
     "fs:allow-exists",
     "fs:allow-mkdir",
     "store:default",
+    "updater:default",
+    "process:default",
     {
       "identifier": "fs:allow-read-file",
       "allow": [{ "path": "**" }]

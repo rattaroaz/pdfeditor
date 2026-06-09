@@ -283,11 +283,7 @@ export interface PdfInfoResult {
   metadata: PdfMetadata;
 }
 
-export type UpdateStatus =
-  | "up_to_date"
-  | "update_available"
-  | "no_release"
-  | "no_installer";
+export type UpdateStatus = "up_to_date" | "update_available" | "error";
 
 export type UpdateDialogPhase =
   | "idle"
@@ -296,20 +292,3 @@ export type UpdateDialogPhase =
   | "downloading"
   | "installing"
   | "error";
-
-export interface UpdateCheckResult {
-  status: UpdateStatus;
-  localVersion: string;
-  localCommit: string;
-  remoteCommit: string;
-  remoteVersion?: string;
-  releaseUrl?: string;
-  installerUrl?: string;
-  installerName?: string;
-  message: string;
-}
-
-export interface ApplyUpdateResult {
-  status: string;
-  message: string;
-}

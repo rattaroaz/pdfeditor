@@ -4,7 +4,6 @@ mod pdf_content;
 mod pdf_forms;
 mod pdf_pages;
 mod pdf_security;
-pub mod update;
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use crate::error::{AppError, CommandResult};

@@ -11,6 +11,8 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             commands::read_pdf_file,
             commands::write_pdf_file,
@@ -38,8 +40,6 @@ pub fn run() {
             commands::log_frontend_event,
             commands::get_logging_info,
             commands::read_recent_log_lines,
-            commands::update::check_for_updates,
-            commands::update::apply_app_update,
         ])
         .setup(|app| {
             tracing::info!(app_version = env!("CARGO_PKG_VERSION"), "PDF Editor started");

@@ -52,18 +52,26 @@ npm run build:installer
 
 The installer is created under `src-tauri/target/release/bundle/nsis/`. See [docs/install-windows.md](docs/install-windows.md) for MSI builds, code signing, and troubleshooting.
 
-### In-app updates (Help → Check for updates)
+### In-app updates (automatic)
 
-Updates compare your local build to `main` on GitHub and download the **NSIS setup** from the [latest GitHub Release](https://github.com/rattaroaz/pdfeditor/releases). If no release exists yet, the app reports that installers are not published.
+The app uses the **Tauri updater**: on startup (and via **Help → Check for updates**) it reads a signed `latest.json` from GitHub Releases, downloads the update in the background, installs it with a passive progress window, and restarts — similar to Chrome or Edge.
 
-To publish a release with Windows installers:
+**First-time install** still uses the NSIS `.exe` or MSI. After that, updates are applied in place.
+
+#### Publish an update
+
+1. Add the signing key to GitHub repo secrets (once):
+   - `TAURI_SIGNING_PRIVATE_KEY` — contents of `scripts/tauri-signing.key` (generate with `npm run tauri signer generate -- -w scripts/tauri-signing.key --ci --force`)
+   - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` — leave empty if the key has no password
+
+2. Tag and push:
 
 ```bash
 git tag v1.1.0
 git push origin v1.1.0
 ```
 
-The [Release workflow](.github/workflows/release.yml) builds NSIS + MSI and attaches them to the GitHub release.
+The [Release workflow](.github/workflows/release.yml) builds signed update artifacts, uploads `latest.json`, and attaches full installers for new users.
 
 ## Architecture
 

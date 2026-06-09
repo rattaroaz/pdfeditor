@@ -26,6 +26,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": ["nsis", "msi"],
     "copyright": "Copyright © 2026 PDF Editor contributors",
     "category": "Productivity",
@@ -50,6 +51,17 @@
       },
       "wix": {
         "language": "en-US"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZDMTBCOUYyMDMyOTk1MApSV1JRbVRJZ253dkJCbm5ETkJISHp1WlhwNkUxRjBiRmpwTkg5YXRoM3lDL0tMN2lDNzA3WEdyQgo=",
+      "endpoints": [
+        "https://github.com/rattaroaz/pdfeditor/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
       }
     }
   }

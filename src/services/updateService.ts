@@ -1,17 +1,30 @@
+import { check } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 import { ask } from "@tauri-apps/plugin-dialog";
-import { APP_NAME } from "@/lib/constants";
+import { APP_NAME, APP_VERSION } from "@/lib/constants";
 import { log } from "@/lib/logging";
 import { toAppErrorPayload } from "@/lib/reportError";
-import { invokeLogged } from "@/lib/tauriInvoke";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useUiStore } from "@/stores/uiStore";
-import type { ApplyUpdateResult, UpdateCheckResult } from "@shared/types";
+
+export type UpdateCheckOptions = {
+  /** When true, do not show a dialog if already up to date (used on startup). */
+  silentIfUpToDate?: boolean;
+  /** When true, skip the check entirely if the document has unsaved changes. */
+  skipIfDirty?: boolean;
+  /** Where the check was triggered from (for logs). */
+  source?: "menu" | "startup";
+};
 
 function setUpdatePhase(
   phase: ReturnType<typeof useUiStore.getState>["updatePhase"],
   message: string,
 ) {
   useUiStore.getState().setUpdateDialog({ phase, message });
+}
+
+function upToDateMessage(): string {
+  return `PDF Editor is up to date (version ${APP_VERSION}).`;
 }
 
 async function confirmDiscardUnsavedChanges(): Promise<boolean> {
@@ -32,46 +45,63 @@ async function confirmDiscardUnsavedChanges(): Promise<boolean> {
   return confirmed;
 }
 
-export async function checkForUpdatesAndApply(): Promise<void> {
-  useUiStore.getState().openUpdateDialog();
-  setUpdatePhase("checking", "Checking GitHub for the latest build…");
-  log.update.info("Checking GitHub for updates", { userAction: "check_for_updates" });
+export async function checkForUpdatesAndApply(
+  options: UpdateCheckOptions = {},
+): Promise<void> {
+  const { silentIfUpToDate = false, skipIfDirty = false, source = "menu" } = options;
+  const userAction = source === "startup" ? "auto_update_check" : "check_for_updates";
+
+  if (skipIfDirty && useDocumentStore.getState().isDirty) {
+    log.update.info("Skipping automatic update — unsaved document changes", {
+      userAction,
+    });
+    return;
+  }
+
+  if (import.meta.env.VITE_E2E) {
+    if (!silentIfUpToDate) {
+      useUiStore.getState().openUpdateDialog();
+      setUpdatePhase("up_to_date", `${upToDateMessage()} (E2E mock).`);
+    }
+    log.update.info(upToDateMessage(), { userAction, metadata: { status: "up_to_date" } });
+    return;
+  }
+
+  if (!silentIfUpToDate) {
+    useUiStore.getState().openUpdateDialog();
+    setUpdatePhase("checking", "Checking for updates…");
+  }
+
+  log.update.info("Checking for updates", { userAction });
 
   try {
-    const result = await invokeLogged<UpdateCheckResult>("check_for_updates");
-    log.update.info(result.message, {
-      userAction: "check_for_updates",
-      metadata: {
-        status: result.status,
-        localCommit: result.localCommit,
-        remoteCommit: result.remoteCommit,
-        remoteVersion: result.remoteVersion,
-      },
+    const update = await check();
+
+    if (!update) {
+      log.update.info(upToDateMessage(), {
+        userAction,
+        metadata: { status: "up_to_date", version: APP_VERSION },
+      });
+      if (silentIfUpToDate) {
+        return;
+      }
+      setUpdatePhase("up_to_date", upToDateMessage());
+      return;
+    }
+
+    log.update.info(`Update ${update.version} is available`, {
+      userAction,
+      metadata: { status: "update_available", remoteVersion: update.version },
     });
 
-    if (result.status === "up_to_date") {
-      setUpdatePhase("up_to_date", result.message);
-      return;
+    if (silentIfUpToDate) {
+      useUiStore.getState().openUpdateDialog();
     }
 
-    if (
-      result.status === "no_release" ||
-      result.status === "no_installer" ||
-      !result.installerUrl ||
-      !result.installerName
-    ) {
-      log.update.warn("Update available but installer not ready", {
-        userAction: "check_for_updates",
-        metadata: {
-          status: result.status,
-          releaseUrl: result.releaseUrl,
-        },
-      });
-      setUpdatePhase("error", result.message);
-      return;
-    }
-
-    const canContinue = await confirmDiscardUnsavedChanges();
+    const canContinue =
+      skipIfDirty || source === "startup"
+        ? !useDocumentStore.getState().isDirty
+        : await confirmDiscardUnsavedChanges();
     if (!canContinue) {
       useUiStore.getState().closeUpdateDialog();
       return;
@@ -79,27 +109,36 @@ export async function checkForUpdatesAndApply(): Promise<void> {
 
     setUpdatePhase(
       "downloading",
-      "A newer build was found. Downloading the latest installer from GitHub…",
+      `Version ${update.version} is available. Downloading in the background…`,
     );
-    log.update.info("Downloading update installer", {
-      userAction: "apply_app_update",
-      metadata: { installerName: result.installerName },
+
+    await update.downloadAndInstall((event) => {
+      if (event.event === "Started") {
+        log.update.info("Update download started", {
+          userAction: "download_update",
+          metadata: { contentLength: event.data.contentLength ?? null },
+        });
+      } else if (event.event === "Finished") {
+        log.update.info("Update download finished", { userAction: "download_update" });
+      }
     });
 
-    const applyResult = await invokeLogged<ApplyUpdateResult>("apply_app_update", {
-      installerUrl: result.installerUrl,
-      installerName: result.installerName,
-    });
-
-    log.update.info(applyResult.message, { userAction: "apply_app_update" });
-    setUpdatePhase("installing", applyResult.message);
+    setUpdatePhase("installing", "Installing update. The app will restart automatically.");
+    log.update.info("Update installed, relaunching", { userAction: "install_update" });
+    await relaunch();
   } catch (err) {
     const payload = toAppErrorPayload(err);
-    setUpdatePhase("error", payload.message);
     log.update.error(payload.message, {
-      userAction: "check_for_updates",
+      userAction,
       errorId: payload.errorId,
       metadata: { code: payload.code },
     });
+    if (silentIfUpToDate) {
+      return;
+    }
+    setUpdatePhase(
+      "error",
+      `${payload.message}\n\nIf this is the first install, publish a signed release (see README).`,
+    );
   }
 }
