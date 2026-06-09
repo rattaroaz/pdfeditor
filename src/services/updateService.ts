@@ -28,7 +28,7 @@ function upToDateMessage(): string {
 }
 
 const UPDATE_FEED_UNAVAILABLE_MESSAGE =
-  "No update feed is published yet. Push a version tag (for example v1.1.0) after adding TAURI_SIGNING_PRIVATE_KEY to GitHub Actions secrets so the Release workflow can upload latest.json.";
+  "No update feed is published yet. Push a version tag (for example v1.1.1) after adding TAURI_SIGNING_PRIVATE_KEY to GitHub Actions secrets so the Release workflow can upload latest.json.";
 
 function isUpdateFeedUnavailable(message: string): boolean {
   const lower = message.toLowerCase();

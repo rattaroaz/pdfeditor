@@ -1,6 +1,6 @@
 # PDF Editor
 
-Production-oriented desktop PDF editor built with **Tauri 2**, **React**, **TypeScript**, and **Rust**. Version **1.1** — open/view PDFs, zoom & navigation, text search, markup and content editing, forms, page tools, save, structured logging, and automated tests.
+Production-oriented desktop PDF editor built with **Tauri 2**, **React**, **TypeScript**, and **Rust**. Version **1.1.1** — open/view PDFs, zoom & navigation, text search, markup and content editing, forms, page tools, save, structured logging, and automated tests.
 
 ## Prerequisites
 
@@ -67,8 +67,8 @@ The app uses the **Tauri updater**: on startup (and via **Help → Check for upd
 2. Tag and push:
 
 ```bash
-git tag v1.1.0
-git push origin v1.1.0
+git tag v1.1.1
+git push origin v1.1.1
 ```
 
 The [Release workflow](.github/workflows/release.yml) builds signed update artifacts, uploads `latest.json`, and attaches full installers for new users.

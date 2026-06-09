@@ -104,7 +104,7 @@ describe("MenuBar", () => {
     render(<MenuBar />);
     fireEvent.click(screen.getByTestId("menu-help"));
     expect(screen.getByTestId("menu-check-updates")).toHaveTextContent("Check for updates");
-    expect(screen.getByTestId("menu-help-version")).toHaveTextContent("Version 1.1.0");
+    expect(screen.getByTestId("menu-help-version")).toHaveTextContent("Version 1.1.1");
   });
 
   it("starts update check from the Help menu", () => {
