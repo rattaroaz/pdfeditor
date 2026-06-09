@@ -175,6 +175,7 @@ export const log = {
   invoke: createLogger({ category: "invoke" }),
   perf: createLogger({ category: "perf" }),
   system: createLogger({ category: "system" }),
+  update: createLogger({ category: "update" }),
 } as const satisfies Record<LogCategory, ScopedLogger>;
 
 export function logUserAction(

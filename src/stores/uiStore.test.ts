@@ -53,6 +53,22 @@ describe("uiStore", () => {
     expect(useUiStore.getState().flattenOnSave).toBe(true);
   });
 
+  it("manages update dialog state", () => {
+    useUiStore.getState().openUpdateDialog();
+    expect(useUiStore.getState().showUpdateDialog).toBe(true);
+    expect(useUiStore.getState().updatePhase).toBe("checking");
+
+    useUiStore.getState().setUpdateDialog({
+      phase: "downloading",
+      message: "Downloading…",
+    });
+    expect(useUiStore.getState().updatePhase).toBe("downloading");
+
+    useUiStore.getState().closeUpdateDialog();
+    expect(useUiStore.getState().showUpdateDialog).toBe(false);
+    expect(useUiStore.getState().updatePhase).toBe("idle");
+  });
+
   it("opens and closes the help guide", () => {
     useUiStore.getState().openHelpGuide("forms-mode");
     expect(useUiStore.getState().showHelpGuide).toBe(true);

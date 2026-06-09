@@ -1,4 +1,10 @@
-import type { Annotation } from "@shared/types";
+import { rotateAnnotationForPage, rotateViewportRect } from "@/lib/pdf/viewportCoords";
+import type {
+  Annotation,
+  FormFieldDefinition,
+  ImageContentEdit,
+  TextContentEdit,
+} from "@shared/types";
 
 type PageIndexed = { pageIndex: number };
 
@@ -94,4 +100,71 @@ export function reorderPageNumbers(
   const [moved] = order.splice(fromIndex, 1);
   order.splice(toIndex, 0, moved);
   return order;
+}
+
+type PageSize = { width: number; height: number };
+
+function rotatePageIndexedItem<T extends PageIndexed & { x: number; y: number; width: number; height: number }>(
+  item: T,
+  rotatedPages: Map<number, PageSize>,
+  rotateRect: (
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    pageWidth: number,
+    pageHeight: number,
+  ) => { x: number; y: number; width: number; height: number },
+): T {
+  const pageNumber = item.pageIndex + 1;
+  const size = rotatedPages.get(pageNumber);
+  if (!size) return item;
+
+  const patch = rotateRect(item.x, item.y, item.width, item.height, size.width, size.height);
+  return { ...item, ...patch };
+}
+
+interface RotatedPageState {
+  annotations: Annotation[];
+  textEdits: TextContentEdit[];
+  imageEdits: ImageContentEdit[];
+  newFields: FormFieldDefinition[];
+}
+
+/** Remap annotations and page-indexed edits after permanent /Rotate changes. */
+export function remapStateAfterPageRotation(
+  state: RotatedPageState,
+  pageNumbers: number[],
+  degrees: 90 | 180 | 270 | -90,
+  pageSizes: Map<number, PageSize>,
+): RotatedPageState {
+  const rotatedPages = new Map<number, PageSize>();
+  for (const pageNumber of pageNumbers) {
+    const size = pageSizes.get(pageNumber);
+    if (size) rotatedPages.set(pageNumber, size);
+  }
+
+  return {
+    annotations: state.annotations.map((annotation) => {
+      const pageNumber = annotation.pageIndex + 1;
+      const size = rotatedPages.get(pageNumber);
+      if (!size) return annotation;
+      return rotateAnnotationForPage(annotation, size.width, size.height, degrees);
+    }),
+    textEdits: state.textEdits.map((edit) =>
+      rotatePageIndexedItem(edit, rotatedPages, (x, y, w, h, pw, ph) =>
+        rotateViewportRect(x, y, w, h, pw, ph, degrees),
+      ),
+    ),
+    imageEdits: state.imageEdits.map((edit) =>
+      rotatePageIndexedItem(edit, rotatedPages, (x, y, w, h, pw, ph) =>
+        rotateViewportRect(x, y, w, h, pw, ph, degrees),
+      ),
+    ),
+    newFields: state.newFields.map((field) =>
+      rotatePageIndexedItem(field, rotatedPages, (x, y, w, h, pw, ph) =>
+        rotateViewportRect(x, y, w, h, pw, ph, degrees),
+      ),
+    ),
+  };
 }

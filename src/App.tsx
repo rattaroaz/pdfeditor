@@ -3,6 +3,7 @@ import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { ErrorDialog } from "@/components/common/ErrorDialog";
 import { SplitPdfDialog } from "@/components/document/SplitPdfDialog";
 import { HelpGuideDialog } from "@/components/help/HelpGuideDialog";
+import { UpdateDialog } from "@/components/help/UpdateDialog";
 import { useUiStore } from "@/stores/uiStore";
 import { useDocumentStore } from "@/stores/documentStore";
 import "./index.css";
@@ -27,6 +28,7 @@ function App() {
       <ErrorDialog />
       <SplitPdfDialog />
       <HelpGuideDialog />
+      <UpdateDialog />
     </ErrorBoundary>
     </div>
   );

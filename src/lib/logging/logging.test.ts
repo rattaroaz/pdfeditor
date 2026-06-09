@@ -61,6 +61,22 @@ describe("logging framework", () => {
     spy.mockRestore();
   });
 
+  it("buffers entries below the active min level but skips console shipping", () => {
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
+    logger.setLevel("info");
+
+    log.app.debug("hidden from console", { userAction: "test" });
+    log.app.info("visible in console", { userAction: "test" });
+
+    expect(getLogEntries()).toHaveLength(2);
+    expect(debugSpy).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalled();
+
+    logSpy.mockRestore();
+    debugSpy.mockRestore();
+  });
+
   it("enriches logs with document id from the store", async () => {
     const { useDocumentStore } = await import("@/stores/documentStore");
     useDocumentStore.setState({

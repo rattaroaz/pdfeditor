@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useRef, useState } from "react";
 import { renderPageToCanvas } from "@/lib/pdf/pdfEngine";
 import { reorderPageNumbers } from "@/lib/pageAnnotationRemap";
 import { useDocumentStore } from "@/stores/documentStore";
-import { deletePages, insertBlankPages, reorderPages, rotatePagesPermanent } from "@/services/pageService";
+import { deletePages, insertBlankPages, reorderPages } from "@/services/pageService";
 import { extractPagesToFile, exportPageAsPng } from "@/services/assemblyService";
 
 export function ThumbnailPanelContent() {
@@ -56,10 +56,6 @@ export function ThumbnailPanelContent() {
     }
     if (!window.confirm(`Delete ${targetPages.length} page(s)?`)) return;
     void runAction(() => deletePages(targetPages));
-  };
-
-  const handleRotate = (degrees: 90 | -90) => {
-    void runAction(() => rotatePagesPermanent(targetPages, degrees));
   };
 
   const finishPageDrag = (toIndex: number) => {
@@ -149,22 +145,6 @@ export function ThumbnailPanelContent() {
           className="rounded bg-zinc-800 px-2 py-1 text-[10px] text-zinc-300 hover:bg-zinc-700 disabled:opacity-40"
         >
           Delete
-        </button>
-        <button
-          type="button"
-          disabled={busy || targetPages.length === 0}
-          onClick={() => handleRotate(90)}
-          className="rounded bg-zinc-800 px-2 py-1 text-[10px] text-zinc-300 hover:bg-zinc-700 disabled:opacity-40"
-        >
-          Rotate 90°
-        </button>
-        <button
-          type="button"
-          disabled={busy || targetPages.length === 0}
-          onClick={() => handleRotate(-90)}
-          className="rounded bg-zinc-800 px-2 py-1 text-[10px] text-zinc-300 hover:bg-zinc-700 disabled:opacity-40"
-        >
-          Rotate −90°
         </button>
       </div>
       <p className="px-2 py-1 text-[10px] text-zinc-500">

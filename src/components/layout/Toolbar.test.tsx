@@ -16,19 +16,51 @@ vi.mock("@/services/historyService", () => ({
   redoEdit: mockRedo,
 }));
 
+import { DEFAULT_TOOLBAR_ORDER } from "@/lib/toolbarOrder";
 import { Toolbar } from "./Toolbar";
 
 describe("Toolbar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useHistoryStore.getState().clear();
-    useUiStore.setState({ appMode: "markup" });
+    useUiStore.setState({
+      appMode: "markup",
+      toolbarOrder: [...DEFAULT_TOOLBAR_ORDER],
+      toolbarDragFrom: null,
+      toolbarDropBeforeId: null,
+    });
     useDocumentStore.setState({
       pdfDoc: null,
       metadata: null,
       currentPage: 1,
       zoom: 1,
     });
+  });
+
+  it("renders toolbar groups in the configured order", () => {
+    useUiStore.setState({
+      toolbarOrder: [
+        "toolbar-sidebar",
+        "toolbar-modes",
+        "toolbar-undo-redo",
+        "toolbar-page-nav",
+        "toolbar-rotate",
+        "toolbar-zoom",
+      ],
+    });
+    render(<Toolbar />);
+    const zone = screen.getByTestId("toolbar-mode-document").closest("[data-toolbar-zone]");
+    const itemIds = Array.from(zone?.querySelectorAll("[data-toolbar-id]") ?? []).map(
+      (el) => el.getAttribute("data-toolbar-id"),
+    );
+    expect(itemIds).toEqual([
+      "toolbar-sidebar",
+      "toolbar-modes",
+      "toolbar-undo-redo",
+      "toolbar-page-nav",
+      "toolbar-rotate",
+      "toolbar-zoom",
+    ]);
   });
 
   it("does not show open or save buttons", () => {

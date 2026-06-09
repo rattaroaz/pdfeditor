@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from "react";
+import { usePageCoordMapper } from "@/hooks/usePageCoordMapper";
 import { useAnnotationStore } from "@/stores/annotationStore";
+import { useDocumentStore } from "@/stores/documentStore";
 import { useUiStore } from "@/stores/uiStore";
 import { recordHistory } from "@/stores/historyStore";
 import { hitTestAnnotation, MARKUP_COLOR, lineMarkupBandY, MARKUP_LINE_THICKNESS, normalizeMarkupRect } from "@/lib/annotationHitTest";
@@ -49,6 +51,8 @@ interface Props {
 }
 
 export function AnnotationLayer({ pageIndex, scale }: Props) {
+  const rotation = useDocumentStore((s) => s.rotation);
+  const coordMapper = usePageCoordMapper(pageIndex + 1, rotation);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const finishingDrawingRef = useRef(false);
@@ -73,6 +77,23 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
   const [current, setCurrent] = useState<{ x: number; y: number } | null>(null);
   const [points, setPoints] = useState<Array<{ x: number; y: number }>>([]);
 
+  const pointOnCanvas = (x: number, y: number) => {
+    const p = coordMapper ? coordMapper.toDisplay(x, y) : { x, y };
+    return { x: p.x * scale, y: p.y * scale };
+  };
+
+  const rectOnCanvas = (x: number, y: number, width: number, height: number) => {
+    const r = coordMapper
+      ? coordMapper.displayRect(x, y, width, height)
+      : { x, y, width, height };
+    return {
+      x: r.x * scale,
+      y: r.y * scale,
+      width: r.width * scale,
+      height: r.height * scale,
+    };
+  };
+
   const paint = () => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
@@ -88,6 +109,7 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
       type: "highlight" | "underline" | "strikeout",
       color?: string,
     ) => {
+      const box = rectOnCanvas(r.x, r.y, r.width, r.height);
       ctx.fillStyle =
         color ??
         (type === "highlight"
@@ -96,15 +118,11 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
             ? "rgba(33, 150, 243, 0.5)"
             : "rgba(244, 67, 54, 0.5)");
       if (type === "highlight") {
-        ctx.fillRect(r.x * scale, r.y * scale, r.width * scale, r.height * scale);
+        ctx.fillRect(box.x, box.y, box.width, box.height);
       } else {
         const bandY = lineMarkupBandY(r, type);
-        ctx.fillRect(
-          r.x * scale,
-          bandY * scale,
-          r.width * scale,
-          MARKUP_LINE_THICKNESS * scale,
-        );
+        const band = pointOnCanvas(r.x, bandY);
+        ctx.fillRect(band.x, band.y, box.width, MARKUP_LINE_THICKNESS * scale);
       }
     };
 
@@ -126,9 +144,11 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
         ctx.beginPath();
-        ctx.moveTo(fh.points[0].x * scale, fh.points[0].y * scale);
+        const first = pointOnCanvas(fh.points[0].x, fh.points[0].y);
+        ctx.moveTo(first.x, first.y);
         for (let i = 1; i < fh.points.length; i++) {
-          ctx.lineTo(fh.points[i].x * scale, fh.points[i].y * scale);
+          const p = pointOnCanvas(fh.points[i].x, fh.points[i].y);
+          ctx.lineTo(p.x, p.y);
         }
         ctx.stroke();
       }
@@ -136,7 +156,8 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
         const note = ann as NoteAnnotation;
         ctx.fillStyle = "#FFC107";
         ctx.beginPath();
-        ctx.arc(note.x * scale, note.y * scale, 8, 0, Math.PI * 2);
+        const notePoint = pointOnCanvas(note.x, note.y);
+        ctx.arc(notePoint.x, notePoint.y, 8, 0, Math.PI * 2);
         ctx.fill();
       }
       if (ann.type === "stamp") {
@@ -147,10 +168,11 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
         ctx.fillStyle = stamp.color || "#D32F2F";
         ctx.strokeStyle = stamp.color || "#D32F2F";
         ctx.lineWidth = 2 * scale;
-        const x = stamp.x * scale;
-        const y = stamp.y * scale;
-        const w = sw * scale;
-        const h = sh * scale;
+        const stampBox = rectOnCanvas(stamp.x, stamp.y, sw, sh);
+        const x = stampBox.x;
+        const y = stampBox.y;
+        const w = stampBox.width;
+        const h = stampBox.height;
         ctx.strokeRect(x, y, w, h);
         ctx.fillText(label, x + 8 * scale, y + 17 * scale);
         if (selectedId === ann.id) {
@@ -164,7 +186,7 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
         const selected = selectedId === ann.id;
         drawShape(ctx, shape, scale, shape.color);
         if (selected) {
-          drawSelectionOutline(ctx, shape, scale);
+          drawSelectionOutline(ctx, shape);
         }
       }
     }
@@ -172,10 +194,10 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
     if (selectedId) {
       const selected = pageAnnotations.find((a) => a.id === selectedId);
       if (selected && selected.type !== "stamp" && selected.type !== "shape") {
-        drawSelectionForAnnotation(ctx, selected, scale);
+        drawSelectionForAnnotation(ctx, selected);
       }
       if (selected && canResizeAnnotation(selected)) {
-        drawResizeHandle(ctx, selected, scale);
+        drawResizeHandle(ctx, selected);
       }
     }
 
@@ -211,16 +233,19 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
       const height = Math.abs(current.y - start.y);
       ctx.strokeStyle = "#2196F3";
       ctx.lineWidth = 1 * scale;
-      ctx.strokeRect(x * scale, y * scale, width * scale, height * scale);
+      const preview = rectOnCanvas(x, y, width, height);
+      ctx.strokeRect(preview.x, preview.y, preview.width, preview.height);
     }
 
     if (drawing && start && current && activeTool === "freehand" && points.length > 1) {
       ctx.strokeStyle = "#E91E63";
       ctx.lineWidth = 2 * scale;
       ctx.beginPath();
-      ctx.moveTo(points[0].x * scale, points[0].y * scale);
+      const firstPoint = pointOnCanvas(points[0].x, points[0].y);
+      ctx.moveTo(firstPoint.x, firstPoint.y);
       for (let i = 1; i < points.length; i++) {
-        ctx.lineTo(points[i].x * scale, points[i].y * scale);
+        const p = pointOnCanvas(points[i].x, points[i].y);
+        ctx.lineTo(p.x, p.y);
       }
       ctx.stroke();
     }
@@ -237,15 +262,16 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
   function drawSelectionOutline(
     ctx: CanvasRenderingContext2D,
     shape: Pick<ShapeAnnotation, "shape" | "x1" | "y1" | "x2" | "y2">,
-    scale: number,
   ) {
     ctx.save();
     ctx.strokeStyle = "#2196F3";
     ctx.lineWidth = 2;
-    const x1 = shape.x1 * scale;
-    const y1 = shape.y1 * scale;
-    const x2 = shape.x2 * scale;
-    const y2 = shape.y2 * scale;
+    const p1 = pointOnCanvas(shape.x1, shape.y1);
+    const p2 = pointOnCanvas(shape.x2, shape.y2);
+    const x1 = p1.x;
+    const y1 = p1.y;
+    const x2 = p2.x;
+    const y2 = p2.y;
     if (shape.shape === "rectangle") {
       ctx.strokeRect(
         Math.min(x1, x2) - 2,
@@ -279,19 +305,14 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
   function drawSelectionForAnnotation(
     ctx: CanvasRenderingContext2D,
     ann: Annotation,
-    scale: number,
   ) {
     ctx.save();
     ctx.strokeStyle = "#2196F3";
     ctx.lineWidth = 2;
     if (ann.type === "highlight" || ann.type === "underline" || ann.type === "strikeout") {
       for (const r of (ann as RectAnnotation).rects) {
-        ctx.strokeRect(
-          r.x * scale - 2,
-          r.y * scale - 2,
-          r.width * scale + 4,
-          r.height * scale + 4,
-        );
+        const box = rectOnCanvas(r.x, r.y, r.width, r.height);
+        ctx.strokeRect(box.x - 2, box.y - 2, box.width + 4, box.height + 4);
       }
     } else if (ann.type === "freehand") {
       const fh = ann as FreehandAnnotation;
@@ -306,37 +327,27 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
         maxX = Math.max(maxX, p.x);
         maxY = Math.max(maxY, p.y);
       }
-      ctx.strokeRect(
-        minX * scale - 4,
-        minY * scale - 4,
-        (maxX - minX) * scale + 8,
-        (maxY - minY) * scale + 8,
-      );
+      const box = rectOnCanvas(minX, minY, maxX - minX, maxY - minY);
+      ctx.strokeRect(box.x - 4, box.y - 4, box.width + 8, box.height + 8);
     } else if (ann.type === "note") {
       const note = ann as NoteAnnotation;
+      const notePoint = pointOnCanvas(note.x, note.y);
       ctx.beginPath();
-      ctx.arc(note.x * scale, note.y * scale, 12, 0, Math.PI * 2);
+      ctx.arc(notePoint.x, notePoint.y, 12, 0, Math.PI * 2);
       ctx.stroke();
     } else if (ann.type === "text") {
       const text = ann as TextAnnotation;
-      ctx.strokeRect(
-        text.x * scale - 2,
-        text.y * scale - 2,
-        text.width * scale + 4,
-        text.height * scale + 4,
-      );
+      const box = rectOnCanvas(text.x, text.y, text.width, text.height);
+      ctx.strokeRect(box.x - 2, box.y - 2, box.width + 4, box.height + 4);
     }
     ctx.restore();
   }
 
-  function drawResizeHandle(
-    ctx: CanvasRenderingContext2D,
-    ann: Annotation,
-    scale: number,
-  ) {
+  function drawResizeHandle(ctx: CanvasRenderingContext2D, ann: Annotation) {
     const b = annotationBounds(ann);
-    const hx = (b.x + b.width) * scale;
-    const hy = (b.y + b.height) * scale;
+    const handle = pointOnCanvas(b.x + b.width, b.y + b.height);
+    const hx = handle.x;
+    const hy = handle.y;
     const s = RESIZE_HANDLE_PX;
     ctx.save();
     ctx.fillStyle = "#ffffff";
@@ -356,10 +367,12 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
     ctx.strokeStyle = color;
     ctx.fillStyle = `${color}22`;
     ctx.lineWidth = shape.strokeWidth * scale;
-    const x1 = shape.x1 * scale;
-    const y1 = shape.y1 * scale;
-    const x2 = shape.x2 * scale;
-    const y2 = shape.y2 * scale;
+    const p1 = pointOnCanvas(shape.x1, shape.y1);
+    const p2 = pointOnCanvas(shape.x2, shape.y2);
+    const x1 = p1.x;
+    const y1 = p1.y;
+    const x2 = p2.x;
+    const y2 = p2.y;
 
     if (shape.shape === "rectangle") {
       const x = Math.min(x1, x2);
@@ -400,17 +413,18 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
 
   useEffect(() => {
     paint();
-  }, [pageAnnotations, scale, drawing, start, current, points, activeTool, selectedId, transform]);
+  }, [pageAnnotations, scale, drawing, start, current, points, activeTool, selectedId, transform, coordMapper]);
 
   const hitTest = (x: number, y: number): Annotation | null =>
     hitTestAnnotation(annotations, pageIndex, x, y);
 
   const localCoords = (e: { clientX: number; clientY: number }) => {
     const rect = containerRef.current!.getBoundingClientRect();
-    return {
-      x: (e.clientX - rect.left) / scale,
-      y: (e.clientY - rect.top) / scale,
-    };
+    const displayX = (e.clientX - rect.left) / scale;
+    const displayY = (e.clientY - rect.top) / scale;
+    return coordMapper
+      ? coordMapper.toStorage(displayX, displayY)
+      : { x: displayX, y: displayY };
   };
 
   useEffect(() => {
@@ -749,15 +763,16 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
           .filter((a) => a.type === "text")
           .map((ann) => {
             const text = ann as TextAnnotation;
+            const box = rectOnCanvas(text.x, text.y, text.width, text.height);
             return (
               <div
                 key={ann.id}
                 className="pointer-events-none absolute overflow-hidden rounded border border-zinc-400 bg-white/90 px-1 text-black leading-none"
                 style={{
-                  left: text.x * scale,
-                  top: text.y * scale,
-                  width: text.width * scale,
-                  height: text.height * scale,
+                  left: box.x,
+                  top: box.y,
+                  width: box.width,
+                  height: box.height,
                   fontSize: text.fontSize * scale,
                   ...markupTextBoxStyle(scale),
                 }}
@@ -802,6 +817,7 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
         .filter((a) => a.type === "note")
         .map((ann) => {
           const note = ann as NoteAnnotation;
+          const notePoint = pointOnCanvas(note.x, note.y);
           return (
             <div
               key={ann.id}
@@ -810,8 +826,8 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
                 selectedId === ann.id ? "ring-2 ring-blue-500" : ""
               }`}
               style={{
-                left: note.x * scale + 10,
-                top: note.y * scale - 8,
+                left: notePoint.x + 10,
+                top: notePoint.y - 8,
               }}
             >
               {note.content}
@@ -823,6 +839,7 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
         .map((ann) => {
           const stamp = ann as StampAnnotation;
           const { width: sw, height: sh } = stampSize(stamp);
+          const stampBox = rectOnCanvas(stamp.x, stamp.y, sw, sh);
           return (
             <button
               key={ann.id}
@@ -832,10 +849,10 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
                 selectedId === ann.id ? "ring-2 ring-blue-500" : ""
               }`}
               style={{
-                left: stamp.x * scale,
-                top: stamp.y * scale,
-                width: sw * scale,
-                height: sh * scale,
+                left: stampBox.x,
+                top: stampBox.y,
+                width: stampBox.width,
+                height: stampBox.height,
                 color: stamp.color,
                 borderColor: stamp.color,
               }}
@@ -848,6 +865,7 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
         .filter((a) => a.type === "text")
         .map((ann) => {
           const text = ann as TextAnnotation;
+          const box = rectOnCanvas(text.x, text.y, text.width, text.height);
           return (
             <div
               key={ann.id}
@@ -855,10 +873,10 @@ export function AnnotationLayer({ pageIndex, scale }: Props) {
                 selectedId === ann.id ? "ring-2 ring-blue-500" : ""
               }`}
               style={{
-                left: text.x * scale,
-                top: text.y * scale,
-                width: text.width * scale,
-                height: text.height * scale,
+                left: box.x,
+                top: box.y,
+                width: box.width,
+                height: box.height,
                 fontSize: text.fontSize * scale,
                 ...markupTextBoxStyle(scale),
               }}

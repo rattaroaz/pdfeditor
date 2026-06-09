@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">66.66% </span>
+                <span class="strong">64.7% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>4/6</span>
+                <span class='fraction'>22/34</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">50% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>4/8</span>
+                <span class='fraction'>2/4</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">66.66% </span>
+                <span class="strong">64.7% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>4/6</span>
+                <span class='fraction'>22/34</span>
             </div>
         
             
@@ -114,41 +114,41 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import type { LogContext } from "@shared/types";
 import type { ScopedLogger } from "./logger";
 &nbsp;
@@ -166,30 +166,30 @@ export function startTimer(
   const base: LogContext = {
     ...context,
     category: context?.category ?? "perf",
-    userAction: context?.userAction ?? <span class="branch-1 cbranch-no" title="branch not covered" >operation,</span>
+    userAction: context?.<span class="branch-0 cbranch-no" title="branch not covered" >userAction ?? operation,</span>
   };
 &nbsp;
   return {
     end(message, extra) {
-      scoped.debug(message ?? <span class="branch-1 cbranch-no" title="branch not covered" >`${operation} completed`, {</span>
+      scoped.debug(<span class="branch-0 cbranch-no" title="branch not covered" >message ?? `${operation} completed`, {</span>
         ...base,
         ...extra,
         durationMs: Math.round(performance.now() - start),
       });
     },
-<span class="fstat-no" title="function not covered" >    fail(e</span>rror, extra) {
-      const errMsg = <span class="cstat-no" title="statement not covered" >error instanceof Error ? error.message : String(error);</span>
+<span class="fstat-no" title="function not covered" >    fail(error, extra) {</span>
+<span class="cstat-no" title="statement not covered" >      const errMsg = error instanceof Error ? error.message : String(error);</span>
 <span class="cstat-no" title="statement not covered" >      scoped.error(`${operation} failed: ${errMsg}`, {</span>
-        ...base,
-        ...extra,
-        durationMs: Math.round(performance.now() - start),
-        metadata: {
-          ...base.metadata,
-          ...extra?.metadata,
-          error: errMsg,
-        },
-      });
-    },
+<span class="cstat-no" title="statement not covered" >        ...base,</span>
+<span class="cstat-no" title="statement not covered" >        ...extra,</span>
+<span class="cstat-no" title="statement not covered" >        durationMs: Math.round(performance.now() - start),</span>
+<span class="cstat-no" title="statement not covered" >        metadata: {</span>
+<span class="cstat-no" title="statement not covered" >          ...base.metadata,</span>
+<span class="cstat-no" title="statement not covered" >          ...extra?.metadata,</span>
+<span class="cstat-no" title="statement not covered" >          error: errMsg,</span>
+<span class="cstat-no" title="statement not covered" >        },</span>
+<span class="cstat-no" title="statement not covered" >      });</span>
+<span class="cstat-no" title="statement not covered" >    },</span>
   };
 }
 &nbsp;</pre></td></tr></table></pre>
@@ -199,7 +199,7 @@ export function startTimer(
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-06-04T13:57:25.529Z
+                at 2026-06-09T03:30:35.952Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

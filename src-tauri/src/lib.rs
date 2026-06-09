@@ -38,6 +38,8 @@ pub fn run() {
             commands::log_frontend_event,
             commands::get_logging_info,
             commands::read_recent_log_lines,
+            commands::update::check_for_updates,
+            commands::update::apply_app_update,
         ])
         .setup(|app| {
             tracing::info!(app_version = env!("CARGO_PKG_VERSION"), "PDF Editor started");

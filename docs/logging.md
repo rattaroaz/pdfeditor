@@ -57,12 +57,13 @@ logUserAction("save", "User saved document");
 | Pages | `delete_pages`, `rotate_pages` |
 | Security | `protect_on_save`, `remove_password_on_save` |
 | Document | `open`, `save`, `revert` (via `log.document`) |
+| Updates | `check_for_updates`, `apply_app_update` (via `log.update`) |
 
 ### Context fields
 
 | Field | Purpose |
 |-------|---------|
-| `category` | Area: `app`, `document`, `pdf`, `form`, `security`, `invoke`, … |
+| `category` | Area: `app`, `document`, `pdf`, `form`, `security`, `invoke`, `update`, … |
 | `userAction` | Short action id (`open`, `save`, `merge`, …) |
 | `documentId` | Auto-filled from document store when a PDF is open |
 | `durationMs` | Operation duration |
@@ -76,7 +77,9 @@ logUserAction("save", "User saved document");
 - **Dev default level:** `debug`
 - **Production default:** `info`
 - **Override:** `localStorage` key `pdfeditor.logLevel` or env `VITE_LOG_LEVEL`
-- **Rust filter:** `RUST_LOG` env (default `info,pdfeditor=debug`)
+- **Rust filter:** `RUST_LOG` env (default `info,pdfeditor=debug,tauri=warn`)
+
+The in-memory Log Viewer buffer records **all** levels regardless of `minLevel`; console output and Rust shipping respect the active level.
 
 `initLogging()` runs once in `main.tsx` and registers global `error` / `unhandledrejection` handlers.
 
@@ -97,8 +100,19 @@ Frontend events arrive via `log_frontend_event` with `target: "frontend"`.
 | `pdf_pages` | delete, rotate, reorder |
 | `pdf_assembly` | insert blank, extract, merge |
 | `pdf_annotations` | embed, strip, prepare bytes, save with annotations |
+| `update` | `check_for_updates`, `apply_app_update` (GitHub commit compare + installer download) |
+| `mod` (light) | `get_recent_files`, `add_recent_file`, `load_annotations`, `save_annotations` |
 
 Each operation logs `elapsed_ms` and output size where applicable.
+
+### Update flow
+
+Help → **Check for updates** uses:
+
+- Frontend: `log.update` for check/download/apply/cancel; `invokeLogged` for `check_for_updates` and `apply_app_update` (correlation IDs + invoke timing)
+- Backend: `check_for_updates` and `apply_app_update` spans with `elapsed_ms`
+
+Update checks compare the **embedded git commit SHA** (from build time) against the latest commit on GitHub `main`, not only the semver version.
 
 ### Slow invoke warnings
 
@@ -150,7 +164,8 @@ Tests disable backend shipping via `logger.setBackendShipping(false)` when neede
 - `src/lib/tauriInvoke.test.ts` — invoke success/failure + correlationId
 - `src/lib/logger.test.ts` — console output + Rust shipping via the `logger` root
 - `src/services/loggingService.test.ts` — `get_logging_info` / tail / open folder
-- Rust: `src-tauri/src/logging.rs` (tail reader), `src-tauri/src/commands/mod.rs` (`log_frontend_payload` levels)
+- `src/services/updateService.test.ts` — `log.update` category + invoke failures
+- Rust: `src-tauri/src/logging.rs` (tail reader), `src-tauri/src/commands/mod.rs` (`log_frontend_payload` levels), `src-tauri/src/commands/update.rs`
 
 Service-layer tests (`formService.test.ts`, `documentService.test.ts`) mock `invokeLogged` and assert command order during save/apply flows.
 
@@ -162,4 +177,4 @@ With `VITE_E2E=true`, mocks record `log_frontend_event` lines and Playwright ass
 - `reportTestError` / forced invoke failures — dialog `errorId` matches session buffer (`data-testid="error-id"`, `log-entry`)
 - Invoke tracing visible in **View log panel** (`invoke ok/failed: <command>`)
 
-See `docs/testing.md` and `e2e/tests/logging.spec.ts`.
+See `docs/testing.md`, `e2e/tests/logging.spec.ts`, and `e2e/tests/update.spec.ts`.

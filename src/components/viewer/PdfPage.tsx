@@ -21,6 +21,23 @@ export function PdfPage({ pageNumber, scale, onVisible }: PdfPageProps) {
   const rotation = useDocumentStore((s) => s.rotation);
   const [rendering, setRendering] = useState(true);
   const [renderError, setRenderError] = useState<string | null>(null);
+  const [pageSize, setPageSize] = useState<{ width: number; height: number } | null>(null);
+
+  useEffect(() => {
+    if (!pdfDoc) {
+      setPageSize(null);
+      return;
+    }
+    let cancelled = false;
+    void pdfDoc.getPage(pageNumber).then((page) => {
+      if (cancelled) return;
+      const viewport = page.getViewport({ scale, rotation });
+      setPageSize({ width: viewport.width, height: viewport.height });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [pdfDoc, pageNumber, scale, rotation]);
 
   const render = useCallback(
     async (signal: AbortSignal) => {
@@ -66,6 +83,11 @@ export function PdfPage({ pageNumber, scale, onVisible }: PdfPageProps) {
       ref={containerRef}
       className="relative mx-auto mb-4 shadow-lg"
       data-page={pageNumber}
+      style={
+        pageSize
+          ? { width: pageSize.width, height: pageSize.height, minWidth: pageSize.width, minHeight: pageSize.height }
+          : undefined
+      }
     >
       <canvas ref={canvasRef} className="block bg-white" />
       <AnnotationLayer pageIndex={pageNumber - 1} scale={scale} />

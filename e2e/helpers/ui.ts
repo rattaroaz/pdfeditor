@@ -11,6 +11,10 @@ export async function openViewMenu(page: Page): Promise<void> {
   await page.getByTestId("menu-view").click(menuClick);
 }
 
+export async function openHelpMenu(page: Page): Promise<void> {
+  await page.getByTestId("menu-help").click(menuClick);
+}
+
 export async function openDocumentFromMenu(page: Page): Promise<void> {
   await openFileMenu(page);
   await page.getByTestId("menu-open").click(menuClick);

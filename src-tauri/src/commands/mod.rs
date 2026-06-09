@@ -4,6 +4,7 @@ mod pdf_content;
 mod pdf_forms;
 mod pdf_pages;
 mod pdf_security;
+pub mod update;
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use crate::error::{AppError, CommandResult};
@@ -220,6 +221,8 @@ pub fn get_pdf_info(path: String) -> CommandResult<PdfInfoResult> {
 
 #[tauri::command]
 pub async fn get_recent_files(app: AppHandle) -> CommandResult<Vec<RecentFileEntry>> {
+  let span = tracing::info_span!("get_recent_files");
+  let _guard = span.enter();
   let store = app.store(RECENT_STORE).map_err(|e| AppError::Pdf(e.to_string()))?;
   let entries: Vec<RecentFileEntry> = store
     .get("files")
@@ -230,6 +233,8 @@ pub async fn get_recent_files(app: AppHandle) -> CommandResult<Vec<RecentFileEnt
 
 #[tauri::command]
 pub async fn add_recent_file(app: AppHandle, path: String) -> CommandResult<()> {
+  let span = tracing::info_span!("add_recent_file", path = %path);
+  let _guard = span.enter();
   let name = Path::new(&path)
     .file_name()
     .and_then(|n| n.to_str())
@@ -259,6 +264,8 @@ pub async fn add_recent_file(app: AppHandle, path: String) -> CommandResult<()> 
 
 #[tauri::command]
 pub fn load_annotations(file_path: String) -> CommandResult<Option<String>> {
+  let span = tracing::info_span!("load_annotations", path = %file_path);
+  let _guard = span.enter();
   let path = annotation_path_for(&file_path)?;
   if !path.exists() {
     return Ok(None);
@@ -269,6 +276,8 @@ pub fn load_annotations(file_path: String) -> CommandResult<Option<String>> {
 
 #[tauri::command]
 pub fn save_annotations(file_path: String, json: String) -> CommandResult<()> {
+  let span = tracing::info_span!("save_annotations", path = %file_path);
+  let _guard = span.enter();
   let path = annotation_path_for(&file_path)?;
   fs::write(path, json).map_err(AppError::Io)?;
   Ok(())

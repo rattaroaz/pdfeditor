@@ -28,7 +28,11 @@ vi.mock("@/services/loggingService", () => ({
 vi.mock("@/lib/logging", () => ({
   isLogViewerEnabled: () => false,
 }));
+vi.mock("@/services/updateService", () => ({
+  checkForUpdatesAndApply: vi.fn(),
+}));
 
+import { checkForUpdatesAndApply } from "@/services/updateService";
 import { MenuBar } from "./MenuBar";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useUiStore } from "@/stores/uiStore";
@@ -76,6 +80,19 @@ describe("MenuBar", () => {
     fireEvent.click(screen.getByTestId("menu-view"));
     fireEvent.click(screen.getByText("Single page"));
     expect(useDocumentStore.getState().viewMode).toBe("single");
+  });
+
+  it("shows check for updates at the bottom of the Help menu", () => {
+    render(<MenuBar />);
+    fireEvent.click(screen.getByTestId("menu-help"));
+    expect(screen.getByTestId("menu-check-updates")).toHaveTextContent("Check for updates");
+  });
+
+  it("starts update check from the Help menu", () => {
+    render(<MenuBar />);
+    fireEvent.click(screen.getByTestId("menu-help"));
+    fireEvent.click(screen.getByTestId("menu-check-updates"));
+    expect(checkForUpdatesAndApply).toHaveBeenCalled();
   });
 
   it("toggles search from the View menu", () => {

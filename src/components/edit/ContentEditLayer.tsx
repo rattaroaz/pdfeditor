@@ -7,6 +7,7 @@ import { useContentEditStore } from "@/stores/contentEditStore";
 import { recordHistory } from "@/stores/historyStore";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useUiStore } from "@/stores/uiStore";
+import { usePageCoordMapper } from "@/hooks/usePageCoordMapper";
 import { findTextAtPoint } from "@/lib/pdf/pdfEngine";
 import { encodeBase64Pdf } from "@/lib/pdf/pdfBinary";
 import {
@@ -97,10 +98,28 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
   const pageTextEdits = textEdits.filter((e) => e.pageIndex === pageIndex);
   const pageImageEdits = imageEdits.filter((e) => e.pageIndex === pageIndex);
 
+  const coordMapper = usePageCoordMapper(pageIndex + 1, rotation);
+
   const localCoords = (e: { clientX: number; clientY: number }) => {
     const rect = layerRef.current?.getBoundingClientRect();
     if (!rect) return { x: 0, y: 0 };
-    return { x: (e.clientX - rect.left) / scale, y: (e.clientY - rect.top) / scale };
+    const displayX = (e.clientX - rect.left) / scale;
+    const displayY = (e.clientY - rect.top) / scale;
+    return coordMapper
+      ? coordMapper.toStorage(displayX, displayY)
+      : { x: displayX, y: displayY };
+  };
+
+  const rectOnCanvas = (x: number, y: number, width: number, height: number) => {
+    const r = coordMapper
+      ? coordMapper.displayRect(x, y, width, height)
+      : { x, y, width, height };
+    return {
+      left: r.x * scale,
+      top: r.y * scale,
+      width: r.width * scale,
+      height: r.height * scale,
+    };
   };
 
   const beginMove = (
@@ -254,10 +273,7 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
               key={edit.id}
               className="absolute overflow-hidden"
               style={{
-                left: edit.x * scale,
-                top: edit.y * scale,
-                width: edit.width * scale,
-                height: edit.height * scale,
+                ...rectOnCanvas(edit.x, edit.y, edit.width, edit.height),
                 backgroundColor: edit.coverOld ? "#ffffff" : "transparent",
               }}
             >
@@ -278,12 +294,7 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
           <div
             key={edit.id}
             className="absolute"
-            style={{
-              left: edit.x * scale,
-              top: edit.y * scale,
-              width: edit.width * scale,
-              height: edit.height * scale,
-            }}
+            style={rectOnCanvas(edit.x, edit.y, edit.width, edit.height)}
           >
             <img
               src={`data:${edit.mimeType};base64,${edit.imageBase64}`}
@@ -458,10 +469,7 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
               !replacing && !isEditing && !isDragging ? "hover:bg-emerald-500/25" : ""
             }`}
             style={{
-              left: edit.x * scale,
-              top: edit.y * scale,
-              width: edit.width * scale,
-              height: edit.height * scale,
+              ...rectOnCanvas(edit.x, edit.y, edit.width, edit.height),
               pointerEvents: "auto",
             }}
             onMouseDown={(e) => beginMove(e, edit.id, "text", edit.x, edit.y)}
@@ -559,10 +567,7 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
               isDragging ? "cursor-grabbing ring-2 ring-purple-400" : "cursor-grab hover:ring-2 hover:ring-purple-300/60"
             } ${isSelected && !isDragging ? "ring-2 ring-purple-300" : ""} ${isResizing ? "ring-2 ring-purple-400" : ""}`}
             style={{
-              left: edit.x * scale,
-              top: edit.y * scale,
-              width: edit.width * scale,
-              height: edit.height * scale,
+              ...rectOnCanvas(edit.x, edit.y, edit.width, edit.height),
               pointerEvents: "auto",
             }}
             onMouseDown={(e) => beginMove(e, edit.id, "image", edit.x, edit.y)}
@@ -591,12 +596,12 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
               ? "border-emerald-400 bg-emerald-400/10"
               : "border-blue-400 bg-blue-400/10"
           }`}
-          style={{
-            left: Math.min(start.x, current.x) * scale,
-            top: Math.min(start.y, current.y) * scale,
-            width: Math.abs(current.x - start.x) * scale,
-            height: Math.abs(current.y - start.y) * scale,
-          }}
+          style={rectOnCanvas(
+            Math.min(start.x, current.x),
+            Math.min(start.y, current.y),
+            Math.abs(current.x - start.x),
+            Math.abs(current.y - start.y),
+          )}
         />
       )}
     </div>
