@@ -1,3 +1,4 @@
+import { showAlert } from "@/lib/appDialog";
 import { createErrorReporter, log } from "@/lib/logging";
 import { invokeLogged } from "@/lib/tauriInvoke";
 import { decodeBase64Pdf, encodeBase64Pdf } from "@/lib/pdf/pdfEngine";
@@ -51,7 +52,10 @@ export function promptForNewPassword(): string | null {
   const confirm = window.prompt("Confirm password:");
   if (!confirm) return null;
   if (userPassword !== confirm) {
-    window.alert("Passwords do not match. Password protection was not applied.");
+    void showAlert(
+      "Passwords do not match. Password protection was not applied.",
+      "warning",
+    );
     return null;
   }
   return userPassword;

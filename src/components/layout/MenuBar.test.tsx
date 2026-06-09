@@ -22,12 +22,6 @@ vi.mock("@/services/securityService", () => ({
   protectDocumentOnNextSave: vi.fn(),
   removeDocumentPasswordProtection: vi.fn(),
 }));
-vi.mock("@/services/loggingService", () => ({
-  openLogDirectory: vi.fn(),
-}));
-vi.mock("@/lib/logging", () => ({
-  isLogViewerEnabled: () => false,
-}));
 vi.mock("@/services/updateService", () => ({
   checkForUpdatesAndApply: vi.fn(),
 }));
@@ -100,5 +94,16 @@ describe("MenuBar", () => {
     fireEvent.click(screen.getByTestId("menu-view"));
     fireEvent.click(screen.getByTestId("menu-find"));
     expect(useUiStore.getState().showSearch).toBe(true);
+  });
+
+  it("toggles the logs panel from the View menu", () => {
+    render(<MenuBar />);
+    fireEvent.click(screen.getByTestId("menu-view"));
+    fireEvent.click(screen.getByTestId("menu-log-panel"));
+    expect(useUiStore.getState().showLogViewer).toBe(true);
+
+    fireEvent.click(screen.getByTestId("menu-view"));
+    fireEvent.click(screen.getByTestId("menu-log-panel"));
+    expect(useUiStore.getState().showLogViewer).toBe(false);
   });
 });

@@ -77,7 +77,7 @@ npm run test:e2e:report           # open HTML report after a run
 Set in `scripts/dev-e2e.mjs` (also overridable):
 
 - `VITE_E2E=true` — enable mocks + bridge
-- `VITE_ENABLE_LOG_VIEWER=true` — log panel menu visible
+- `VITE_ENABLE_LOG_VIEWER=true` — legacy flag (log panel is always available via View → Show logs)
 - `VITE_LOG_LEVEL=debug` — verbose session logs
 
 ### Stable selectors

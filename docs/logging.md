@@ -142,8 +142,7 @@ Tauri commands: `get_logging_info`, `read_recent_log_lines`.
 
 ## Log Viewer (UI)
 
-**View → View log panel** — live session buffer (dev or `VITE_ENABLE_LOG_VIEWER=true`), shows `correlationId` and `errorId` when present.  
-**View → Open log folder** — opens the OS log directory in the file manager.
+**View → Show logs** — opens the right-side log panel with the live session buffer and on-disk log file tail; shows `correlationId` and `errorId` when present. The panel footer shows the log directory path on disk.
 
 ## Log file locations
 
@@ -175,6 +174,6 @@ With `VITE_E2E=true`, mocks record `log_frontend_event` lines and Playwright ass
 
 - Boot log (`userAction: boot`)
 - `reportTestError` / forced invoke failures — dialog `errorId` matches session buffer (`data-testid="error-id"`, `log-entry`)
-- Invoke tracing visible in **View log panel** (`invoke ok/failed: <command>`)
+- Invoke tracing visible in **View → Show logs** (`invoke ok/failed: <command>`)
 
 See `docs/testing.md`, `e2e/tests/logging.spec.ts`, and `e2e/tests/update.spec.ts`.

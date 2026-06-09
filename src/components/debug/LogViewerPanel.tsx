@@ -6,7 +6,7 @@ import {
   logger,
   subscribeLogBuffer,
 } from "@/lib/logging";
-import { fetchLoggingInfo, openLogDirectory, readBackendLogTail } from "@/services/loggingService";
+import { fetchLoggingInfo, readBackendLogTail } from "@/services/loggingService";
 
 const LEVEL_CLASS: Record<LogLevel, string> = {
   debug: "text-zinc-500",
@@ -35,11 +35,27 @@ export function LogViewerPanel({ onClose }: LogViewerPanelProps) {
   }, [refresh]);
 
   useEffect(() => {
-    void fetchLoggingInfo().then((i) => setLogDir(i.logDirectory));
+    let cancelled = false;
+    void fetchLoggingInfo()
+      .then((i) => {
+        if (!cancelled) setLogDir(i.logDirectory);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setLogDir(
+            err instanceof Error ? err.message : "Log directory unavailable",
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const loadFileTail = () => {
-    void readBackendLogTail(300).then(setBackendTail);
+    void readBackendLogTail(300)
+      .then(setBackendTail)
+      .catch(() => setBackendTail([]));
   };
 
   const filtered = entries.filter((e) => filter === "all" || e.level === filter);
@@ -47,27 +63,17 @@ export function LogViewerPanel({ onClose }: LogViewerPanelProps) {
   return (
     <div
       data-testid="log-viewer"
-      className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col border-l border-zinc-700 bg-zinc-950 shadow-2xl"
+      className="flex h-full w-80 min-w-72 max-w-md shrink-0 flex-col border-l border-zinc-700 bg-zinc-950"
     >
       <header className="flex items-center justify-between border-b border-zinc-800 px-3 py-2">
         <h2 className="text-sm font-semibold text-zinc-100">Logs</h2>
-        <div className="flex gap-1">
-          <button
-            type="button"
-            className="rounded px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800"
-            onClick={() => void openLogDirectory()}
-            title={logDir}
-          >
-            Open folder
-          </button>
-          <button
-            type="button"
-            className="rounded px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800"
-            onClick={onClose}
-          >
-            Close
-          </button>
-        </div>
+        <button
+          type="button"
+          className="rounded px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800"
+          onClick={onClose}
+        >
+          Close
+        </button>
       </header>
 
       <div className="flex flex-wrap items-center gap-2 border-b border-zinc-800 px-3 py-2 text-xs">

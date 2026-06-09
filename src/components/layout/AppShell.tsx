@@ -50,7 +50,7 @@ export function AppShell() {
       await win.destroy();
     });
     return () => {
-      void unlistenPromise.then((fn) => fn());
+      void unlistenPromise.then((fn) => fn()).catch(() => {});
     };
   }, []);
 
@@ -64,12 +64,16 @@ export function AppShell() {
       }
     });
     return () => {
-      void unlisten.then((fn) => fn());
+      void unlisten.then((fn) => fn()).catch(() => {});
     };
   }, []);
 
   useEffect(() => {
-    void getCurrentWindow().setFullscreen(presentationMode);
+    void getCurrentWindow()
+      .setFullscreen(presentationMode)
+      .catch(() => {
+        // Fullscreen may be unavailable during startup or in some hosts.
+      });
   }, [presentationMode]);
 
   if (presentationMode) {
@@ -110,9 +114,9 @@ export function AppShell() {
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         <PdfViewer />
+        {showLogViewer && <LogViewerPanel onClose={toggleLogViewer} />}
       </div>
       <StatusBar />
-      {showLogViewer && <LogViewerPanel onClose={toggleLogViewer} />}
     </div>
   );
 }

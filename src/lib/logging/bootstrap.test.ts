@@ -39,7 +39,7 @@ describe("initLogging", () => {
     ).toBe(true);
   });
 
-  it("logs unhandled rejections", () => {
+  it("logs unhandled rejections with the rejection message", () => {
     initLogging();
     const reason = new Error("reject");
     const event = new PromiseRejectionEvent("unhandledrejection", {
@@ -48,8 +48,27 @@ describe("initLogging", () => {
     });
     window.dispatchEvent(event);
 
-    expect(
-      getLogEntries().some((e) => e.context?.userAction === "unhandled_rejection"),
-    ).toBe(true);
+    const entry = getLogEntries().find(
+      (e) => e.context?.userAction === "unhandled_rejection",
+    );
+    expect(entry?.message).toContain("reject");
+  });
+
+  it("does not duplicate handlers after re-init (e.g. Vite HMR)", () => {
+    initLogging();
+    initLogging();
+
+    const reason = new Error("once");
+    window.dispatchEvent(
+      new PromiseRejectionEvent("unhandledrejection", {
+        promise: Promise.resolve(),
+        reason,
+      }),
+    );
+
+    const rejectionEntries = getLogEntries().filter(
+      (e) => e.context?.userAction === "unhandled_rejection",
+    );
+    expect(rejectionEntries.length).toBe(1);
   });
 });

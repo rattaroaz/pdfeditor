@@ -330,7 +330,7 @@ export const HELP_SECTIONS: HelpSection[] = [
           "Bookmarks / outline — jump via the PDF outline tree (sidebar Outline tab).",
           "Rotate view — temporary on-screen rotation for reading.",
           "Presentation mode (F11) — fullscreen slide-style view; Esc to exit.",
-          "Open log folder — diagnostic logs for troubleshooting.",
+          "Show logs — open the right-side log panel (session buffer and on-disk log file tail).",
         ],
       },
       {

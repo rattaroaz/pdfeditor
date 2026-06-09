@@ -6,7 +6,6 @@ import { LogViewerPanel } from "./LogViewerPanel";
 
 vi.mock("@/services/loggingService", () => ({
   fetchLoggingInfo: vi.fn().mockResolvedValue({ logDirectory: "C:\\logs\\pdfeditor" }),
-  openLogDirectory: vi.fn(),
   readBackendLogTail: vi.fn().mockResolvedValue(["line one", "line two"]),
 }));
 

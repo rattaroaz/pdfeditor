@@ -1,7 +1,6 @@
 import { type ReactNode } from "react";
 
 import { HELP_MENU_LINKS } from "@/content/helpGuide";
-import { isLogViewerEnabled } from "@/lib/logging";
 import type { MenuBarMenuId } from "@/lib/menuBarOrder";
 import {
   mergeIntoCurrentDocument,
@@ -20,7 +19,6 @@ import {
   flattenForms,
   importFormDataCsv,
 } from "@/services/formService";
-import { openLogDirectory } from "@/services/loggingService";
 import { checkForUpdatesAndApply } from "@/services/updateService";
 import {
   protectDocumentOnNextSave,
@@ -86,6 +84,7 @@ export function useMenuContent(onAction: () => void) {
   const setFlattenOnSave = useUiStore((s) => s.setFlattenOnSave);
   const toggleSearch = useUiStore((s) => s.toggleSearch);
   const toggleLogViewer = useUiStore((s) => s.toggleLogViewer);
+  const showLogViewer = useUiStore((s) => s.showLogViewer);
   const showSidebar = useDocumentStore((s) => s.showSidebar);
   const setShowSidebar = useDocumentStore((s) => s.setShowSidebar);
   const openHelpGuide = useUiStore((s) => s.openHelpGuide);
@@ -237,12 +236,9 @@ export function useMenuContent(onAction: () => void) {
               Presentation mode
             </MenuItem>
             <div className="my-1 border-t border-zinc-700" />
-            {isLogViewerEnabled() && (
-              <MenuItem testId="menu-log-panel" onClick={() => run(toggleLogViewer)}>
-                View log panel
-              </MenuItem>
-            )}
-            <MenuItem onClick={() => run(() => void openLogDirectory())}>Open log folder…</MenuItem>
+            <MenuItem testId="menu-log-panel" onClick={() => run(toggleLogViewer)}>
+              {showLogViewer ? "✓ Hide logs" : "Show logs"}
+            </MenuItem>
           </>
         );
       case "help":

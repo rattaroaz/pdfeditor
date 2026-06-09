@@ -17,16 +17,19 @@ function onGlobalError(event: ErrorEvent): void {
 
 function onUnhandledRejection(event: PromiseRejectionEvent): void {
   const reason = event.reason;
-  const message = reason instanceof Error ? reason.message : String(reason);
-  log.system.error("Unhandled promise rejection", {
+  const detail = reason instanceof Error ? reason.message : String(reason);
+  log.system.error(`Unhandled promise rejection: ${detail}`, {
     userAction: "unhandled_rejection",
-    metadata: { message, stack: reason instanceof Error ? reason.stack : undefined },
+    metadata: { stack: reason instanceof Error ? reason.stack : undefined },
   });
 }
 
 /** Install global handlers and log application startup. Call once from main.tsx. */
 export function initLogging(): void {
-  if (initialized) return;
+  window.removeEventListener("error", onGlobalError);
+  window.removeEventListener("unhandledrejection", onUnhandledRejection);
+
+  const firstInit = !initialized;
   initialized = true;
 
   if (import.meta.env.VITE_LOG_LEVEL) {
@@ -39,14 +42,16 @@ export function initLogging(): void {
   window.addEventListener("error", onGlobalError);
   window.addEventListener("unhandledrejection", onUnhandledRejection);
 
-  log.app.info("Frontend logging initialized", {
-    userAction: "boot",
-    metadata: {
-      minLevel: logger.getLevel(),
-      dev: import.meta.env.DEV,
-      mode: import.meta.env.MODE,
-    },
-  });
+  if (firstInit) {
+    log.app.info("Frontend logging initialized", {
+      userAction: "boot",
+      metadata: {
+        minLevel: logger.getLevel(),
+        dev: import.meta.env.DEV,
+        mode: import.meta.env.MODE,
+      },
+    });
+  }
 }
 
 export function shutdownLogging(): void {

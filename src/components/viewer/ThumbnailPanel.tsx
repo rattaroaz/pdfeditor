@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useRef, useState } from "react";
 import { renderPageToCanvas } from "@/lib/pdf/pdfEngine";
 import { reorderPageNumbers } from "@/lib/pageAnnotationRemap";
 import { useDocumentStore } from "@/stores/documentStore";
+import { showAlert, showConfirm } from "@/lib/appDialog";
 import { deletePages, insertBlankPages, reorderPages } from "@/services/pageService";
 import { extractPagesToFile, exportPageAsPng } from "@/services/assemblyService";
 
@@ -50,12 +51,17 @@ export function ThumbnailPanelContent() {
   };
 
   const handleDelete = () => {
-    if (targetPages.length >= pageCount) {
-      window.alert("Cannot delete all pages — at least one page must remain.");
-      return;
-    }
-    if (!window.confirm(`Delete ${targetPages.length} page(s)?`)) return;
-    void runAction(() => deletePages(targetPages));
+    void (async () => {
+      if (targetPages.length >= pageCount) {
+        await showAlert(
+          "Cannot delete all pages — at least one page must remain.",
+          "warning",
+        );
+        return;
+      }
+      if (!(await showConfirm(`Delete ${targetPages.length} page(s)?`))) return;
+      await runAction(() => deletePages(targetPages));
+    })();
   };
 
   const finishPageDrag = (toIndex: number) => {
