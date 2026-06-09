@@ -77,7 +77,7 @@ export async function handleInvoke<T>(
     case "get_logging_info":
       return {
         logDirectory: "/tmp/pdfeditor-e2e-logs",
-        appVersion: "1.0.0-e2e",
+        appVersion: "1.1.0-e2e",
         rustLogFilter: "info",
       } as T;
     case "read_recent_log_lines":
@@ -103,7 +103,7 @@ export async function handleInvoke<T>(
     case "check_for_updates":
       return {
         status: "up_to_date",
-        localVersion: "1.0.0-e2e",
+        localVersion: "1.1.0-e2e",
         localCommit: "e2e-local",
         remoteCommit: "e2e-local",
         message: "PDF Editor is up to date (E2E mock).",

@@ -40,7 +40,7 @@ describe("updateService", () => {
       if (command === "check_for_updates") {
         return Promise.resolve({
           status: "up_to_date",
-          localVersion: "1.0.0",
+          localVersion: "1.1.0",
           localCommit: "abc1234",
           remoteCommit: "abc1234",
           message: "PDF Editor is up to date.",
@@ -62,7 +62,7 @@ describe("updateService", () => {
       if (command === "check_for_updates") {
         return Promise.resolve({
           status: "update_available",
-          localVersion: "1.0.0",
+          localVersion: "1.1.0",
           localCommit: "oldcommit",
           remoteCommit: "newcommit",
           installerUrl: "https://example.com/setup.exe",
@@ -97,7 +97,7 @@ describe("updateService", () => {
       if (command === "check_for_updates") {
         return Promise.resolve({
           status: "update_available",
-          localVersion: "1.0.0",
+          localVersion: "1.1.0",
           localCommit: "old",
           remoteCommit: "new",
           releaseUrl: "https://github.com/rattaroaz/pdfeditor/releases/latest",
@@ -120,7 +120,7 @@ describe("updateService", () => {
       if (command === "check_for_updates") {
         return Promise.resolve({
           status: "update_available",
-          localVersion: "1.0.0",
+          localVersion: "1.1.0",
           localCommit: "oldcommit",
           remoteCommit: "newcommit",
           installerUrl: "https://example.com/setup.exe",

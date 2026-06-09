@@ -1,6 +1,6 @@
 # PDF Editor
 
-Production-oriented desktop PDF editor built with **Tauri 2**, **React**, **TypeScript**, and **Rust**. Version **1.0** — open/view PDFs, zoom & navigation, text search, markup and content editing, forms, page tools, save, structured logging, and automated tests.
+Production-oriented desktop PDF editor built with **Tauri 2**, **React**, **TypeScript**, and **Rust**. Version **1.1** — open/view PDFs, zoom & navigation, text search, markup and content editing, forms, page tools, save, structured logging, and automated tests.
 
 ## Prerequisites
 
@@ -59,8 +59,8 @@ Updates compare your local build to `main` on GitHub and download the **NSIS set
 To publish a release with Windows installers:
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.1.0
+git push origin v1.1.0
 ```
 
 The [Release workflow](.github/workflows/release.yml) builds NSIS + MSI and attaches them to the GitHub release.
