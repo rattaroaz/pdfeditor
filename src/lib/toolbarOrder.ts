@@ -6,7 +6,7 @@ export type ToolbarItemId =
   | "toolbar-rotate"
   | "toolbar-zoom";
 
-export const ALL_TOOLBAR_ITEM_IDS: ToolbarItemId[] = [
+const ALL_TOOLBAR_ITEM_IDS: ToolbarItemId[] = [
   "toolbar-modes",
   "toolbar-undo-redo",
   "toolbar-page-nav",
@@ -20,7 +20,7 @@ export const DEFAULT_TOOLBAR_ORDER: ToolbarItemId[] = [...ALL_TOOLBAR_ITEM_IDS];
 const STORAGE_KEY = "pdfeditor.toolbarOrder";
 const LEGACY_CHROME_LAYOUT_KEY = "pdfeditor.chromeLayout";
 
-export function isToolbarItemId(value: string): value is ToolbarItemId {
+function isToolbarItemId(value: string): value is ToolbarItemId {
   return ALL_TOOLBAR_ITEM_IDS.includes(value as ToolbarItemId);
 }
 

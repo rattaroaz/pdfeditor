@@ -1386,7 +1386,7 @@ mod tests {
     )
     .unwrap();
 
-    let values_json = r#"[{"name":"Size","value":"Medium","type":"dropdown"}]"#;
+    let _values_json = r#"[{"name":"Size","value":"Medium","type":"dropdown"}]"#;
     let output = apply_form_values_in_pdf(
       &with_field,
       &[FieldValueDto {

@@ -323,19 +323,6 @@ async function writeSplitParts(ranges: number[][]): Promise<void> {
   }
 }
 
-export async function splitPdfByRanges(rangesInput: string): Promise<void> {
-  await splitPdfWithOptions("custom", { customRanges: rangesInput });
-}
-
-export async function splitPdfEveryPage(): Promise<void> {
-  await splitPdfWithOptions("every-page");
-}
-
-/** Split after `splitAfterPage` (1-based): pages 1..N in part 1, N+1..end in part 2. */
-export async function splitPdfAtPage(splitAfterPage: number): Promise<void> {
-  await splitPdfWithOptions("at-page", { splitAfterPage });
-}
-
 export async function exportPageAsPng(pageNumber: number, dpi = 150): Promise<void> {
   const docStore = useDocumentStore.getState();
   const pdfDoc = docStore.pdfDoc;

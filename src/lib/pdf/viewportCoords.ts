@@ -1,5 +1,4 @@
 import type { PdfPage } from "./pdfEngine";
-import type { Annotation } from "@shared/types";
 import type { PageRotation } from "@/stores/documentStore";
 
 export interface ViewportCoordMapper {
@@ -114,69 +113,4 @@ export function rotateViewportRect(
     width: right - left,
     height: bottom - top,
   };
-}
-
-function rotateShapeCoords(
-  shape: Extract<Annotation, { type: "shape" }>,
-  pageWidth: number,
-  pageHeight: number,
-  degrees: 90 | 180 | 270 | -90,
-): { x1: number; y1: number; x2: number; y2: number } {
-  const p1 = rotateViewportPoint(shape.x1, shape.y1, pageWidth, pageHeight, degrees);
-  const p2 = rotateViewportPoint(shape.x2, shape.y2, pageWidth, pageHeight, degrees);
-  return {
-    x1: Math.min(p1.x, p2.x),
-    y1: Math.min(p1.y, p2.y),
-    x2: Math.max(p1.x, p2.x),
-    y2: Math.max(p1.y, p2.y),
-  };
-}
-
-/** Remap stored viewport coordinates after a permanent page /Rotate change. */
-export function rotateAnnotationForPage(
-  annotation: Annotation,
-  pageWidth: number,
-  pageHeight: number,
-  degrees: 90 | 180 | 270 | -90,
-): Annotation {
-  switch (annotation.type) {
-    case "highlight":
-    case "underline":
-    case "strikeout":
-      return {
-        ...annotation,
-        rects: annotation.rects.map((rect) =>
-          rotateViewportRect(rect.x, rect.y, rect.width, rect.height, pageWidth, pageHeight, degrees),
-        ),
-      };
-    case "freehand":
-      return {
-        ...annotation,
-        points: annotation.points.map((point) =>
-          rotateViewportPoint(point.x, point.y, pageWidth, pageHeight, degrees),
-        ),
-      };
-    case "text":
-      return {
-        ...annotation,
-        ...rotateViewportRect(
-          annotation.x,
-          annotation.y,
-          annotation.width,
-          annotation.height,
-          pageWidth,
-          pageHeight,
-          degrees,
-        ),
-      };
-    case "note":
-    case "stamp": {
-      const point = rotateViewportPoint(annotation.x, annotation.y, pageWidth, pageHeight, degrees);
-      return { ...annotation, x: point.x, y: point.y };
-    }
-    case "shape":
-      return { ...annotation, ...rotateShapeCoords(annotation, pageWidth, pageHeight, degrees) };
-    default:
-      return annotation;
-  }
 }

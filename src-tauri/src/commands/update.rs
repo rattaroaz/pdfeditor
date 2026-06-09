@@ -45,8 +45,6 @@ struct GitHubReleaseAsset {
 struct GitHubReleaseResponse {
     tag_name: String,
     html_url: String,
-    #[allow(dead_code)]
-    target_commitish: Option<String>,
     assets: Vec<GitHubReleaseAsset>,
 }
 
@@ -401,7 +399,6 @@ mod tests {
             GitHubReleaseResponse {
                 tag_name: "v0.9.0".into(),
                 html_url: "https://example.com/v0.9.0".into(),
-                target_commitish: None,
                 assets: vec![GitHubReleaseAsset {
                     name: "notes.txt".into(),
                     browser_download_url: "https://example.com/notes.txt".into(),
@@ -410,7 +407,6 @@ mod tests {
             GitHubReleaseResponse {
                 tag_name: "v1.0.0".into(),
                 html_url: "https://example.com/v1.0.0".into(),
-                target_commitish: None,
                 assets: vec![GitHubReleaseAsset {
                     name: "PDF Editor_1.0.0_x64-setup.exe".into(),
                     browser_download_url: "https://example.com/setup.exe".into(),

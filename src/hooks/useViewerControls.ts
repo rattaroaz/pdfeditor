@@ -5,7 +5,7 @@ import { ZOOM_MAX, ZOOM_MIN } from "@/lib/constants";
 
 const VIEWER_PADDING = 48;
 
-export async function computeFitZoom(
+async function computeFitZoom(
   pdfDoc: PdfDocument,
   pageNumber: number,
   containerWidth: number,

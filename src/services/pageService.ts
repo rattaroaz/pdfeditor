@@ -8,7 +8,6 @@ import {
   remapPageIndexedAfterDelete,
   remapPageIndexedAfterInsert,
   remapPageIndexedAfterReorder,
-  remapStateAfterPageRotation,
 } from "@/lib/pageAnnotationRemap";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useAnnotationStore } from "@/stores/annotationStore";
@@ -114,39 +113,6 @@ export async function deletePages(pageNumbers: number[]): Promise<void> {
       newFields: remapPageIndexedAfterDelete(newFields, sorted),
     }),
   );
-}
-
-export async function rotatePagesPermanent(
-  pageNumbers: number[],
-  degrees: 90 | 180 | 270 | -90,
-): Promise<void> {
-  if (pageNumbers.length === 0) return;
-  log.document.info("Rotating pages", {
-    userAction: "rotate_pages",
-    metadata: { pageNumbers, degrees },
-  });
-
-  const pdfDoc = useDocumentStore.getState().pdfDoc;
-  const pageSizes = new Map<number, { width: number; height: number }>();
-  if (pdfDoc) {
-    for (const pageNumber of pageNumbers) {
-      const page = await pdfDoc.getPage(pageNumber);
-      const viewport = page.getViewport({ scale: 1, rotation: 0 });
-      pageSizes.set(pageNumber, { width: viewport.width, height: viewport.height });
-    }
-  }
-
-  await applyPdfMutation(
-    (pdfBase64) =>
-      invokeLogged<PdfBytesResult>("rotate_pdf_pages", {
-        pdfBase64,
-        pageNumbers,
-        degrees,
-      }),
-    (state) => remapStateAfterPageRotation(state, pageNumbers, degrees, pageSizes),
-  );
-
-  useDocumentStore.setState({ rotation: 0 });
 }
 
 export async function insertBlankPages(afterPage: number, count = 1): Promise<void> {

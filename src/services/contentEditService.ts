@@ -12,7 +12,7 @@ import { useDocumentStore } from "@/stores/documentStore";
 import { log, reportError } from "@/lib/logging";
 import { TEXT_COVER_H_PAD, TEXT_COVER_V_PAD } from "@/lib/textEditBox";
 
-export async function textEditsPayload(edits: TextContentEdit[]) {
+async function textEditsPayload(edits: TextContentEdit[]) {
   const { pdfDoc, rotation } = useDocumentStore.getState();
   if (!pdfDoc) return [];
 
@@ -50,7 +50,7 @@ export async function textEditsPayload(edits: TextContentEdit[]) {
   return payload;
 }
 
-export async function imageEditsPayload(edits: ImageContentEdit[]) {
+async function imageEditsPayload(edits: ImageContentEdit[]) {
   const { pdfDoc, rotation } = useDocumentStore.getState();
   if (!pdfDoc) return [];
 

@@ -2,9 +2,9 @@ import { useEffect, useRef, type CSSProperties } from "react";
 import { dropdownFontSizeFromBoxHeight, dropdownOptionRowStyle } from "@/lib/textEditBox";
 
 /** Selected dropdown label (Tailwind zinc-900). */
-export const DROPDOWN_SELECTED_TEXT = "#18181b";
+const DROPDOWN_SELECTED_TEXT = "#18181b";
 /** Unselected dropdown labels — one shade lighter than selected (Tailwind zinc-800). */
-export const DROPDOWN_UNSELECTED_TEXT = "#27272a";
+const DROPDOWN_UNSELECTED_TEXT = "#27272a";
 
 interface FormDropdownControlProps {
   controlKey: string;

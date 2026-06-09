@@ -32,7 +32,7 @@ export async function encryptPdfBytes(
   return decodeBase64Pdf(result.dataBase64);
 }
 
-export async function decryptPdfBytes(
+async function decryptPdfBytes(
   pdfBytes: Uint8Array,
   password: string,
 ): Promise<Uint8Array> {
@@ -43,7 +43,7 @@ export async function decryptPdfBytes(
   return decodeBase64Pdf(result.dataBase64);
 }
 
-export function promptForNewPassword(): string | null {
+function promptForNewPassword(): string | null {
   const userPassword = window.prompt(
     "Set a password required to open this PDF.\n\nLeave blank to cancel.",
   );
@@ -61,7 +61,7 @@ export function promptForNewPassword(): string | null {
   return userPassword;
 }
 
-export function promptForCurrentPassword(hint?: string): string | null {
+function promptForCurrentPassword(hint?: string): string | null {
   return window.prompt(
     hint ?? "This document is password protected. Enter the current password:",
   );

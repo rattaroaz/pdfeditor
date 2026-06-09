@@ -279,15 +279,3 @@ const ThumbnailItem = forwardRef(function ThumbnailItem(
     </div>
   );
 });
-
-/** @deprecated Use Sidebar instead */
-export function ThumbnailPanel() {
-  const showSidebar = useDocumentStore((s) => s.showSidebar);
-  const pdfDoc = useDocumentStore((s) => s.pdfDoc);
-  if (!showSidebar || !pdfDoc) return null;
-  return (
-    <aside className="flex w-44 shrink-0 flex-col border-r border-zinc-700 bg-zinc-900">
-      <ThumbnailPanelContent />
-    </aside>
-  );
-}

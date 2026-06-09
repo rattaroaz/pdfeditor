@@ -287,8 +287,7 @@ export type UpdateStatus =
   | "up_to_date"
   | "update_available"
   | "no_release"
-  | "no_installer"
-  | "error";
+  | "no_installer";
 
 export type UpdateDialogPhase =
   | "idle"

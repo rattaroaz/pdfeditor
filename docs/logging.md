@@ -135,7 +135,7 @@ This logs once with the same `errorId` shown in the error dialog. `AppInvokeErro
 Query log directory:
 
 ```typescript
-import { fetchLoggingInfo, openLogDirectory, readBackendLogTail } from "@/services/loggingService";
+import { fetchLoggingInfo, readBackendLogTail } from "@/services/loggingService";
 ```
 
 Tauri commands: `get_logging_info`, `read_recent_log_lines`.

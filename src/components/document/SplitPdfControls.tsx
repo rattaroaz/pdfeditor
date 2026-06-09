@@ -8,7 +8,7 @@ import {
 } from "@/services/assemblyService";
 import { useDocumentStore } from "@/stores/documentStore";
 
-export const SPLIT_MODES: { id: SplitMode; label: string; hint: string }[] = [
+const SPLIT_MODES: { id: SplitMode; label: string; hint: string }[] = [
   {
     id: "half",
     label: "In half",
