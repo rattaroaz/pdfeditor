@@ -1,23 +1,19 @@
 import { test, expect } from "@playwright/test";
 import { waitForE2eBridge, openFixtureDocument } from "../helpers/bridge";
+import { clickPageCenter, waitForPageReady } from "../helpers/ui";
 
 test.describe("dropdown form fields", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     await waitForE2eBridge(page);
     await openFixtureDocument(page);
-    await expect(page.getByTestId("pdf-viewer")).toBeVisible({ timeout: 30_000 });
+    await waitForPageReady(page);
     await page.getByTestId("toolbar-mode-forms").click();
     await page.getByTestId("tool-form-dropdown").click();
   });
 
   test("places, resizes, and keeps descender text visible", async ({ page }) => {
-    const viewer = page.getByTestId("pdf-viewer");
-    const box = await viewer.boundingBox();
-    expect(box).not.toBeNull();
-    if (!box) return;
-
-    await page.mouse.click(box.x + box.width * 0.35, box.y + box.height * 0.35);
+    await clickPageCenter(page);
     await expect(page.getByTestId("dropdown-options-dialog")).toBeVisible();
     const dialog = page.getByTestId("dropdown-options-dialog");
 
