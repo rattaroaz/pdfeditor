@@ -1,7 +1,12 @@
 import { create } from "zustand";
 import type { ImageContentEdit, TextContentEdit } from "@shared/types";
 import { log } from "@/lib/logging";
+import {
+  computeTextEditBox,
+  coverLayoutMinimums,
+} from "@/lib/textEditBox";
 import { recordHistory } from "@/stores/historyStore";
+import { useDocumentStore } from "@/stores/documentStore";
 import { v4 as uuidv4 } from "uuid";
 
 interface ContentEditStore {
@@ -27,6 +32,8 @@ interface ContentEditStore {
   updateImageEditPosition: (id: string, x: number, y: number) => void;
   updateImageEditSize: (id: string, width: number, height: number) => void;
   clearEdits: () => void;
+  /** Commit in-progress text boxes before save (trim, drop empty, fix layout). */
+  finalizeTextEdits: () => void;
   setReflowWarnings: (warnings: string[]) => void;
   hasEdits: () => boolean;
 }
@@ -123,6 +130,50 @@ export const useContentEditStore = create<ContentEditStore>((set, get) => ({
     })),
 
   clearEdits: () => set({ textEdits: [], imageEdits: [], reflowWarnings: [] }),
+
+  finalizeTextEdits: () => {
+    let changed = false;
+    set((s) => {
+      const textEdits = s.textEdits.flatMap((existing) => {
+        const trimmed = existing.newText.trim();
+        if (!trimmed && !existing.coverOld) {
+          changed = true;
+          return [];
+        }
+        if (!trimmed) {
+          return [existing];
+        }
+        const { minWidth, minHeight } = coverLayoutMinimums(existing, trimmed);
+        const box = computeTextEditBox(trimmed, existing.fontSize, {
+          coverOld: existing.coverOld,
+          minWidth,
+          minHeight: existing.coverOld
+            ? minHeight
+            : Math.max(minHeight ?? 0, existing.height),
+        });
+        const next = {
+          ...existing,
+          newText: trimmed,
+          width: existing.coverOld
+            ? Math.max(existing.coverWidth ?? 0, box.width)
+            : box.width,
+          height: box.height,
+        };
+        if (
+          next.newText !== existing.newText ||
+          next.width !== existing.width ||
+          next.height !== existing.height
+        ) {
+          changed = true;
+        }
+        return [next];
+      });
+      return { textEdits };
+    });
+    if (changed && get().hasEdits()) {
+      useDocumentStore.getState().setDirty(true);
+    }
+  },
 
   setReflowWarnings: (reflowWarnings) => set({ reflowWarnings }),
 

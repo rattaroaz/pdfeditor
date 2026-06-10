@@ -102,6 +102,25 @@ describe("contentEditService", () => {
     expect(parsed[0]?.newText).toBe("Saved");
   });
 
+  it("keeps edits in the store when clearAfter is false", async () => {
+    useContentEditStore.getState().addTextEdit({
+      pageIndex: 0,
+      x: 72,
+      y: 72,
+      width: 200,
+      height: 24,
+      newText: "Keep me",
+      fontSize: 12,
+      fontFamily: "Helvetica",
+      color: "#000000",
+      coverOld: false,
+    });
+
+    const ok = await applyContentEdits({ clearAfter: false });
+    expect(ok).toBe(true);
+    expect(useContentEditStore.getState().hasEdits()).toBe(true);
+  });
+
   it("includes pdf coordinates in image edit payload", async () => {
     useContentEditStore.getState().addImageEdit({
       pageIndex: 0,

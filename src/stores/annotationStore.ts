@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { Annotation, NewAnnotation, StampKind, Tool } from "@shared/types";
 import { log } from "@/lib/logging";
 import { recordHistory } from "@/stores/historyStore";
+import { useDocumentStore } from "@/stores/documentStore";
 import { v4 as uuidv4 } from "uuid";
 
 interface AnnotationStore {
@@ -54,6 +55,7 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
         } as Annotation,
       ],
     }));
+    useDocumentStore.getState().setDirty(true);
   },
   updateAnnotation: (id, patch) => {
     recordHistory();

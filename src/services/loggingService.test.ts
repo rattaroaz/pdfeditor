@@ -13,13 +13,13 @@ describe("loggingService", () => {
   it("fetchLoggingInfo merges backend and session metadata", async () => {
     vi.mocked(invoke).mockResolvedValue({
       logDirectory: "C:\\logs\\pdfeditor",
-      appVersion: "1.1.5",
+      appVersion: "1.1.6",
       rustLogFilter: "info",
     });
 
     const info = await fetchLoggingInfo();
     expect(info.logDirectory).toBe("C:\\logs\\pdfeditor");
-    expect(info.appVersion).toBe("1.1.5");
+    expect(info.appVersion).toBe("1.1.6");
     expect(info.sessionId).toBe(logger.sessionId);
     expect(info.minLevel).toBe(logger.getLevel());
   });

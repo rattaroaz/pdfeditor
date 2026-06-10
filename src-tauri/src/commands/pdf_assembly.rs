@@ -31,11 +31,19 @@ fn page_media_box(doc: &Document, page_id: ObjectId) -> Vec<Object> {
 }
 
 fn create_blank_page(doc: &mut Document, pages_id: ObjectId, media_box: Vec<Object>) -> ObjectId {
+  // Give the page an (empty) content stream. Pages without /Contents are
+  // valid PDF but break tooling that edits page content later (lopdf's
+  // change_page_content errors on them, which used to abort saves).
+  let content_id = doc.add_object(Object::Stream(lopdf::Stream::new(
+    Dictionary::new(),
+    Vec::new(),
+  )));
   let page_id = doc.new_object_id();
   let mut page_dict = Dictionary::new();
   page_dict.set("Type", Object::Name(b"Page".to_vec()));
   page_dict.set("Parent", Object::Reference(pages_id));
   page_dict.set("MediaBox", Object::Array(media_box));
+  page_dict.set("Contents", Object::Reference(content_id));
   doc.objects.insert(page_id, Object::Dictionary(page_dict));
   page_id
 }

@@ -83,7 +83,15 @@ async function imageEditsPayload(edits: ImageContentEdit[]) {
   return payload;
 }
 
-export async function applyContentEdits(): Promise<boolean> {
+export type ApplyContentEditsOptions = {
+  /** Clear the edit store after a successful apply (default true). */
+  clearAfter?: boolean;
+};
+
+export async function applyContentEdits(
+  options: ApplyContentEditsOptions = {},
+): Promise<boolean> {
+  const { clearAfter = true } = options;
   const docStore = useDocumentStore.getState();
   const editStore = useContentEditStore.getState();
   const sourceBytes = docStore.basePdfBytes ?? docStore.pdfBytes;
@@ -107,7 +115,9 @@ export async function applyContentEdits(): Promise<boolean> {
       pdfBytes: newBytes,
       pageCount: pdfDoc.numPages,
     });
-    editStore.clearEdits();
+    if (clearAfter) {
+      editStore.clearEdits();
+    }
     log.content.info("Content edits applied", { userAction: "content_edit" });
     return true;
   } catch (err) {

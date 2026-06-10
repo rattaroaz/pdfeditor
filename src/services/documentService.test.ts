@@ -36,6 +36,10 @@ vi.mock("@/services/securityService", () => ({
   inspectPdfSecurity: vi.fn(),
 }));
 
+vi.mock("@/lib/pdf/pdfStorage", () => ({
+  writePdfBytes: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("@/lib/pdf/pdfEngine", () => ({
   encodeBase64Pdf: (bytes: Uint8Array) => encodeBase64Pdf(bytes),
   decodeBase64Pdf: () => PDF_BYTES.slice(),
@@ -138,7 +142,7 @@ describe("documentService savePdf", () => {
 
     await savePdf();
 
-    expect(mockApplyContentEdits).toHaveBeenCalledTimes(1);
+    expect(mockApplyContentEdits).toHaveBeenCalledWith({ clearAfter: false });
     expect(mockApplyFormChanges).not.toHaveBeenCalled();
     expect(mockInvokeLogged).toHaveBeenCalledWith(
       "save_pdf_with_annotations",
@@ -161,7 +165,7 @@ describe("documentService savePdf", () => {
     await savePdf();
 
     expect(useUiStore.getState().appMode).toBe("document");
-    expect(mockApplyContentEdits).toHaveBeenCalledTimes(1);
+    expect(mockApplyContentEdits).toHaveBeenCalledWith({ clearAfter: false });
   });
 
   it("embeds markup annotations after content and form changes", async () => {

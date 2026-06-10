@@ -175,27 +175,44 @@ fn ensure_page_font(doc: &mut Document, page_id: ObjectId) -> Result<(), AppErro
 }
 
 fn append_page_content(doc: &mut Document, page_id: ObjectId, ops: Vec<Operation>) -> Result<(), AppError> {
-  let mut existing = doc
-    .get_and_decode_page_content(page_id)
-    .unwrap_or(Content {
-      operations: vec![],
-    });
+  let has_contents = doc
+    .get_dictionary(page_id)
+    .map_err(|e| AppError::Pdf(e.to_string()))?
+    .has(b"Contents");
 
-  // Wrap the original content in q/Q so any leaked graphics state from our
-  // new operations cannot mutate the appearance of the existing content.
-  // We then append our edits *after* the wrapped original.
-  let mut combined: Vec<Operation> = Vec::with_capacity(existing.operations.len() + ops.len() + 2);
-  combined.push(Operation::new("q", vec![]));
-  combined.append(&mut existing.operations);
-  combined.push(Operation::new("Q", vec![]));
+  let mut combined: Vec<Operation> = Vec::with_capacity(ops.len() + 2);
+  if has_contents {
+    // Refuse to continue if the existing content cannot be decoded — falling
+    // back to empty content would silently erase the rest of the page.
+    let mut existing = doc
+      .get_and_decode_page_content(page_id)
+      .map_err(|e| AppError::Pdf(format!("cannot decode existing page content: {e}")))?;
+
+    // Wrap the original content in q/Q so any leaked graphics state from our
+    // new operations cannot mutate the appearance of the existing content.
+    // We then append our edits *after* the wrapped original.
+    combined.reserve(existing.operations.len());
+    combined.push(Operation::new("q", vec![]));
+    combined.append(&mut existing.operations);
+    combined.push(Operation::new("Q", vec![]));
+  }
   combined.extend(ops);
 
   let new_content = Content { operations: combined };
   let encoded = new_content
     .encode()
     .map_err(|e| AppError::Pdf(e.to_string()))?;
-  doc.change_page_content(page_id, encoded)
-    .map_err(|e| AppError::Pdf(e.to_string()))
+
+  // Always point the page at a fresh content stream. lopdf's
+  // change_page_content errors on pages without /Contents (e.g. blank pages
+  // inserted by this app) and silently drops the update for other unusual
+  // /Contents shapes, which loses edits.
+  let stream_id = doc.add_object(Object::Stream(Stream::new(Dictionary::new(), encoded)));
+  let page = doc
+    .get_dictionary_mut(page_id)
+    .map_err(|e| AppError::Pdf(e.to_string()))?;
+  page.set("Contents", Object::Reference(stream_id));
+  Ok(())
 }
 
 #[derive(Debug, Deserialize)]
@@ -680,6 +697,188 @@ mod tests {
     let doc = Document::load_mem(&output).unwrap();
     assert_eq!(doc.get_pages().len(), 1);
     assert!(output.len() > input.len());
+  }
+
+  /// Decode the final page content and return the operator names in order.
+  fn page_operators(output: &[u8]) -> Vec<String> {
+    let doc = Document::load_mem(output).unwrap();
+    let page_id = *doc.get_pages().values().next().unwrap();
+    let content = doc.get_and_decode_page_content(page_id).unwrap();
+    content.operations.iter().map(|op| op.operator.clone()).collect()
+  }
+
+  /// Mirrors a real user session: several text edits plus an image edit in
+  /// one apply call. The image's `Do` operator must survive into the final
+  /// content stream — not just the XObject resource entry.
+  #[test]
+  fn image_do_operator_survives_combined_text_and_image_edits() {
+    let input = one_page_pdf();
+    let png = STANDARD
+      .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+      .unwrap();
+    let text_edits = vec![TextEditDto {
+      page_index: 0,
+      x: 90.0,
+      y: 90.0,
+      width: 200.0,
+      height: 20.0,
+      pdf_x1: None,
+      pdf_y1: None,
+      pdf_x2: None,
+      pdf_y2: None,
+      new_text: "World".into(),
+      font_size: 14.0,
+      color: "#000000".into(),
+      cover_old: true,
+    }];
+    let image_edits = vec![ImageEditDto {
+      page_index: 0,
+      x: 72.0,
+      y: 96.0,
+      width: 120.0,
+      height: 80.0,
+      pdf_x1: Some(72.0),
+      pdf_y1: Some(616.0),
+      pdf_x2: Some(192.0),
+      pdf_y2: Some(696.0),
+      image_base64: STANDARD.encode(&png),
+      mime_type: "image/png".into(),
+    }];
+    let output = apply_content_edits_in_pdf(&input, &text_edits, &image_edits).unwrap();
+    let ops = page_operators(&output);
+    assert!(
+      ops.iter().any(|op| op == "Do"),
+      "image Do operator missing from page content: {ops:?}"
+    );
+    assert!(
+      ops.iter().any(|op| op == "Tj"),
+      "text edit Tj operator missing from page content: {ops:?}"
+    );
+  }
+
+  /// Pages inserted via "insert blank page" (or any PDF page without a
+  /// /Contents entry) must accept content edits. Previously this aborted the
+  /// whole save with `missing required dictionary key "Contents"`.
+  #[test]
+  fn edits_on_blank_inserted_page_survive_save() {
+    let input = one_page_pdf();
+    let with_blank =
+      crate::commands::pdf_assembly::insert_blank_pages_in_pdf(&input, 1, 1).unwrap();
+    let png = STANDARD
+      .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+      .unwrap();
+    let text_edits = vec![TextEditDto {
+      page_index: 1,
+      x: 90.0,
+      y: 90.0,
+      width: 200.0,
+      height: 20.0,
+      pdf_x1: None,
+      pdf_y1: None,
+      pdf_x2: None,
+      pdf_y2: None,
+      new_text: "On blank page".into(),
+      font_size: 14.0,
+      color: "#000000".into(),
+      cover_old: false,
+    }];
+    let image_edits = vec![ImageEditDto {
+      page_index: 1,
+      x: 72.0,
+      y: 96.0,
+      width: 120.0,
+      height: 80.0,
+      pdf_x1: Some(72.0),
+      pdf_y1: Some(500.0),
+      pdf_x2: Some(192.0),
+      pdf_y2: Some(580.0),
+      image_base64: STANDARD.encode(&png),
+      mime_type: "image/png".into(),
+    }];
+    let output = apply_content_edits_in_pdf(&with_blank, &text_edits, &image_edits).unwrap();
+    let doc = Document::load_mem(&output).unwrap();
+    let page_id = *doc.get_pages().get(&2).unwrap();
+    let content = doc.get_and_decode_page_content(page_id).unwrap();
+    let ops: Vec<&str> = content.operations.iter().map(|op| op.operator.as_str()).collect();
+    assert!(ops.contains(&"Do"), "image Do op missing on blank page: {ops:?}");
+    assert!(ops.contains(&"Tj"), "text Tj op missing on blank page: {ops:?}");
+
+    // Page 1's original content must be untouched.
+    let page1_id = *doc.get_pages().get(&1).unwrap();
+    let page1 = doc.get_and_decode_page_content(page1_id).unwrap();
+    assert!(page1.operations.iter().any(|op| op.operator == "Tj"));
+  }
+
+  /// A page without /Contents that never receives edits must stay valid
+  /// through a full save pipeline (edits elsewhere + annotation embed/strip).
+  #[test]
+  fn blank_page_without_contents_survives_pipeline() {
+    let input = one_page_pdf();
+    let with_blank =
+      crate::commands::pdf_assembly::insert_blank_pages_in_pdf(&input, 1, 1).unwrap();
+    let text_edits = vec![TextEditDto {
+      page_index: 0,
+      x: 90.0,
+      y: 90.0,
+      width: 200.0,
+      height: 20.0,
+      pdf_x1: None,
+      pdf_y1: None,
+      pdf_x2: None,
+      pdf_y2: None,
+      new_text: "Page one edit".into(),
+      font_size: 14.0,
+      color: "#000000".into(),
+      cover_old: false,
+    }];
+    let output = apply_content_edits_in_pdf(&with_blank, &text_edits, &[]).unwrap();
+    let embedded = crate::commands::pdf_annotations::embed_annotations_in_pdf(
+      &output,
+      r##"[{"id":"a1","type":"note","pageIndex":0,"x":50.0,"y":50.0,"width":200.0,"height":50.0,"color":"#ffff00","content":"note","createdAt":"2026-01-01T00:00:00Z"}]"##,
+    )
+    .unwrap();
+    let stripped =
+      crate::commands::pdf_annotations::strip_annotations_from_pdf(&embedded).unwrap();
+    let doc = Document::load_mem(&stripped).unwrap();
+    assert_eq!(doc.get_pages().len(), 2);
+    let page1_id = *doc.get_pages().get(&1).unwrap();
+    let content = doc.get_and_decode_page_content(page1_id).unwrap();
+    assert!(content.operations.iter().any(|op| op.operator == "Tj"));
+
+    // The blank page's (empty) content stream must still resolve after the
+    // lopdf load/save roundtrips — a dangling /Contents reference would put
+    // us back in silent-edit-drop territory.
+    let page2_id = *doc.get_pages().get(&2).unwrap();
+    let page2_content = doc.get_and_decode_page_content(page2_id).unwrap();
+    assert!(page2_content.operations.is_empty());
+  }
+
+  /// Image-only edit must also draw the image, not just embed the XObject.
+  #[test]
+  fn image_do_operator_survives_image_only_edit() {
+    let input = one_page_pdf();
+    let png = STANDARD
+      .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+      .unwrap();
+    let image_edits = vec![ImageEditDto {
+      page_index: 0,
+      x: 72.0,
+      y: 96.0,
+      width: 120.0,
+      height: 80.0,
+      pdf_x1: Some(72.0),
+      pdf_y1: Some(616.0),
+      pdf_x2: Some(192.0),
+      pdf_y2: Some(696.0),
+      image_base64: STANDARD.encode(&png),
+      mime_type: "image/png".into(),
+    }];
+    let output = apply_content_edits_in_pdf(&input, &[], &image_edits).unwrap();
+    let ops = page_operators(&output);
+    assert!(
+      ops.iter().any(|op| op == "Do"),
+      "image Do operator missing from page content: {ops:?}"
+    );
   }
 
   #[test]

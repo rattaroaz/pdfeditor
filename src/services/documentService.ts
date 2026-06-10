@@ -192,7 +192,6 @@ export async function savePdf(saveAs = false): Promise<void> {
   const correlationId = createCorrelationId();
   const timer = startTimer(log.document, "save_pdf", { userAction: "save", correlationId });
   const docStore = useDocumentStore.getState();
-  const annStore = useAnnotationStore.getState();
   const { filePath, pdfBytes, fileName } = docStore;
 
   if (!pdfBytes || !docStore.pdfDoc) {
@@ -218,10 +217,11 @@ export async function savePdf(saveAs = false): Promise<void> {
         useUiStore.getState().setAppMode("document");
       });
     }
+    useContentEditStore.getState().finalizeTextEdits();
 
     if (useContentEditStore.getState().hasEdits()) {
       log.document.info("Applying content edits before save", { userAction: "save" });
-      const ok = await applyContentEdits();
+      const ok = await applyContentEdits({ clearAfter: false });
       if (!ok) {
         docStore.setStatusMessage(null);
         return;
@@ -251,7 +251,7 @@ export async function savePdf(saveAs = false): Promise<void> {
     const result = await invokeLogged<SavePdfResult>("save_pdf_with_annotations", {
       targetPath,
       pdfBase64: encodeBase64Pdf(sourceBytes),
-      annotationsJson: JSON.stringify(annStore.annotations),
+      annotationsJson: JSON.stringify(useAnnotationStore.getState().annotations),
     });
 
     let newBytes = decodeBase64Pdf(result.dataBase64);
@@ -259,8 +259,8 @@ export async function savePdf(saveAs = false): Promise<void> {
     const securityStore = useDocumentStore.getState();
     if (securityStore.pendingSavePassword || securityStore.removePasswordOnSave) {
       newBytes = await applySecurityOnSaveBytes(newBytes);
-      await writePdfBytes(targetPath, newBytes);
     }
+    await writePdfBytes(targetPath, newBytes);
 
     const updatedDoc = useDocumentStore.getState();
     const reloadPassword = useDocumentStore.getState().documentPassword ?? undefined;
@@ -291,9 +291,12 @@ export async function savePdf(saveAs = false): Promise<void> {
       log.document.warn("Form reload after save failed", { userAction: "save" });
     }
 
+    useContentEditStore.getState().clearEdits();
+
     const flatten = useUiStore.getState().flattenOnSave;
+    const savedAnnotations = useAnnotationStore.getState().annotations;
     if (flatten) {
-      annStore.clearAnnotations();
+      useAnnotationStore.getState().clearAnnotations();
       try {
         await invokeLogged("save_annotations", {
           filePath: targetPath,
@@ -306,7 +309,7 @@ export async function savePdf(saveAs = false): Promise<void> {
       try {
         await invokeLogged("save_annotations", {
           filePath: targetPath,
-          json: JSON.stringify(annStore.annotations),
+          json: JSON.stringify(savedAnnotations),
         });
       } catch {
         log.document.warn("Annotation sidecar save failed", { userAction: "save" });
