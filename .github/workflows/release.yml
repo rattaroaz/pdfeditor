@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (e.g. v1.1.4)"
+        description: "Release tag (e.g. v1.1.5)"
         required: true
-        default: v1.1.4
+        default: v1.1.5
 
 permissions:
   contents: write
@@ -29,6 +29,18 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+
+      # WiX (MSI) requires VBScript on Windows Server runners.
+      - name: Enable VBScript for MSI builds
+        shell: pwsh
+        run: |
+          $cap = Get-WindowsCapability -Online | Where-Object { $_.Name -like 'VBSCRIPT*' }
+          if (-not $cap) {
+            throw 'VBSCRIPT Windows capability not found on this runner.'
+          }
+          if ($cap.State -ne 'Installed') {
+            Add-WindowsCapability -Online -Name $cap.Name
+          }
 
       - uses: tauri-apps/tauri-action@v0
         env:
@@ -50,4 +62,15 @@ jobs:
           releaseDraft: false
           prerelease: false
           updaterJsonPreferNsis: true
+          uploadWorkflowArtifacts: true
+          workflowArtifactNamePattern: pdfeditor-[version]-[bundle][ext]
           args: --bundles nsis,msi
+
+      - name: Verify MSI was built and uploaded
+        shell: pwsh
+        run: |
+          $msi = Get-ChildItem -Path src-tauri/target/release/bundle/msi -Filter *.msi -Recurse -ErrorAction SilentlyContinue
+          if (-not $msi) {
+            throw 'MSI bundle was not produced. Check the WiX/VBScript build step above.'
+          }
+          Write-Host "MSI ready: $($msi.FullName)"

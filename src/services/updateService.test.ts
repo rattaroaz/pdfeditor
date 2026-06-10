@@ -52,7 +52,7 @@ describe("updateService", () => {
 
   it("does not download when the remote version is not newer", async () => {
     mockCheck.mockResolvedValue({
-      version: "1.1.4",
+      version: "1.1.5",
       downloadAndInstall: mockDownloadAndInstall,
     });
 

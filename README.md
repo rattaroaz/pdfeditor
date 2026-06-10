@@ -1,6 +1,6 @@
 # PDF Editor
 
-Production-oriented desktop PDF editor built with **Tauri 2**, **React**, **TypeScript**, and **Rust**. Version **1.1.4** — open/view PDFs, zoom & navigation, text search, markup and content editing, forms, page tools, save, structured logging, and automated tests.
+Production-oriented desktop PDF editor built with **Tauri 2**, **React**, **TypeScript**, and **Rust**. Version **1.1.5** — open/view PDFs, zoom & navigation, text search, markup and content editing, forms, page tools, save, structured logging, and automated tests.
 
 ## Prerequisites
 
@@ -62,13 +62,13 @@ The app uses the **Tauri updater**: on startup (and via **Help → Check for upd
 
 1. Add the signing key to GitHub repo secrets (once):
    - `TAURI_SIGNING_PRIVATE_KEY` — contents of `scripts/tauri-signing.key` (generate with `npm run tauri signer generate -- -w scripts/tauri-signing.key --ci --force`)
-   - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` — leave empty if the key has no password
+   - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` — the password for the key (required; the current key in `scripts/tauri-signing.key` is password-protected)
 
 2. Tag and push:
 
 ```bash
-git tag v1.1.4
-git push origin v1.1.4
+git tag v1.1.5
+git push origin v1.1.5
 ```
 
 The [Release workflow](.github/workflows/release.yml) builds signed update artifacts, uploads `latest.json`, and attaches full installers for new users.

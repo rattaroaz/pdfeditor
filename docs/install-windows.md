@@ -79,6 +79,10 @@ Icons live in `src-tauri/icons/`. To regenerate from the project artwork:
 npx tauri icon scripts/app-icon.png
 ```
 
+## GitHub Releases (CI)
+
+The [Release workflow](.github/workflows/release.yml) builds **both** NSIS (`.exe`) and MSI (`.msi`) and attaches them to each GitHub Release, plus `latest.json` for the in-app updater. The Windows runner enables **VBScript** before the build because WiX requires it for MSI packaging.
+
 ## Troubleshooting
 
 | Issue | What to try |
