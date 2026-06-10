@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">35.23% </span>
+                <span class="strong">36.27% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>111/315</span>
+                <span class='fraction'>111/306</span>
             </div>
         
             
@@ -37,16 +37,16 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">47.36% </span>
+                <span class="strong">56.25% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>9/19</span>
+                <span class='fraction'>9/16</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">35.23% </span>
+                <span class="strong">36.27% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>111/315</span>
+                <span class='fraction'>111/306</span>
             </div>
         
             
@@ -421,20 +421,7 @@
 <a name='L356'></a><a href='#L356'>356</a>
 <a name='L357'></a><a href='#L357'>357</a>
 <a name='L358'></a><a href='#L358'>358</a>
-<a name='L359'></a><a href='#L359'>359</a>
-<a name='L360'></a><a href='#L360'>360</a>
-<a name='L361'></a><a href='#L361'>361</a>
-<a name='L362'></a><a href='#L362'>362</a>
-<a name='L363'></a><a href='#L363'>363</a>
-<a name='L364'></a><a href='#L364'>364</a>
-<a name='L365'></a><a href='#L365'>365</a>
-<a name='L366'></a><a href='#L366'>366</a>
-<a name='L367'></a><a href='#L367'>367</a>
-<a name='L368'></a><a href='#L368'>368</a>
-<a name='L369'></a><a href='#L369'>369</a>
-<a name='L370'></a><a href='#L370'>370</a>
-<a name='L371'></a><a href='#L371'>371</a>
-<a name='L372'></a><a href='#L372'>372</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L359'></a><a href='#L359'>359</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -755,19 +742,6 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -1130,19 +1104,6 @@ export function describeSplitParts(ranges: number[][]): string {
 <span class="cstat-no" title="statement not covered" >  }</span>
 <span class="cstat-no" title="statement not covered" >}</span>
 &nbsp;
-<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >export async function splitPdfByRanges(rangesInput: string): Promise&lt;void&gt; {</span></span>
-<span class="cstat-no" title="statement not covered" >  await splitPdfWithOptions("custom", { customRanges: rangesInput });</span>
-<span class="cstat-no" title="statement not covered" >}</span>
-&nbsp;
-<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >export async function splitPdfEveryPage(): Promise&lt;void&gt; {</span></span>
-<span class="cstat-no" title="statement not covered" >  await splitPdfWithOptions("every-page");</span>
-<span class="cstat-no" title="statement not covered" >}</span>
-&nbsp;
-/** Split after `splitAfterPage` (1-based): pages 1..N in part 1, N+1..end in part 2. */
-<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >export async function splitPdfAtPage(splitAfterPage: number): Promise&lt;void&gt; {</span></span>
-<span class="cstat-no" title="statement not covered" >  await splitPdfWithOptions("at-page", { splitAfterPage });</span>
-<span class="cstat-no" title="statement not covered" >}</span>
-&nbsp;
 <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >export async function exportPageAsPng(pageNumber: number, dpi = 150): Promise&lt;void&gt; {</span></span>
 <span class="cstat-no" title="statement not covered" >  const docStore = useDocumentStore.getState();</span>
 <span class="cstat-no" title="statement not covered" >  const pdfDoc = docStore.pdfDoc;</span>
@@ -1183,7 +1144,7 @@ export function describeSplitParts(ranges: number[][]): string {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-06-09T03:30:35.952Z
+                at 2026-06-09T14:03:23.106Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

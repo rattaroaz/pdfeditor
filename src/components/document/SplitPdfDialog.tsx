@@ -14,6 +14,7 @@ export function SplitPdfDialog() {
     >
       <div
         role="dialog"
+        data-testid="split-dialog"
         aria-labelledby="split-dialog-title"
         className="w-full max-w-md rounded-lg border border-zinc-700 bg-zinc-900 p-5 shadow-xl"
         onClick={(e) => e.stopPropagation()}

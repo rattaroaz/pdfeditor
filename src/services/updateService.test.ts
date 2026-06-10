@@ -52,7 +52,7 @@ describe("updateService", () => {
 
   it("does not download when the remote version is not newer", async () => {
     mockCheck.mockResolvedValue({
-      version: "1.1.3",
+      version: "1.1.4",
       downloadAndInstall: mockDownloadAndInstall,
     });
 
@@ -96,6 +96,49 @@ describe("updateService", () => {
 
     expect(useUiStore.getState().showUpdateDialog).toBe(false);
     expect(useUiStore.getState().updatePhase).toBe("idle");
+  });
+
+  it("silent startup downloads when a newer semver is published", async () => {
+    mockCheck.mockResolvedValue({
+      version: "1.2.0",
+      downloadAndInstall: mockDownloadAndInstall,
+    });
+
+    await checkForUpdatesAndApply({
+      silentIfUpToDate: true,
+      skipIfDirty: true,
+      source: "startup",
+    });
+
+    expect(mockCheck).toHaveBeenCalledWith({ allowDowngrades: false });
+    expect(mockDownloadAndInstall).toHaveBeenCalled();
+    expect(useUiStore.getState().updatePhase).toBe("installing");
+    expect(
+      getLogEntries().some(
+        (entry) =>
+          entry.context?.userAction === "auto_update_check" &&
+          entry.context?.metadata?.status === "update_available",
+      ),
+    ).toBe(true);
+  });
+
+  it("silent startup skips download when the document has unsaved changes", async () => {
+    useDocumentStore.setState({ isDirty: true });
+    mockCheck.mockResolvedValue({
+      version: "1.2.0",
+      downloadAndInstall: mockDownloadAndInstall,
+    });
+
+    await checkForUpdatesAndApply({
+      silentIfUpToDate: true,
+      skipIfDirty: true,
+      source: "startup",
+    });
+
+    expect(mockDownloadAndInstall).not.toHaveBeenCalled();
+    expect(
+      getLogEntries().some((entry) => entry.message.includes("Skipping automatic update")),
+    ).toBe(true);
   });
 
   it("surfaces updater failures in the update dialog", async () => {

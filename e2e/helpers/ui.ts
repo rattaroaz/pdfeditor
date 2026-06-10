@@ -15,6 +15,48 @@ export async function openHelpMenu(page: Page): Promise<void> {
   await page.getByTestId("menu-help").click(menuClick);
 }
 
+export async function openDocumentMenu(page: Page): Promise<void> {
+  await page.getByTestId("menu-document").click(menuClick);
+}
+
+export async function openSearchFromMenu(page: Page): Promise<void> {
+  await openViewMenu(page);
+  await page.getByTestId("menu-find").click(menuClick);
+  await page.getByTestId("search-bar").waitFor({ state: "visible", timeout: 10_000 });
+}
+
+export async function getToolbarItemOrder(page: Page): Promise<string[]> {
+  return page.evaluate(() =>
+    Array.from(
+      document.querySelectorAll('[data-toolbar-zone="toolbar"] [data-toolbar-id]'),
+    ).map((el) => el.getAttribute("data-toolbar-id") ?? ""),
+  );
+}
+
+export async function dragToolbarItemBefore(
+  page: Page,
+  dragId: string,
+  beforeId: string,
+): Promise<void> {
+  const drag = page.locator(`[data-toolbar-id="${dragId}"]`);
+  const target = page.locator(`[data-toolbar-id="${beforeId}"]`);
+  const dragBox = await drag.boundingBox();
+  const targetBox = await target.boundingBox();
+  if (!dragBox || !targetBox) {
+    throw new Error(`Toolbar drag targets not found: ${dragId} -> ${beforeId}`);
+  }
+
+  const startX = dragBox.x + 4;
+  const startY = dragBox.y + dragBox.height / 2;
+  const endX = targetBox.x + 2;
+  const endY = targetBox.y + targetBox.height / 2;
+
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(endX, endY, { steps: 12 });
+  await page.mouse.up();
+}
+
 export async function openDocumentFromMenu(page: Page): Promise<void> {
   await openFileMenu(page);
   await page.getByTestId("menu-open").click(menuClick);

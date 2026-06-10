@@ -21,7 +21,7 @@ npm run test:coverage
 |------|-----------------|
 | `src/lib/logging/**` | 85% |
 | `src/stores/**` | 60% |
-| `src/services/**` | 38% |
+| `src/services/**` | 50% |
 
 Components are excluded from thresholds (covered by services, E2E, and manual smoke). Ratchet thresholds up as coverage improves.
 
@@ -29,8 +29,8 @@ Components are excluded from thresholds (covered by services, E2E, and manual sm
 
 | Area | Tests |
 |------|-------|
-| `updateService` | Up-to-date, apply flow, missing installer, dirty-doc cancel, invoke errors |
-| `update.rs` | Commit matching, installer pick, `short_sha`, GitHub URL builder |
+| `updateService` | Semver gating, apply flow, missing feed, dirty-doc cancel, startup auto-check, invoke errors |
+| `semver` | Parse `v1.2.3`, numeric compare, reject invalid |
 | `toolbarOrder` | Load/save, legacy migration, DOM insert helper |
 | `ToolbarDragContext` | Drag reorder, ignore nested buttons |
 | `UpdateDialog` | Phase titles and close behavior |
@@ -54,7 +54,7 @@ npm run test:e2e:report           # open HTML report after a run
 | Path | Purpose |
 |------|---------|
 | `e2e/tests/*.spec.ts` | Playwright specs |
-| `e2e/mocks/` | Tauri `invoke` / dialog / window shims |
+| `e2e/mocks/` | Tauri `invoke`, dialog (`ask`/`confirm`/`message`), window, updater, and process shims |
 | `e2e/helpers/` | Bridge + menu helpers |
 | `playwright.config.ts` | Web server on port 1420 (`scripts/dev-e2e.mjs`) |
 | `src/lib/e2eBridge.ts` | `window.__PDFEDITOR_E2E__` for logs and fixtures |
@@ -71,6 +71,9 @@ npm run test:e2e:report           # open HTML report after a run
 8. **security** — password protection on save
 9. **dropdown** — dropdown field placement/resize/text visibility
 10. **update** — Help → Check for updates; up-to-date dialog; `update` category in session log
+11. **search** — View → Find; search document text; match count
+12. **split** — Document → Split PDF; dialog opens; single-page guard message
+13. **toolbar** — drag-reorder toolbar groups; order persists in `localStorage` after reload
 
 ### E2E environment variables
 
@@ -81,7 +84,7 @@ Set in `scripts/dev-e2e.mjs` (also overridable):
 
 ### Stable selectors
 
-Interactive elements use `data-testid` (e.g. `menu-open`, `menu-check-updates`, `pdf-viewer`, `error-id`, `log-entry`, `tool-highlight`).
+Interactive elements use `data-testid` (e.g. `menu-open`, `menu-find`, `menu-check-updates`, `search-input`, `split-dialog`, `pdf-viewer`, `error-id`, `log-entry`, `tool-highlight`).
 
 ### Desktop E2E (optional)
 
@@ -93,18 +96,19 @@ For full native webview + Rust commands on **Windows/Linux**, see [Tauri WebDriv
 cd src-tauri && cargo test --lib
 ```
 
-Unit tests live in `#[cfg(test)]` modules beside command implementations (`pdf_forms`, `pdf_annotations`, `error`, `update`, etc.).
+Unit tests live in `#[cfg(test)]` modules beside command implementations (`pdf_forms`, `pdf_annotations`, `error`, etc.).
 
 ## Key test utilities
 
 - `reportError` / `toAppErrorPayload` — unified error logging + dialog (`src/lib/reportError.test.ts`)
 - `invokeLogged` — invoke contract + `correlationId` (`src/lib/tauriInvoke.test.ts`)
+- `isVersionNewer` — updater semver gate (`src/lib/semver.test.ts`)
 - `normalizeMarkupRect` — markup tools (`src/lib/annotationHitTest.test.ts`)
 - `window.__PDFEDITOR_E2E__` — Playwright bridge (`e2e/helpers/bridge.ts`)
 
 ## Remaining gaps (lower priority)
 
 - Viewer layers (`PdfViewer`, `AnnotationLayer`, `ContentEditLayer`, `PdfFormLayer`) — covered indirectly via E2E
-- Native Rust HTTP integration for `check_for_updates` / `apply_app_update` (requires network mocks)
-- E2E for toolbar drag-reorder persistence
-- Split/merge PDF, search, and forms-mode workflows beyond dropdown spec
+- Real Tauri updater plugin integration (signature verify, `latest.json` download) — unit tests mock `@tauri-apps/plugin-updater`
+- Multi-page split workflow E2E (fixture PDF is single-page; dialog guard is tested)
+- Native Tauri WebDriver on Windows for release validation

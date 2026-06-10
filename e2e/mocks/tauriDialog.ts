@@ -12,3 +12,11 @@ export async function save(options?: { defaultPath?: string }): Promise<string |
 export async function ask(): Promise<boolean> {
   return true;
 }
+
+export async function confirm(): Promise<boolean> {
+  return true;
+}
+
+export async function message(): Promise<void> {
+  // noop
+}

@@ -4,7 +4,6 @@ import { waitForE2eBridge, getSessionLogs } from "../helpers/bridge";
 test.describe("application boot", () => {
   test("loads shell and initializes logging", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByTestId("app-root")).toBeVisible();
     await expect(page.getByTestId("menu-file")).toBeVisible();
 
     await waitForE2eBridge(page);

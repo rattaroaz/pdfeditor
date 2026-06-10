@@ -57,7 +57,7 @@ logUserAction("save", "User saved document");
 | Pages | `delete_pages`, `rotate_pages` |
 | Security | `protect_on_save`, `remove_password_on_save` |
 | Document | `open`, `save`, `revert` (via `log.document`) |
-| Updates | `check_for_updates`, `apply_app_update` (via `log.update`) |
+| Updates | `check_for_updates`, `auto_update_check`, `download_update`, `install_update` |
 
 ### Context fields
 
@@ -100,19 +100,25 @@ Frontend events arrive via `log_frontend_event` with `target: "frontend"`.
 | `pdf_pages` | delete, rotate, reorder |
 | `pdf_assembly` | insert blank, extract, merge |
 | `pdf_annotations` | embed, strip, prepare bytes, save with annotations |
-| `update` | `check_for_updates`, `apply_app_update` (GitHub commit compare + installer download) |
 | `mod` (light) | `get_recent_files`, `add_recent_file`, `load_annotations`, `save_annotations` |
 
 Each operation logs `elapsed_ms` and output size where applicable.
 
 ### Update flow
 
-Help → **Check for updates** uses:
+In-app updates use **`@tauri-apps/plugin-updater`** (not custom Rust HTTP commands):
 
-- Frontend: `log.update` for check/download/apply/cancel; `invokeLogged` for `check_for_updates` and `apply_app_update` (correlation IDs + invoke timing)
-- Backend: `check_for_updates` and `apply_app_update` spans with `elapsed_ms`
+- **Startup:** `auto_update_check` — silent when up to date; downloads when a **newer semver** is published
+- **Help → Check for updates:** `check_for_updates` — same version comparison, shows dialog
 
-Update checks compare the **embedded git commit SHA** (from build time) against the latest commit on GitHub `main`, not only the semver version.
+Frontend logging (`log.update`):
+
+- Compares installed version (`APP_VERSION`) with `latest.json` from GitHub Releases
+- Logs `installedVersion` and `remoteVersion` in metadata
+- Only downloads when remote semver is strictly newer (`src/lib/semver.ts`)
+- Missing `latest.json` on startup logs info (`no_update_feed`), not error
+
+Updates do **not** go through `invokeLogged`; Tauri plugin handles download/install.
 
 ### Slow invoke warnings
 
@@ -162,9 +168,9 @@ Tests disable backend shipping via `logger.setBackendShipping(false)` when neede
 - `src/lib/reportError.test.ts` — error id + correlation in logs and UI
 - `src/lib/tauriInvoke.test.ts` — invoke success/failure + correlationId
 - `src/lib/logger.test.ts` — console output + Rust shipping via the `logger` root
-- `src/services/loggingService.test.ts` — `get_logging_info` / tail / open folder
-- `src/services/updateService.test.ts` — `log.update` category + invoke failures
-- Rust: `src-tauri/src/logging.rs` (tail reader), `src-tauri/src/commands/mod.rs` (`log_frontend_payload` levels), `src-tauri/src/commands/update.rs`
+- `src/lib/semver.test.ts` — version comparison used by the updater
+- `src/services/loggingService.test.ts` — `get_logging_info` / tail
+- `src/services/updateService.test.ts` — `log.update` category, semver gating, startup auto-check
 
 Service-layer tests (`formService.test.ts`, `documentService.test.ts`) mock `invokeLogged` and assert command order during save/apply flows.
 
@@ -175,5 +181,6 @@ With `VITE_E2E=true`, mocks record `log_frontend_event` lines and Playwright ass
 - Boot log (`userAction: boot`)
 - `reportTestError` / forced invoke failures — dialog `errorId` matches session buffer (`data-testid="error-id"`, `log-entry`)
 - Invoke tracing visible in **View → Show logs** (`invoke ok/failed: <command>`)
+- Help → Check for updates logs `category: update`
 
 See `docs/testing.md`, `e2e/tests/logging.spec.ts`, and `e2e/tests/update.spec.ts`.

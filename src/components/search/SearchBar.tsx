@@ -73,9 +73,13 @@ export function SearchBar() {
   if (!showSearch) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-zinc-700 bg-zinc-900 px-3 py-2">
+    <div
+      data-testid="search-bar"
+      className="flex flex-wrap items-center gap-2 border-b border-zinc-700 bg-zinc-900 px-3 py-2"
+    >
       <input
         type="search"
+        data-testid="search-input"
         placeholder="Find in document…"
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
@@ -110,7 +114,7 @@ export function SearchBar() {
         />
         Comments
       </label>
-      <span className="text-xs text-zinc-500">
+      <span data-testid="search-match-count" className="text-xs text-zinc-500">
         {searchMatches.length === 0
           ? searchQuery.trim()
             ? "No matches"

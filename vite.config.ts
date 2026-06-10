@@ -14,6 +14,8 @@ const e2eTauriAliases = isE2e
       "@tauri-apps/plugin-dialog": path.join(e2eMocks, "tauriDialog.ts"),
       "@tauri-apps/plugin-opener": path.join(e2eMocks, "tauriOpener.ts"),
       "@tauri-apps/plugin-fs": path.join(e2eMocks, "tauriFs.ts"),
+      "@tauri-apps/plugin-updater": path.join(e2eMocks, "tauriUpdater.ts"),
+      "@tauri-apps/plugin-process": path.join(e2eMocks, "tauriProcess.ts"),
     }
   : {};
 
@@ -40,6 +42,8 @@ export default defineConfig(async () => ({
           "@tauri-apps/plugin-dialog",
           "@tauri-apps/plugin-opener",
           "@tauri-apps/plugin-fs",
+          "@tauri-apps/plugin-updater",
+          "@tauri-apps/plugin-process",
         ],
       }
     : undefined,
@@ -88,10 +92,10 @@ export default defineConfig(async () => ({
           statements: 60,
         },
         "src/services/**": {
-          lines: 38,
-          branches: 32,
-          functions: 45,
-          statements: 38,
+          lines: 50,
+          branches: 45,
+          functions: 50,
+          statements: 50,
         },
       },
     },

@@ -77,7 +77,7 @@ export async function handleInvoke<T>(
     case "get_logging_info":
       return {
         logDirectory: "/tmp/pdfeditor-e2e-logs",
-        appVersion: "1.1.3-e2e",
+        appVersion: "1.1.4-e2e",
         rustLogFilter: "info",
       } as T;
     case "read_recent_log_lines":

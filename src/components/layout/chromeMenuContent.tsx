@@ -38,6 +38,7 @@ const MENU_LABELS = {
 
 const MENU_TEST_IDS: Partial<Record<keyof typeof MENU_LABELS, string>> = {
   file: "menu-file",
+  document: "menu-document",
   view: "menu-view",
   help: "menu-help",
 };
@@ -165,6 +166,7 @@ export function useMenuContent(onAction: () => void) {
               Append to current…
             </MenuItem>
             <MenuItem
+              testId="menu-split-pdf"
               disabled={!hasDocument}
               onClick={() =>
                 run(() => {
