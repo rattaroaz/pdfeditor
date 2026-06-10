@@ -42,6 +42,26 @@ jobs:
             Add-WindowsCapability -Online -Name $cap.Name
           }
 
+      - name: Verify updater signing secrets
+        shell: pwsh
+        run: |
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
+            throw @'
+          TAURI_SIGNING_PRIVATE_KEY is not set.
+          Add it under Settings → Secrets and variables → Actions:
+            - TAURI_SIGNING_PRIVATE_KEY = contents of scripts/tauri-signing.key
+            - TAURI_SIGNING_PRIVATE_KEY_PASSWORD = your signing key password
+          Without these, tauri build fails after bundling and no latest.json is published.
+          '@
+          }
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
+            throw 'TAURI_SIGNING_PRIVATE_KEY_PASSWORD is not set (required for the password-protected signing key).'
+          }
+          Write-Host 'Updater signing secrets are present.'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -61,9 +81,8 @@ jobs:
             Installed copies check `latest.json` on startup and apply signed updates automatically.
           releaseDraft: false
           prerelease: false
+          includeUpdaterJson: true
           updaterJsonPreferNsis: true
-          uploadWorkflowArtifacts: true
-          workflowArtifactNamePattern: pdfeditor-[version]-[bundle][ext]
           args: --bundles nsis,msi
 
       - name: Verify MSI was built and uploaded
