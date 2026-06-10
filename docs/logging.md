@@ -57,7 +57,7 @@ logUserAction("save", "User saved document");
 | Pages | `delete_pages`, `rotate_pages` |
 | Security | `protect_on_save`, `remove_password_on_save` |
 | Document | `open`, `save`, `revert` (via `log.document`) |
-| Updates | `check_for_updates`, `auto_update_check`, `download_update`, `install_update` |
+| Updates | `check_for_updates`, `download_update`, `install_update` |
 
 ### Context fields
 
@@ -106,17 +106,14 @@ Each operation logs `elapsed_ms` and output size where applicable.
 
 ### Update flow
 
-In-app updates use **`@tauri-apps/plugin-updater`** (not custom Rust HTTP commands):
-
-- **Startup:** `auto_update_check` — silent when up to date; downloads when a **newer semver** is published
-- **Help → Check for updates:** `check_for_updates` — same version comparison, shows dialog
+In-app updates use **`@tauri-apps/plugin-updater`** (not custom Rust HTTP commands). Updates run only when the user chooses **Help → Check for updates** (`check_for_updates`).
 
 Frontend logging (`log.update`):
 
 - Compares installed version (`APP_VERSION`) with `latest.json` from GitHub Releases
 - Logs `installedVersion` and `remoteVersion` in metadata
 - Only downloads when remote semver is strictly newer (`src/lib/semver.ts`)
-- Missing `latest.json` on startup logs info (`no_update_feed`), not error
+- Missing `latest.json` shows an error in the update dialog with setup guidance
 
 Updates do **not** go through `invokeLogged`; Tauri plugin handles download/install.
 
@@ -170,7 +167,7 @@ Tests disable backend shipping via `logger.setBackendShipping(false)` when neede
 - `src/lib/logger.test.ts` — console output + Rust shipping via the `logger` root
 - `src/lib/semver.test.ts` — version comparison used by the updater
 - `src/services/loggingService.test.ts` — `get_logging_info` / tail
-- `src/services/updateService.test.ts` — `log.update` category, semver gating, startup auto-check
+- `src/services/updateService.test.ts` — `log.update` category, semver gating, manual check flow
 
 Service-layer tests (`formService.test.ts`, `documentService.test.ts`) mock `invokeLogged` and assert command order during save/apply flows.
 

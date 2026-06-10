@@ -29,7 +29,7 @@ Components are excluded from thresholds (covered by services, E2E, and manual sm
 
 | Area | Tests |
 |------|-------|
-| `updateService` | Semver gating, apply flow, missing feed, dirty-doc cancel, startup auto-check, invoke errors |
+| `updateService` | Semver gating, apply flow, missing feed, dirty-doc cancel, invoke errors |
 | `semver` | Parse `v1.2.3`, numeric compare, reject invalid |
 | `toolbarOrder` | Load/save, legacy migration, DOM insert helper |
 | `ToolbarDragContext` | Drag reorder, ignore nested buttons |

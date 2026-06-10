@@ -52,7 +52,7 @@ describe("updateService", () => {
 
   it("does not download when the remote version is not newer", async () => {
     mockCheck.mockResolvedValue({
-      version: "1.1.6",
+      version: "1.2",
       downloadAndInstall: mockDownloadAndInstall,
     });
 
@@ -89,58 +89,6 @@ describe("updateService", () => {
     expect(useUiStore.getState().showUpdateDialog).toBe(false);
   });
 
-  it("does not show dialog on silent startup when already up to date", async () => {
-    mockCheck.mockResolvedValue(null);
-
-    await checkForUpdatesAndApply({ silentIfUpToDate: true, source: "startup" });
-
-    expect(useUiStore.getState().showUpdateDialog).toBe(false);
-    expect(useUiStore.getState().updatePhase).toBe("idle");
-  });
-
-  it("silent startup downloads when a newer semver is published", async () => {
-    mockCheck.mockResolvedValue({
-      version: "1.2.0",
-      downloadAndInstall: mockDownloadAndInstall,
-    });
-
-    await checkForUpdatesAndApply({
-      silentIfUpToDate: true,
-      skipIfDirty: true,
-      source: "startup",
-    });
-
-    expect(mockCheck).toHaveBeenCalledWith({ allowDowngrades: false });
-    expect(mockDownloadAndInstall).toHaveBeenCalled();
-    expect(useUiStore.getState().updatePhase).toBe("installing");
-    expect(
-      getLogEntries().some(
-        (entry) =>
-          entry.context?.userAction === "auto_update_check" &&
-          entry.context?.metadata?.status === "update_available",
-      ),
-    ).toBe(true);
-  });
-
-  it("silent startup skips download when the document has unsaved changes", async () => {
-    useDocumentStore.setState({ isDirty: true });
-    mockCheck.mockResolvedValue({
-      version: "1.2.0",
-      downloadAndInstall: mockDownloadAndInstall,
-    });
-
-    await checkForUpdatesAndApply({
-      silentIfUpToDate: true,
-      skipIfDirty: true,
-      source: "startup",
-    });
-
-    expect(mockDownloadAndInstall).not.toHaveBeenCalled();
-    expect(
-      getLogEntries().some((entry) => entry.message.includes("Skipping automatic update")),
-    ).toBe(true);
-  });
-
   it("surfaces updater failures in the update dialog", async () => {
     mockCheck.mockRejectedValue(new Error("Failed to reach update server"));
 
@@ -148,22 +96,6 @@ describe("updateService", () => {
 
     expect(useUiStore.getState().updatePhase).toBe("error");
     expect(useUiStore.getState().updateMessage).toContain("Failed to reach update server");
-  });
-
-  it("treats a missing release feed as non-fatal on silent startup", async () => {
-    mockCheck.mockRejectedValue(
-      new Error("Could not fetch a valid release JSON from the remote"),
-    );
-
-    await checkForUpdatesAndApply({ silentIfUpToDate: true, source: "startup" });
-
-    expect(useUiStore.getState().showUpdateDialog).toBe(false);
-    expect(
-      getLogEntries().some((entry) => entry.message.includes("Update feed not published yet")),
-    ).toBe(true);
-    expect(
-      getLogEntries().some((entry) => entry.level === "error" && entry.context?.category === "update"),
-    ).toBe(false);
   });
 
   it("shows setup guidance when the release feed is missing from the Help menu", async () => {

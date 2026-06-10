@@ -8,15 +8,6 @@ import { toAppErrorPayload } from "@/lib/reportError";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useUiStore } from "@/stores/uiStore";
 
-export type UpdateCheckOptions = {
-  /** When true, do not show a dialog if already up to date (used on startup). */
-  silentIfUpToDate?: boolean;
-  /** When true, skip the check entirely if the document has unsaved changes. */
-  skipIfDirty?: boolean;
-  /** Where the check was triggered from (for logs). */
-  source?: "menu" | "startup";
-};
-
 function setUpdatePhase(
   phase: ReturnType<typeof useUiStore.getState>["updatePhase"],
   message: string,
@@ -29,7 +20,7 @@ function upToDateMessage(): string {
 }
 
 const UPDATE_FEED_UNAVAILABLE_MESSAGE =
-  "No update feed is published yet. Bump the app version and push a matching tag (for example v1.1.6) after adding TAURI_SIGNING_PRIVATE_KEY to GitHub Actions secrets so the Release workflow can upload latest.json.";
+  "No update feed is published yet. Bump the app version and push a matching tag (for example v1.2) after adding TAURI_SIGNING_PRIVATE_KEY to GitHub Actions secrets so the Release workflow can upload latest.json.";
 
 function isUpdateFeedUnavailable(message: string): boolean {
   const lower = message.toLowerCase();
@@ -59,32 +50,19 @@ async function confirmDiscardUnsavedChanges(): Promise<boolean> {
   return confirmed;
 }
 
-export async function checkForUpdatesAndApply(
-  options: UpdateCheckOptions = {},
-): Promise<void> {
-  const { silentIfUpToDate = false, skipIfDirty = false, source = "menu" } = options;
-  const userAction = source === "startup" ? "auto_update_check" : "check_for_updates";
-
-  if (skipIfDirty && useDocumentStore.getState().isDirty) {
-    log.update.info("Skipping automatic update — unsaved document changes", {
-      userAction,
-    });
-    return;
-  }
+/** Check for updates when the user chooses Help → Check for updates. */
+export async function checkForUpdatesAndApply(): Promise<void> {
+  const userAction = "check_for_updates";
 
   if (import.meta.env.VITE_E2E) {
-    if (!silentIfUpToDate) {
-      useUiStore.getState().openUpdateDialog();
-      setUpdatePhase("up_to_date", `${upToDateMessage()} (E2E mock).`);
-    }
+    useUiStore.getState().openUpdateDialog();
+    setUpdatePhase("up_to_date", `${upToDateMessage()} (E2E mock).`);
     log.update.info(upToDateMessage(), { userAction, metadata: { status: "up_to_date" } });
     return;
   }
 
-  if (!silentIfUpToDate) {
-    useUiStore.getState().openUpdateDialog();
-    setUpdatePhase("checking", "Checking for updates…");
-  }
+  useUiStore.getState().openUpdateDialog();
+  setUpdatePhase("checking", "Checking for updates…");
 
   log.update.info("Checking for a newer app version", {
     userAction,
@@ -104,9 +82,6 @@ export async function checkForUpdatesAndApply(
           remoteVersion,
         },
       });
-      if (silentIfUpToDate) {
-        return;
-      }
       setUpdatePhase("up_to_date", upToDateMessage());
       return;
     }
@@ -120,15 +95,7 @@ export async function checkForUpdatesAndApply(
       },
     });
 
-    if (silentIfUpToDate) {
-      useUiStore.getState().openUpdateDialog();
-    }
-
-    const canContinue =
-      skipIfDirty || source === "startup"
-        ? !useDocumentStore.getState().isDirty
-        : await confirmDiscardUnsavedChanges();
-    if (!canContinue) {
+    if (!(await confirmDiscardUnsavedChanges())) {
       useUiStore.getState().closeUpdateDialog();
       return;
     }
@@ -156,13 +123,10 @@ export async function checkForUpdatesAndApply(
     const payload = toAppErrorPayload(err);
 
     if (isUpdateFeedUnavailable(payload.message)) {
-      log.update.info("Update feed not published yet — automatic check skipped", {
+      log.update.info("Update feed not published yet", {
         userAction,
         metadata: { status: "no_update_feed" },
       });
-      if (silentIfUpToDate) {
-        return;
-      }
       setUpdatePhase("error", UPDATE_FEED_UNAVAILABLE_MESSAGE);
       return;
     }
@@ -172,9 +136,6 @@ export async function checkForUpdatesAndApply(
       errorId: payload.errorId,
       metadata: { code: payload.code },
     });
-    if (silentIfUpToDate) {
-      return;
-    }
     setUpdatePhase("error", payload.message);
   }
 }

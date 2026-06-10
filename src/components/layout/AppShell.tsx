@@ -2,7 +2,6 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { useEffect, useRef } from "react";
 import { openPdfFromPath } from "@/services/documentService";
-import { checkForUpdatesAndApply } from "@/services/updateService";
 import { MenuBar } from "./MenuBar";
 import { Toolbar } from "./Toolbar";
 import { StatusBar } from "./StatusBar";
@@ -25,17 +24,6 @@ export function AppShell() {
   const showLogViewer = useUiStore((s) => s.showLogViewer);
   const toggleLogViewer = useUiStore((s) => s.toggleLogViewer);
   const forceClosingRef = useRef(false);
-  const startupUpdateCheckedRef = useRef(false);
-
-  useEffect(() => {
-    if (startupUpdateCheckedRef.current || import.meta.env.DEV || import.meta.env.VITE_E2E) return;
-    startupUpdateCheckedRef.current = true;
-    void checkForUpdatesAndApply({
-      silentIfUpToDate: true,
-      skipIfDirty: true,
-      source: "startup",
-    });
-  }, []);
 
   useEffect(() => {
     const win = getCurrentWindow();

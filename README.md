@@ -1,6 +1,6 @@
 # PDF Editor
 
-Production-oriented desktop PDF editor built with **Tauri 2**, **React**, **TypeScript**, and **Rust**. Version **1.1.6** — open/view PDFs, zoom & navigation, text search, markup and content editing, forms, page tools, save, structured logging, and automated tests.
+Production-oriented desktop PDF editor built with **Tauri 2**, **React**, **TypeScript**, and **Rust**. Version **1.2** — open/view PDFs, zoom & navigation, text search, markup and content editing, forms, page tools, save, structured logging, and automated tests.
 
 ## Prerequisites
 
@@ -52,9 +52,9 @@ npm run build:installer
 
 The installer is created under `src-tauri/target/release/bundle/nsis/`. See [docs/install-windows.md](docs/install-windows.md) for MSI builds, code signing, and troubleshooting.
 
-### In-app updates (automatic)
+### In-app updates (manual)
 
-The app uses the **Tauri updater**: on startup (and via **Help → Check for updates**) it reads a signed `latest.json` from GitHub Releases and **only updates when the published version number is newer** than the installed app (for example `1.1.2` over `1.1.1`). Code changes without a version bump do not trigger an update.
+The app uses the **Tauri updater**: use **Help → Check for updates** to read a signed `latest.json` from GitHub Releases and install when the published version is **newer** than the installed app (for example `1.1.2` over `1.1.1`). Updates are never checked or applied automatically on startup.
 
 **First-time install** still uses the NSIS `.exe` or MSI. After that, updates are applied in place.
 
@@ -67,8 +67,8 @@ The app uses the **Tauri updater**: on startup (and via **Help → Check for upd
 2. Tag and push:
 
 ```bash
-git tag v1.1.6
-git push origin v1.1.6
+git tag v1.2
+git push origin v1.2
 ```
 
 The [Release workflow](.github/workflows/release.yml) builds signed update artifacts, uploads `latest.json`, and attaches full installers for new users.
