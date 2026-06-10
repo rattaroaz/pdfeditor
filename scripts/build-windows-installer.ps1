@@ -15,7 +15,7 @@ if ($args -contains "--msi") {
   $bundle = "nsis,msi"
 }
 
-npm run tauri build -- --bundles $bundle
+node scripts/tauri-build.mjs --bundles $bundle
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 $bundleDir = Join-Path $Root "src-tauri\target\release\bundle"

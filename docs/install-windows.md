@@ -42,8 +42,12 @@ npm run tauri build -- --bundles nsis
 # MSI only (requires WiX + VBScript)
 npm run tauri build -- --bundles msi
 
-# Both NSIS and MSI
+# Both NSIS and MSI (installers only; updater signatures skipped without signing env vars)
 npm run build:win
+
+# Signed build with updater artifacts (same as CI release)
+# $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "your-password"
+# npm run build:win:signed
 
 # Helper script
 .\scripts\build-windows-installer.ps1
