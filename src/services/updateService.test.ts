@@ -52,7 +52,7 @@ describe("updateService", () => {
 
   it("does not download when the remote version is not newer", async () => {
     mockCheck.mockResolvedValue({
-      version: "1.2.0",
+      version: "1.2.1",
       downloadAndInstall: mockDownloadAndInstall,
     });
 
@@ -64,7 +64,7 @@ describe("updateService", () => {
 
   it("downloads, installs, and relaunches when a newer version is available", async () => {
     mockCheck.mockResolvedValue({
-      version: "1.2.0",
+      version: "1.3.0",
       downloadAndInstall: mockDownloadAndInstall,
     });
 
@@ -79,7 +79,7 @@ describe("updateService", () => {
     useDocumentStore.setState({ isDirty: true });
     mockAsk.mockResolvedValueOnce(false);
     mockCheck.mockResolvedValue({
-      version: "1.2.0",
+      version: "1.3.0",
       downloadAndInstall: mockDownloadAndInstall,
     });
 
