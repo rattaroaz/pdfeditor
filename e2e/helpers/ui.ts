@@ -65,6 +65,8 @@ export async function openDocumentFromMenu(page: Page): Promise<void> {
 export async function saveDocumentFromMenu(page: Page): Promise<void> {
   await openFileMenu(page);
   await page.getByTestId("menu-save").click(menuClick);
+  // Save is async; wait so a later edit is not cleared when applySavedDocument runs.
+  await expect(page.getByTestId("status-bar")).toContainText("Saved", { timeout: 15_000 });
 }
 
 export async function revertDocumentFromMenu(page: Page): Promise<void> {
