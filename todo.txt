@@ -4,6 +4,11 @@ The phases must have items underneath them, with check boxes next to them.
 It must be created with typescript, and tauri framework.  
 It must be a production level app with full tests and logging. 
 
+ 
+To update versions
+git tag v1.2.1
+git push origin v1.2.1
 
-ewhen filling out text boxes, the box shoul delete after users
-adjust size of drop down after creation
+Need to update versions:  
+    package.json
+    tauri.conf.json
