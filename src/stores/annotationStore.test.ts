@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { RectAnnotation } from "@shared/types";
 import { clearHistory } from "@/stores/historyStore";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useAnnotationStore } from "./annotationStore";
@@ -67,8 +68,9 @@ describe("annotationStore", () => {
     expect(useDocumentStore.getState().isDirty).toBe(true);
 
     useDocumentStore.setState({ isDirty: false });
+    const highlight = useAnnotationStore.getState().annotations[0] as RectAnnotation;
     useAnnotationStore.getState().updateAnnotationLayout(id, {
-      ...useAnnotationStore.getState().annotations[0]!,
+      ...highlight,
       rects: [{ x: 1, y: 1, width: 20, height: 20 }],
     });
     expect(useDocumentStore.getState().isDirty).toBe(true);

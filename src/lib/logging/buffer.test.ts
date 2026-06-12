@@ -45,7 +45,7 @@ describe("log buffer", () => {
     const entries = getLogEntries();
     expect(entries).toHaveLength(1000);
     expect(entries[0]?.message).toBe("entry-5");
-    expect(entries.at(-1)?.message).toBe("entry-1004");
+    expect(entries[entries.length - 1]?.message).toBe("entry-1004");
   });
 
   it("clears entries and notifies subscribers", () => {
