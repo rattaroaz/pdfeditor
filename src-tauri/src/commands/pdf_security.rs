@@ -2,7 +2,7 @@ use crate::commands::pdf_pages::save_doc;
 use crate::error::{map_err, AppError, CommandResult};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use lopdf::encryption::crypt_filters::{Aes128CryptFilter, CryptFilter};
-use lopdf::{Document, EncryptionState, EncryptionVersion, Object, Permissions};
+use lopdf::{Document, EncryptionState, EncryptionVersion, LoadOptions, Object, Permissions};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -55,8 +55,10 @@ fn decode_pdf(pdf_base64: &str) -> Result<Vec<u8>, AppError> {
 
 fn load_document(bytes: &[u8], password: Option<&str>) -> Result<Document, AppError> {
   match password {
-    Some(pw) if !pw.is_empty() => Document::load_mem_with_password(bytes, pw)
-      .map_err(|e| AppError::Pdf(format!("Failed to open encrypted PDF: {e}"))),
+    Some(pw) if !pw.is_empty() => {
+      Document::load_mem_with_options(bytes, LoadOptions::with_password(pw))
+        .map_err(|e| AppError::Pdf(format!("Failed to open encrypted PDF: {e}")))
+    }
     _ => Document::load_mem(bytes).map_err(|e| AppError::Pdf(e.to_string())),
   }
 }
