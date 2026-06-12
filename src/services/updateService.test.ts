@@ -20,10 +20,17 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 }));
 
 import { clearLogBuffer, getLogEntries } from "@/lib/logging";
+import { parseSemver } from "@/lib/semver";
 import { checkForUpdatesAndApply } from "./updateService";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useUiStore } from "@/stores/uiStore";
 import { APP_VERSION } from "@/lib/constants";
+
+function newerRemoteVersion(): string {
+  const parts = parseSemver(APP_VERSION);
+  if (!parts) return "99.0.0";
+  return `${parts[0]}.${parts[1]}.${parts[2] + 1}`;
+}
 
 describe("updateService", () => {
   beforeEach(() => {
@@ -65,7 +72,7 @@ describe("updateService", () => {
 
   it("downloads, installs, and relaunches when a newer version is available", async () => {
     mockCheck.mockResolvedValue({
-      version: "1.3.0",
+      version: newerRemoteVersion(),
       downloadAndInstall: mockDownloadAndInstall,
     });
 
@@ -80,7 +87,7 @@ describe("updateService", () => {
     useDocumentStore.setState({ isDirty: true });
     mockAsk.mockResolvedValueOnce(false);
     mockCheck.mockResolvedValue({
-      version: "1.3.0",
+      version: newerRemoteVersion(),
       downloadAndInstall: mockDownloadAndInstall,
     });
 
