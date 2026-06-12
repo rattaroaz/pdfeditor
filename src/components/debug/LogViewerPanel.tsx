@@ -78,19 +78,10 @@ export function LogViewerPanel({ onClose }: LogViewerPanelProps) {
 
       <div className="flex flex-wrap items-center gap-2 border-b border-zinc-800 px-3 py-2 text-xs">
         <select
-          value={logger.getLevel()}
-          onChange={(e) => logger.setLevel(e.target.value as LogLevel)}
-          className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-zinc-200"
-        >
-          <option value="debug">debug</option>
-          <option value="info">info</option>
-          <option value="warn">warn</option>
-          <option value="error">error</option>
-        </select>
-        <select
           value={filter}
           onChange={(e) => setFilter(e.target.value as LogLevel | "all")}
           className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-zinc-200"
+          aria-label="Filter log level"
         >
           <option value="all">All levels</option>
           <option value="debug">debug</option>

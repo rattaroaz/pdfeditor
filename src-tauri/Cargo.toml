@@ -30,7 +30,7 @@ chrono = { version = "0.4", features = ["serde"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-appender = "0.2"
-lopdf = "0.40"
+lopdf = "0.41"
 dirs = "6"
 base64 = "0.22"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
