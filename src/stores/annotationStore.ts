@@ -55,7 +55,7 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
         } as Annotation,
       ],
     }));
-    useDocumentStore.getState().setDirty(true);
+    useDocumentStore.getState().markDocumentChanged("annotation");
   },
   updateAnnotation: (id, patch) => {
     recordHistory();
@@ -64,12 +64,15 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
         a.id === id ? ({ ...a, ...patch } as Annotation) : a,
       ),
     }));
+    useDocumentStore.getState().markDocumentChanged("annotation");
   },
 
-  updateAnnotationLayout: (id, annotation) =>
+  updateAnnotationLayout: (id, annotation) => {
     set((state) => ({
       annotations: state.annotations.map((a) => (a.id === id ? annotation : a)),
-    })),
+    }));
+    useDocumentStore.getState().markDocumentChanged("annotation");
+  },
   removeAnnotation: (id) => {
     recordHistory();
     log.annotation.info("Annotation removed", {
@@ -80,6 +83,7 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
       annotations: state.annotations.filter((a) => a.id !== id),
       selectedId: state.selectedId === id ? null : state.selectedId,
     }));
+    useDocumentStore.getState().markDocumentChanged("annotation");
   },
   clearAnnotations: () => set({ annotations: [], selectedId: null }),
   getPageAnnotations: (pageIndex) =>

@@ -189,7 +189,7 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
           : box.width,
         height: box.height,
       });
-      useDocumentStore.getState().setDirty(true);
+      useDocumentStore.getState().markDocumentChanged("content_edit");
     }
     setEditingId(null);
   };
@@ -245,12 +245,12 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
       pendingDragRef.current = null;
       if (resizing) {
         setResizing(null);
-        useDocumentStore.getState().setDirty(true);
+        useDocumentStore.getState().markDocumentChanged("content_edit");
         return;
       }
       if (moving) {
         setMoving(null);
-        useDocumentStore.getState().setDirty(true);
+        useDocumentStore.getState().markDocumentChanged("content_edit");
       }
     };
 
@@ -368,7 +368,7 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
         mimeType,
       });
       setSelectedId(id);
-      useDocumentStore.getState().setDirty(true);
+      useDocumentStore.getState().markDocumentChanged("content_edit");
     }
   };
 
@@ -406,7 +406,7 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
     });
     setSelectedId(id);
     setEditingId(id);
-    useDocumentStore.getState().setDirty(true);
+    useDocumentStore.getState().markDocumentChanged("content_edit");
   };
 
   const canPlaceNew = activeTool === "add-text-block" || activeTool === "add-image";
@@ -500,7 +500,7 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
                   const el = e.currentTarget;
                   updateTextEditContent(edit.id, el.value);
                   if (el.value.trim()) {
-                    useDocumentStore.getState().setDirty(true);
+                    useDocumentStore.getState().markDocumentChanged("content_edit");
                   }
                   flushSync(() => {
                     syncTextBoxSize(edit, el, scale, (patch) =>
@@ -512,7 +512,7 @@ export function ContentEditLayer({ pageIndex, scale }: ContentEditLayerProps) {
                   const el = e.currentTarget;
                   updateTextEditContent(edit.id, el.value);
                   if (el.value.trim()) {
-                    useDocumentStore.getState().setDirty(true);
+                    useDocumentStore.getState().markDocumentChanged("content_edit");
                   }
                   flushSync(() => {
                     syncTextBoxSize(edit, el, scale, (patch) =>

@@ -406,7 +406,7 @@ export function FormsPanel() {
 
                   renameNewField(field.id, name);
 
-                  useDocumentStore.getState().setDirty(true);
+                  useDocumentStore.getState().markDocumentChanged("forms");
 
                 }
 
@@ -442,7 +442,7 @@ export function FormsPanel() {
 
                     updateNewField(field.id, { options: normalizeDropdownOptions(options) });
 
-                    useDocumentStore.getState().setDirty(true);
+                    useDocumentStore.getState().markDocumentChanged("forms");
 
                   }}
 

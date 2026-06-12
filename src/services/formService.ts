@@ -235,7 +235,7 @@ export async function importFormDataCsv(): Promise<void> {
     }
   }
   log.form.info("Form data imported from CSV", { userAction: "import_form_csv", metadata: { path: selected } });
-  useDocumentStore.getState().setDirty(true);
+  useDocumentStore.getState().markDocumentChanged("forms");
 }
 
 export async function exportFormDataFdfFile(): Promise<void> {

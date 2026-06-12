@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { APP_VERSION } from "@/lib/constants";
 
 vi.mock("@/services/documentService", () => ({
   openPdfFromDialog: vi.fn(),
@@ -104,7 +105,7 @@ describe("MenuBar", () => {
     render(<MenuBar />);
     fireEvent.click(screen.getByTestId("menu-help"));
     expect(screen.getByTestId("menu-check-updates")).toHaveTextContent("Check for updates");
-    expect(screen.getByTestId("menu-help-version")).toHaveTextContent("Version 1.2.2");
+    expect(screen.getByTestId("menu-help-version")).toHaveTextContent(`Version ${APP_VERSION}`);
   });
 
   it("starts update check from the Help menu", () => {

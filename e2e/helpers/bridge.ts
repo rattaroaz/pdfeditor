@@ -2,7 +2,12 @@ import type { Page } from "@playwright/test";
 import type { LogEntry } from "@shared/types";
 
 export async function waitForE2eBridge(page: Page): Promise<void> {
-  await page.waitForFunction(() => window.__PDFEDITOR_E2E__?.enabled === true);
+  await page.waitForFunction(
+    () =>
+      window.__PDFEDITOR_E2E__?.enabled === true &&
+      typeof window.__PDFEDITOR_E2E__.openFixtureDocument === "function" &&
+      typeof window.__PDFEDITOR_E2E__.getInvokeLog === "function",
+  );
 }
 
 export async function getSessionLogs(page: Page): Promise<readonly LogEntry[]> {

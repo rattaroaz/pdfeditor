@@ -55,11 +55,18 @@ export async function dragToolbarItemBefore(
   await page.mouse.down();
   await page.mouse.move(endX, endY, { steps: 12 });
   await page.mouse.up();
+  await expect
+    .poll(async () => {
+      const order = await getToolbarItemOrder(page);
+      return order.indexOf(dragId) < order.indexOf(beforeId);
+    }, { timeout: 10_000 })
+    .toBe(true);
 }
 
 export async function openDocumentFromMenu(page: Page): Promise<void> {
   await openFileMenu(page);
   await page.getByTestId("menu-open").click(menuClick);
+  await waitForPageReady(page);
 }
 
 export async function saveDocumentFromMenu(page: Page): Promise<void> {
@@ -72,6 +79,7 @@ export async function saveDocumentFromMenu(page: Page): Promise<void> {
 export async function revertDocumentFromMenu(page: Page): Promise<void> {
   await openFileMenu(page);
   await page.getByTestId("menu-revert").click(menuClick);
+  await expectDocumentDirty(page, false);
 }
 
 export async function protectDocumentFromMenu(page: Page): Promise<void> {

@@ -1,7 +1,7 @@
 {
   "name": "pdfeditor",
   "private": true,
-  "version": "1.2.2",
+  "version": "1.4.0",
   "type": "module",
   "scripts": {
     "dev": "node ./node_modules/vite/bin/vite.js",
@@ -22,6 +22,9 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report e2e/report",
+    "check:versions": "node scripts/check-versions.mjs",
+    "check:invoke-contract": "node scripts/check-invoke-contract.mjs",
+    "check:contracts": "node scripts/check-contracts.mjs",
     "lint": "eslint src shared",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"shared/**/*.ts\""

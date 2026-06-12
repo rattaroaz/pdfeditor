@@ -1,13 +1,9 @@
 use crate::commands::pdf_pages::save_doc;
 use crate::error::{map_err, AppError, CommandResult};
-use base64::{engine::general_purpose::STANDARD, Engine as _};
+use super::pdf_common::{decode_pdf_base64, encode_pdf_bytes};
 use lopdf::{Dictionary, Document, Object, ObjectId, Stream};
 use serde::{Deserialize, Serialize};
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PdfBytesResult {
-  pub data_base64: String,
-}
+pub use super::pdf_common::PdfBytesResult;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1092,43 +1088,35 @@ pub struct FlattenFormsPayload {
 }
 
 pub fn inspect_forms_impl(payload: InspectFormsPayload) -> CommandResult<FormInfoResult> {
-  let bytes = STANDARD
-    .decode(&payload.pdf_base64)
-    .map_err(|e| map_err(AppError::InvalidInput(e.to_string())))?;
+  let bytes = decode_pdf_base64(&payload.pdf_base64).map_err(map_err)?;
   inspect_forms(&bytes).map_err(map_err)
 }
 
 pub fn apply_form_values_impl(payload: ApplyFormValuesPayload) -> CommandResult<PdfBytesResult> {
-  let bytes = STANDARD
-    .decode(&payload.pdf_base64)
-    .map_err(|e| map_err(AppError::InvalidInput(e.to_string())))?;
+  let bytes = decode_pdf_base64(&payload.pdf_base64).map_err(map_err)?;
   let values: Vec<FieldValueDto> = serde_json::from_str(&payload.values_json)
     .map_err(|e| map_err(AppError::InvalidInput(e.to_string())))?;
   let output = apply_form_values_in_pdf(&bytes, &values).map_err(map_err)?;
   Ok(PdfBytesResult {
-    data_base64: STANDARD.encode(&output),
+    data_base64: encode_pdf_bytes(&output),
   })
 }
 
 pub fn create_form_fields_impl(payload: CreateFormFieldsPayload) -> CommandResult<PdfBytesResult> {
-  let bytes = STANDARD
-    .decode(&payload.pdf_base64)
-    .map_err(|e| map_err(AppError::InvalidInput(e.to_string())))?;
+  let bytes = decode_pdf_base64(&payload.pdf_base64).map_err(map_err)?;
   let fields: Vec<NewFieldDto> = serde_json::from_str(&payload.fields_json)
     .map_err(|e| map_err(AppError::InvalidInput(e.to_string())))?;
   let output = create_form_fields_in_pdf(&bytes, &fields).map_err(map_err)?;
   Ok(PdfBytesResult {
-    data_base64: STANDARD.encode(&output),
+    data_base64: encode_pdf_bytes(&output),
   })
 }
 
 pub fn flatten_forms_impl(payload: FlattenFormsPayload) -> CommandResult<PdfBytesResult> {
-  let bytes = STANDARD
-    .decode(&payload.pdf_base64)
-    .map_err(|e| map_err(AppError::InvalidInput(e.to_string())))?;
+  let bytes = decode_pdf_base64(&payload.pdf_base64).map_err(map_err)?;
   let output = flatten_forms_in_pdf(&bytes).map_err(map_err)?;
   Ok(PdfBytesResult {
-    data_base64: STANDARD.encode(&output),
+    data_base64: encode_pdf_bytes(&output),
   })
 }
 

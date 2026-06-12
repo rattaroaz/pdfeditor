@@ -23,6 +23,7 @@ import { clearLogBuffer, getLogEntries } from "@/lib/logging";
 import { checkForUpdatesAndApply } from "./updateService";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useUiStore } from "@/stores/uiStore";
+import { APP_VERSION } from "@/lib/constants";
 
 describe("updateService", () => {
   beforeEach(() => {
@@ -52,7 +53,7 @@ describe("updateService", () => {
 
   it("does not download when the remote version is not newer", async () => {
     mockCheck.mockResolvedValue({
-      version: "1.2.2",
+      version: APP_VERSION,
       downloadAndInstall: mockDownloadAndInstall,
     });
 

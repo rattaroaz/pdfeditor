@@ -32,6 +32,23 @@ interface PdfInfoResponse {
 }
 
 const showError = createErrorReporter("document", "document");
+let documentOperationQueue: Promise<unknown> = Promise.resolve();
+
+function runDocumentOperation<T>(operation: string, task: () => Promise<T>): Promise<T> {
+  const run = documentOperationQueue.then(task, task);
+  documentOperationQueue = run.catch((err) => {
+    log.document.warn("Document operation failed", {
+      userAction: operation,
+      metadata: { error: errorMessage(err) },
+    });
+  });
+  return run;
+}
+
+export async function confirmDiscardDocumentChanges(message: string): Promise<boolean> {
+  if (!useDocumentStore.getState().isDirty) return true;
+  return ask(message, { title: APP_NAME, kind: "warning" });
+}
 
 async function readPdfBytes(filePath: string): Promise<Uint8Array> {
   const result = await invokeLogged<ReadFileResult>("read_pdf_file", {
@@ -91,6 +108,13 @@ async function loadPdfWithPasswordPrompt(
 }
 
 export async function openPdfFromPath(filePath: string): Promise<void> {
+  return runDocumentOperation("open", () => openPdfFromPathImpl(filePath));
+}
+
+async function openPdfFromPathImpl(filePath: string): Promise<void> {
+  if (!(await confirmDiscardDocumentChanges("You have unsaved changes. Open another PDF without saving?"))) {
+    return;
+  }
   const docStore = useDocumentStore.getState();
   const annStore = useAnnotationStore.getState();
 
@@ -138,6 +162,8 @@ export async function openPdfFromPath(filePath: string): Promise<void> {
       fileName,
       pdfDoc,
       pdfBytes: viewBytes,
+      basePdfBytes: baseBytes,
+      documentPassword: password ?? null,
       metadata,
     });
     const openedDocId = useDocumentStore.getState().documentId;
@@ -146,11 +172,7 @@ export async function openPdfFromPath(filePath: string): Promise<void> {
         useDocumentStore.getState().setHasExtractableText(hasText);
       }
     });
-    useDocumentStore.setState({
-      basePdfBytes: baseBytes.slice(),
-      documentPassword: password ?? null,
-      isPasswordProtected: security.isEncrypted,
-    });
+    useDocumentStore.getState().setPasswordProtected(security.isEncrypted);
 
     try {
       await invokeLogged("add_recent_file", { path: filePath });
@@ -189,6 +211,10 @@ export async function openPdfFromPath(filePath: string): Promise<void> {
 }
 
 export async function savePdf(saveAs = false): Promise<void> {
+  return runDocumentOperation("save", () => savePdfImpl(saveAs));
+}
+
+async function savePdfImpl(saveAs = false): Promise<void> {
   const correlationId = createCorrelationId();
   const timer = startTimer(log.document, "save_pdf", { userAction: "save", correlationId });
   const docStore = useDocumentStore.getState();
@@ -270,10 +296,6 @@ export async function savePdf(saveAs = false): Promise<void> {
       filePath: targetPath,
       pdfDoc: reloadedDoc,
       pdfBytes: newBytes,
-    });
-    useDocumentStore.setState({
-      basePdfBytes: newBytes.slice(),
-      savedPdfBytes: newBytes.slice(),
       metadata: updatedDoc.metadata
         ? {
             ...updatedDoc.metadata,
@@ -337,23 +359,21 @@ export async function persistAnnotations(): Promise<void> {
       filePath,
       json: JSON.stringify(annotations),
     });
-    useDocumentStore.getState().setDirty(true);
+    useDocumentStore.getState().markDocumentChanged("annotations");
   } catch (err) {
     showError(err);
   }
 }
 
 export async function closeDocument(): Promise<void> {
+  return runDocumentOperation("close", closeDocumentImpl);
+}
+
+async function closeDocumentImpl(): Promise<void> {
   const docStore = useDocumentStore.getState();
   if (!docStore.pdfDoc) return;
 
-  if (docStore.isDirty) {
-    const discard = await ask(
-      "You have unsaved changes. Close without saving?",
-      { title: APP_NAME, kind: "warning" },
-    );
-    if (!discard) return;
-  }
+  if (!(await confirmDiscardDocumentChanges("You have unsaved changes. Close without saving?"))) return;
 
   useAnnotationStore.getState().clearAnnotations();
   useContentEditStore.getState().clearEdits();
@@ -373,6 +393,10 @@ export async function closeDocument(): Promise<void> {
 }
 
 export async function revertToSaved(): Promise<void> {
+  return runDocumentOperation("revert", revertToSavedImpl);
+}
+
+async function revertToSavedImpl(): Promise<void> {
   const docStore = useDocumentStore.getState();
   const annStore = useAnnotationStore.getState();
   const { savedPdfBytes, filePath } = docStore;
@@ -398,6 +422,9 @@ export async function revertToSaved(): Promise<void> {
       fileName,
       pdfDoc,
       pdfBytes: savedPdfBytes.slice(),
+      basePdfBytes: savedPdfBytes,
+      savedPdfBytes,
+      documentPassword: reloadPassword ?? null,
       metadata,
     });
     const openedDocId = useDocumentStore.getState().documentId;

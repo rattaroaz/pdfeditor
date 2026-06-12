@@ -77,7 +77,7 @@ export function protectDocumentOnNextSave(): void {
   const store = useDocumentStore.getState();
   store.setPendingSavePassword(password);
   store.setRemovePasswordOnSave(false);
-  store.setDirty(true);
+  store.markDocumentChanged("security");
   store.setStatusMessage("Password protection will be applied when you save");
 }
 
@@ -95,7 +95,7 @@ export async function removeDocumentPasswordProtection(): Promise<void> {
   store.setPendingSavePassword(null);
   store.setRemovePasswordOnSave(true);
   store.setDocumentPassword(password);
-  store.setDirty(true);
+  store.markDocumentChanged("security");
   store.setStatusMessage("Password will be removed when you save");
   log.security.info("Password removal scheduled for next save", {
     userAction: "remove_password_on_save",

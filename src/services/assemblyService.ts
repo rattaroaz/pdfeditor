@@ -15,7 +15,7 @@ const showError = createErrorReporter("assembly", "assembly");
 
 function getOpenDocumentBytes(): Uint8Array | null {
   const { pdfBytes, basePdfBytes } = useDocumentStore.getState();
-  return pdfBytes ?? basePdfBytes ?? null;
+  return basePdfBytes ?? pdfBytes ?? null;
 }
 
 async function pickPdfPaths(multiple: boolean): Promise<string[]> {
@@ -48,10 +48,7 @@ async function applyMergedOrNewDocument(newBytes: Uint8Array, fileName: string):
       fileSize: newBytes.byteLength,
     },
   });
-  useDocumentStore.setState({
-    basePdfBytes: newBytes.slice(),
-    isDirty: true,
-  });
+  useDocumentStore.getState().markDocumentChanged("assembly");
   annStore.clearAnnotations();
   log.assembly.info("Document loaded from assembly operation", { userAction: "assembly" });
 }

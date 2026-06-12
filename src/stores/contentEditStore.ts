@@ -171,7 +171,7 @@ export const useContentEditStore = create<ContentEditStore>((set, get) => ({
       return { textEdits };
     });
     if (changed && get().hasEdits()) {
-      useDocumentStore.getState().setDirty(true);
+      useDocumentStore.getState().markDocumentChanged("content_edit");
     }
   },
 

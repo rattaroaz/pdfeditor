@@ -1,22 +1,14 @@
 use crate::error::{map_err, AppError, CommandResult};
-use base64::{engine::general_purpose::STANDARD, Engine as _};
+use super::pdf_common::{decode_pdf_base64, encode_pdf_bytes};
 use lopdf::{Document, Object, ObjectId};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::collections::BTreeMap;
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PdfBytesResult {
-  pub data_base64: String,
-}
+pub use super::pdf_common::PdfBytesResult;
 
 
 pub(crate) fn save_doc(doc: &mut Document) -> Result<Vec<u8>, AppError> {
-  let mut buffer = Vec::new();
-  doc
-    .save_to(&mut buffer)
-    .map_err(|e| AppError::Pdf(e.to_string()))?;
-  Ok(buffer)
+  super::pdf_common::save_doc(doc)
 }
 
 pub(crate) fn root_pages_id(doc: &Document) -> Result<ObjectId, AppError> {
@@ -215,9 +207,7 @@ pub fn delete_pdf_pages_impl(payload: DeletePagesPayload) -> CommandResult<PdfBy
   let _guard = span.enter();
 
   let output = delete_pages_in_pdf(
-    &STANDARD
-      .decode(&payload.pdf_base64)
-      .map_err(|e| map_err(AppError::InvalidInput(e.to_string())))?,
+    &decode_pdf_base64(&payload.pdf_base64).map_err(map_err)?,
     &payload.page_numbers,
   )
   .map_err(map_err)?;
@@ -228,7 +218,7 @@ pub fn delete_pdf_pages_impl(payload: DeletePagesPayload) -> CommandResult<PdfBy
     "delete_pdf_pages command complete"
   );
   Ok(PdfBytesResult {
-    data_base64: STANDARD.encode(&output),
+    data_base64: encode_pdf_bytes(&output),
   })
 }
 
@@ -237,16 +227,14 @@ pub fn rotate_pdf_pages_impl(payload: RotatePagesPayload) -> CommandResult<PdfBy
   let _guard = span.enter();
 
   let output = rotate_pages_in_pdf(
-    &STANDARD
-      .decode(&payload.pdf_base64)
-      .map_err(|e| map_err(AppError::InvalidInput(e.to_string())))?,
+    &decode_pdf_base64(&payload.pdf_base64).map_err(map_err)?,
     &payload.page_numbers,
     payload.degrees,
   )
   .map_err(map_err)?;
 
   Ok(PdfBytesResult {
-    data_base64: STANDARD.encode(&output),
+    data_base64: encode_pdf_bytes(&output),
   })
 }
 
@@ -255,15 +243,13 @@ pub fn reorder_pdf_pages_impl(payload: ReorderPagesPayload) -> CommandResult<Pdf
   let _guard = span.enter();
 
   let output = reorder_pages_in_pdf(
-    &STANDARD
-      .decode(&payload.pdf_base64)
-      .map_err(|e| map_err(AppError::InvalidInput(e.to_string())))?,
+    &decode_pdf_base64(&payload.pdf_base64).map_err(map_err)?,
     &payload.new_order,
   )
   .map_err(map_err)?;
 
   Ok(PdfBytesResult {
-    data_base64: STANDARD.encode(&output),
+    data_base64: encode_pdf_bytes(&output),
   })
 }
 

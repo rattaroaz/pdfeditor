@@ -1,17 +1,13 @@
 use crate::commands::pdf_pages::save_doc;
 use crate::error::{map_err, AppError, CommandResult};
-use base64::{engine::general_purpose::STANDARD, Engine as _};
+use super::pdf_common::{decode_pdf_base64, encode_pdf_bytes};
 use lopdf::encryption::crypt_filters::{Aes128CryptFilter, CryptFilter};
 use lopdf::{Document, EncryptionState, EncryptionVersion, LoadOptions, Object, Permissions};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PdfBytesResult {
-  pub data_base64: String,
-}
+pub use super::pdf_common::PdfBytesResult;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -45,12 +41,6 @@ pub struct EncryptPdfPayload {
 pub struct DecryptPdfPayload {
   pub pdf_base64: String,
   pub password: String,
-}
-
-fn decode_pdf(pdf_base64: &str) -> Result<Vec<u8>, AppError> {
-  STANDARD
-    .decode(pdf_base64.trim())
-    .map_err(|e| AppError::InvalidInput(format!("Invalid base64: {e}")))
 }
 
 fn load_document(bytes: &[u8], password: Option<&str>) -> Result<Document, AppError> {
@@ -241,12 +231,12 @@ pub fn decrypt_pdf_in_memory(bytes: &[u8], password: &str) -> Result<Vec<u8>, Ap
 }
 
 pub fn inspect_security_impl(payload: InspectSecurityPayload) -> CommandResult<SecurityInfoResult> {
-  let bytes = decode_pdf(&payload.pdf_base64)?;
+  let bytes = decode_pdf_base64(&payload.pdf_base64).map_err(map_err)?;
   Ok(inspect_pdf_security(&bytes))
 }
 
 pub fn encrypt_pdf_impl(payload: EncryptPdfPayload) -> CommandResult<PdfBytesResult> {
-  let bytes = decode_pdf(&payload.pdf_base64)?;
+  let bytes = decode_pdf_base64(&payload.pdf_base64).map_err(map_err)?;
   let output = encrypt_pdf_in_memory(
     &bytes,
     &payload.user_password,
@@ -256,15 +246,15 @@ pub fn encrypt_pdf_impl(payload: EncryptPdfPayload) -> CommandResult<PdfBytesRes
   .map_err(map_err)?;
 
   Ok(PdfBytesResult {
-    data_base64: STANDARD.encode(&output),
+    data_base64: encode_pdf_bytes(&output),
   })
 }
 
 pub fn decrypt_pdf_impl(payload: DecryptPdfPayload) -> CommandResult<PdfBytesResult> {
-  let bytes = decode_pdf(&payload.pdf_base64)?;
+  let bytes = decode_pdf_base64(&payload.pdf_base64).map_err(map_err)?;
   let output = decrypt_pdf_in_memory(&bytes, &payload.password).map_err(map_err)?;
   Ok(PdfBytesResult {
-    data_base64: STANDARD.encode(&output),
+    data_base64: encode_pdf_bytes(&output),
   })
 }
 

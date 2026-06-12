@@ -1,15 +1,11 @@
 use crate::commands::pdf_pages::{root_pages_id, save_doc, validate_page_numbers};
 use crate::error::{map_err, AppError, CommandResult};
-use base64::{engine::general_purpose::STANDARD, Engine as _};
+use super::pdf_common::{decode_pdf_base64, encode_pdf_bytes};
 use lopdf::{Dictionary, Document, Object, ObjectId};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::collections::{BTreeMap, HashSet};
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PdfBytesResult {
-  pub data_base64: String,
-}
+pub use super::pdf_common::PdfBytesResult;
 
 fn default_media_box() -> Vec<Object> {
   vec![
@@ -291,23 +287,19 @@ pub struct MergePdfsPayload {
 }
 
 pub fn insert_blank_pages_impl(payload: InsertBlankPagesPayload) -> CommandResult<PdfBytesResult> {
-  let bytes = STANDARD
-    .decode(&payload.pdf_base64)
-    .map_err(|e| map_err(AppError::InvalidInput(e.to_string())))?;
+  let bytes = decode_pdf_base64(&payload.pdf_base64).map_err(map_err)?;
   let output =
     insert_blank_pages_in_pdf(&bytes, payload.after_page, payload.count).map_err(map_err)?;
   Ok(PdfBytesResult {
-    data_base64: STANDARD.encode(&output),
+    data_base64: encode_pdf_bytes(&output),
   })
 }
 
 pub fn extract_pdf_pages_impl(payload: ExtractPagesPayload) -> CommandResult<PdfBytesResult> {
-  let bytes = STANDARD
-    .decode(&payload.pdf_base64)
-    .map_err(|e| map_err(AppError::InvalidInput(e.to_string())))?;
+  let bytes = decode_pdf_base64(&payload.pdf_base64).map_err(map_err)?;
   let output = extract_pages_in_pdf(&bytes, &payload.page_numbers).map_err(map_err)?;
   Ok(PdfBytesResult {
-    data_base64: STANDARD.encode(&output),
+    data_base64: encode_pdf_bytes(&output),
   })
 }
 
@@ -315,14 +307,12 @@ pub fn merge_pdfs_impl(payload: MergePdfsPayload) -> CommandResult<PdfBytesResul
   let mut decoded = Vec::new();
   for b64 in &payload.pdf_base64_list {
     decoded.push(
-      STANDARD
-        .decode(b64)
-        .map_err(|e| map_err(AppError::InvalidInput(e.to_string())))?,
+      decode_pdf_base64(b64).map_err(map_err)?,
     );
   }
   let output = merge_pdf_bytes_list(&decoded).map_err(map_err)?;
   Ok(PdfBytesResult {
-    data_base64: STANDARD.encode(&output),
+    data_base64: encode_pdf_bytes(&output),
   })
 }
 

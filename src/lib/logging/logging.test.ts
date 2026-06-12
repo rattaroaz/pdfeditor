@@ -6,6 +6,7 @@ import {
   getLogEntries,
   logger,
   log,
+  logUserAction,
   startTimer,
 } from "./index";
 
@@ -87,5 +88,42 @@ describe("logging framework", () => {
     const entry = getLogEntries()[getLogEntries().length - 1];
     expect(entry?.context?.documentId).toBe("doc-test-123");
     expect(entry?.context?.metadata?.fileName).toBe("sample.pdf");
+  });
+
+  it("logUserAction sets ui category and userAction", () => {
+    logUserAction("save", "User saved document", "info", {
+      metadata: { path: "test.pdf" },
+    });
+    const entry = getLogEntries()[getLogEntries().length - 1];
+    expect(entry?.context?.userAction).toBe("save");
+    expect(entry?.context?.category).toBe("ui");
+    expect(entry?.message).toBe("User saved document");
+  });
+
+  it("child logger merges nested scopes", () => {
+    const parent = createLogger({ category: "document", component: "Save" });
+    const child = parent.child({ component: "Dialog" });
+    child.info("nested", { userAction: "test" });
+    const entry = getLogEntries()[getLogEntries().length - 1];
+    expect(entry?.context?.category).toBe("document");
+    expect(entry?.context?.component).toBe("Dialog");
+  });
+
+  it("startTimer fail records error metadata and duration", () => {
+    const timer = startTimer(log.perf, "failing-op", { userAction: "test" });
+    timer.fail(new Error("boom"), { metadata: { step: "write" } });
+    const entry = getLogEntries()[getLogEntries().length - 1];
+    expect(entry?.level).toBe("error");
+    expect(entry?.message).toContain("boom");
+    expect(entry?.context?.durationMs).toBeGreaterThanOrEqual(0);
+    expect(entry?.context?.metadata?.error).toBe("boom");
+    expect(entry?.context?.metadata?.step).toBe("write");
+  });
+
+  it("persists min level in localStorage", () => {
+    logger.setLevel("warn");
+    expect(logger.getLevel()).toBe("warn");
+    expect(localStorage.getItem("pdfeditor.logLevel")).toBe("warn");
+    logger.setLevel("debug");
   });
 });

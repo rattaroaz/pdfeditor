@@ -1,7 +1,6 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { ask } from "@tauri-apps/plugin-dialog";
 import { useEffect, useRef } from "react";
-import { openPdfFromPath } from "@/services/documentService";
+import { confirmDiscardDocumentChanges, openPdfFromPath } from "@/services/documentService";
 import { MenuBar } from "./MenuBar";
 import { Toolbar } from "./Toolbar";
 import { StatusBar } from "./StatusBar";
@@ -13,7 +12,6 @@ import { useDocumentStore } from "@/stores/documentStore";
 import { useUiStore } from "@/stores/uiStore";
 import { useContentEditStore } from "@/stores/contentEditStore";
 import { LogViewerPanel } from "@/components/debug/LogViewerPanel";
-import { APP_NAME } from "@/lib/constants";
 
 export function AppShell() {
   useKeyboardShortcuts();
@@ -37,13 +35,14 @@ export function AppShell() {
         return;
       }
 
-      const { isDirty } = useDocumentStore.getState();
-      if (isDirty) {
-        const discard = await ask(
+      if (
+        !(await confirmDiscardDocumentChanges(
           "You have unsaved changes. Close without saving?",
-          { title: APP_NAME, kind: "warning" },
-        );
-        if (!discard) return;
+        ))
+      ) {
+        return;
+      }
+      if (useDocumentStore.getState().isDirty) {
         forceClosingRef.current = true;
       }
 

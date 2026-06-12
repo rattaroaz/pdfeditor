@@ -242,7 +242,7 @@ function NewFieldPreview({
           onChange={(next) => {
             recordHistory();
             setFieldValue(field.name, next, "dropdown");
-            useDocumentStore.getState().setDirty(true);
+            useDocumentStore.getState().markDocumentChanged("forms");
           }}
         />
         {(isSelected || isResizing) && (
@@ -428,7 +428,7 @@ export function PdfFormLayer({ pageNumber, scale }: PdfFormLayerProps) {
         const resizeId = resizing.id;
         const field = useFormStore.getState().newFields.find((f) => f.id === resizeId);
         setResizing(null);
-        useDocumentStore.getState().setDirty(true);
+        useDocumentStore.getState().markDocumentChanged("forms");
         if (field?.kind === "dropdown") {
           const { fontSize } = layoutDropdownFromDrag(field.height);
           log.form.info("Resized dropdown field", {
@@ -446,7 +446,7 @@ export function PdfFormLayer({ pageNumber, scale }: PdfFormLayerProps) {
       }
       if (moving) {
         setMoving(null);
-        useDocumentStore.getState().setDirty(true);
+        useDocumentStore.getState().markDocumentChanged("forms");
       }
     };
 
@@ -512,7 +512,7 @@ export function PdfFormLayer({ pageNumber, scale }: PdfFormLayerProps) {
       useFormStore.getState().setActiveField(suggestedName);
       setSelectedFieldId(id);
       setPendingDropdownFieldId(id);
-      useDocumentStore.getState().setDirty(true);
+      useDocumentStore.getState().markDocumentChanged("forms");
       const { fontSize } = layoutDropdownFromDrag(height);
       log.form.info("Placed form field", {
         userAction: "place_form_field",
@@ -536,7 +536,7 @@ export function PdfFormLayer({ pageNumber, scale }: PdfFormLayerProps) {
     setFieldValue(suggestedName, kind === "checkbox" ? "Off" : "", kind);
     useFormStore.getState().setActiveField(suggestedName);
     setSelectedFieldId(id);
-    useDocumentStore.getState().setDirty(true);
+    useDocumentStore.getState().markDocumentChanged("forms");
     log.form.info("Placed form field", {
       userAction: "place_form_field",
       metadata: { name: suggestedName, kind, pageIndex, x, y, width, height },
@@ -552,7 +552,7 @@ export function PdfFormLayer({ pageNumber, scale }: PdfFormLayerProps) {
     useFormStore.getState().setActiveField(field.name);
     setSelectedFieldId(pendingDropdownFieldId);
     setPendingDropdownFieldId(null);
-    useDocumentStore.getState().setDirty(true);
+    useDocumentStore.getState().markDocumentChanged("forms");
     log.form.info("Configured dropdown field", {
       userAction: "configure_dropdown_field",
       metadata: {
@@ -666,7 +666,7 @@ export function PdfFormLayer({ pageNumber, scale }: PdfFormLayerProps) {
               onChange={(e) => {
                 recordHistory();
                 setFieldValue(widget.name, e.target.checked ? "Yes" : "Off", "checkbox");
-                useDocumentStore.getState().setDirty(true);
+                useDocumentStore.getState().markDocumentChanged("forms");
               }}
             />
           );
@@ -707,7 +707,7 @@ export function PdfFormLayer({ pageNumber, scale }: PdfFormLayerProps) {
                 onChange={(next) => {
                   recordHistory();
                   setFieldValue(widget.name, next, "dropdown");
-                  useDocumentStore.getState().setDirty(true);
+                  useDocumentStore.getState().markDocumentChanged("forms");
                 }}
               />
             </div>
@@ -728,7 +728,7 @@ export function PdfFormLayer({ pageNumber, scale }: PdfFormLayerProps) {
             style={commonStyle}
             onChange={(e) => {
               setFieldValue(widget.name, e.target.value, "text");
-              useDocumentStore.getState().setDirty(true);
+              useDocumentStore.getState().markDocumentChanged("forms");
             }}
             onFocus={() => {
               recordHistory();

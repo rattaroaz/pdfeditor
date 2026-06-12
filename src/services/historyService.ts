@@ -10,7 +10,7 @@ export async function undoEdit(): Promise<void> {
     userAction: "undo",
     metadata: { canRedo: history.canRedo() },
   });
-  useDocumentStore.getState().setDirty(true);
+  useDocumentStore.getState().markDocumentChanged("history");
   void persistAnnotations();
 }
 
@@ -21,6 +21,6 @@ export async function redoEdit(): Promise<void> {
     userAction: "redo",
     metadata: { canUndo: history.canUndo() },
   });
-  useDocumentStore.getState().setDirty(true);
+  useDocumentStore.getState().markDocumentChanged("history");
   void persistAnnotations();
 }

@@ -20,15 +20,22 @@ npm run test:coverage
 | Area | Lines (approx.) |
 |------|-----------------|
 | `src/lib/logging/**` | 85% |
-| `src/stores/**` | 60% |
-| `src/services/**` | 50% |
+| `src/stores/**` | 65% |
+| `src/services/**` | 55% |
 
 Components are excluded from thresholds (covered by services, E2E, and manual smoke). Ratchet thresholds up as coverage improves.
+
+`src/test/contracts.test.ts` runs `npm run check:contracts` inside Vitest so version sync and invoke wiring regressions fail unit tests as well as CI.
 
 ### Recently added coverage
 
 | Area | Tests |
 |------|-------|
+| `documentStore` | Dirty/saved lifecycle, byte baselines, applySavedDocument, clear/rotate |
+| `annotationStore` | Dirty marking on add/update/layout/remove |
+| `documentService` (lifecycle) | confirmDiscard, close, revert, serialized save queue |
+| `logging/buffer` | Subscribe/trim/clear ring buffer |
+| `contracts` | Version + invoke contract scripts |
 | `updateService` | Semver gating, apply flow, missing feed, dirty-doc cancel, invoke errors |
 | `semver` | Parse `v1.2.3`, numeric compare, reject invalid |
 | `toolbarOrder` | Load/save, legacy migration, DOM insert helper |

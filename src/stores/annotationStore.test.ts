@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearHistory } from "@/stores/historyStore";
+import { useDocumentStore } from "@/stores/documentStore";
 import { useAnnotationStore } from "./annotationStore";
 
 vi.mock("@/stores/historyStore", () => ({
@@ -47,6 +48,34 @@ describe("annotationStore", () => {
     useAnnotationStore.getState().setActiveTool("highlight");
     expect(useAnnotationStore.getState().selectedId).toBeNull();
     expect(useAnnotationStore.getState().activeTool).toBe("highlight");
+  });
+
+  it("marks the document dirty when annotations change", () => {
+    useDocumentStore.setState({ isDirty: false });
+    useAnnotationStore.getState().addAnnotation({
+      type: "highlight",
+      pageIndex: 0,
+      author: "User",
+      color: "#FFEB3B",
+      rects: [{ x: 0, y: 0, width: 10, height: 10 }],
+    });
+    expect(useDocumentStore.getState().isDirty).toBe(true);
+
+    useDocumentStore.setState({ isDirty: false });
+    const id = useAnnotationStore.getState().annotations[0]!.id;
+    useAnnotationStore.getState().updateAnnotation(id, { color: "#FF0000" });
+    expect(useDocumentStore.getState().isDirty).toBe(true);
+
+    useDocumentStore.setState({ isDirty: false });
+    useAnnotationStore.getState().updateAnnotationLayout(id, {
+      ...useAnnotationStore.getState().annotations[0]!,
+      rects: [{ x: 1, y: 1, width: 20, height: 20 }],
+    });
+    expect(useDocumentStore.getState().isDirty).toBe(true);
+
+    useDocumentStore.setState({ isDirty: false });
+    useAnnotationStore.getState().removeAnnotation(id);
+    expect(useDocumentStore.getState().isDirty).toBe(true);
   });
 
   it("filters page annotations", () => {

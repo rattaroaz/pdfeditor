@@ -12,8 +12,11 @@ interface DocumentStore {
   filePath: string | null;
   fileName: string;
   pdfDoc: PdfDocument | null;
+  /** Bytes currently rendered in the viewer. */
   pdfBytes: Uint8Array | null;
+  /** Last successful save/open bytes used by File -> Revert to Saved. */
   savedPdfBytes: Uint8Array | null;
+  /** Clean mutation source, without transient sidecar-rendered annotation overlays. */
   basePdfBytes: Uint8Array | null;
   metadata: PdfMetadata | null;
   isDirty: boolean;
@@ -38,9 +41,14 @@ interface DocumentStore {
     fileName: string;
     pdfDoc: PdfDocument;
     pdfBytes: Uint8Array;
+    basePdfBytes?: Uint8Array;
+    savedPdfBytes?: Uint8Array;
     metadata: PdfMetadata;
+    documentPassword?: string | null;
   }) => void;
   clearDocument: () => void;
+  markDocumentChanged: (reason?: string) => void;
+  markDocumentSaved: (message?: string) => void;
   setDirty: (dirty: boolean) => void;
   setCurrentPage: (page: number, options?: { scroll?: boolean }) => void;
   clearScrollRequest: () => void;
@@ -60,6 +68,7 @@ interface DocumentStore {
     filePath: string;
     pdfDoc: PdfDocument;
     pdfBytes: Uint8Array;
+    metadata?: PdfMetadata | null;
   }) => void;
   applyPdfStructureChange: (args: {
     pdfDoc: PdfDocument;
@@ -112,15 +121,24 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
 
   setLoading: (isLoading) => set({ isLoading }),
   setLoadError: (loadError) => set({ loadError }),
-  setDocument: ({ filePath, fileName, pdfDoc, pdfBytes, metadata }) =>
+  setDocument: ({
+    filePath,
+    fileName,
+    pdfDoc,
+    pdfBytes,
+    basePdfBytes,
+    savedPdfBytes,
+    metadata,
+    documentPassword = null,
+  }) =>
     set({
       documentId: uuidv4(),
       filePath,
       fileName,
       pdfDoc,
       pdfBytes,
-      savedPdfBytes: pdfBytes.slice(),
-      basePdfBytes: pdfBytes.slice(),
+      savedPdfBytes: (savedPdfBytes ?? pdfBytes).slice(),
+      basePdfBytes: (basePdfBytes ?? pdfBytes).slice(),
       metadata,
       isDirty: false,
       isLoading: false,
@@ -129,7 +147,7 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
       scrollToPage: 1,
       rotation: 0,
       isPasswordProtected: !!metadata.isPasswordProtected,
-      documentPassword: null,
+      documentPassword,
       pendingSavePassword: null,
       removePasswordOnSave: false,
       hasExtractableText: null,
@@ -158,6 +176,8 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
       hasExtractableText: null,
       viewMode: "single",
     }),
+  markDocumentChanged: () => set({ isDirty: true }),
+  markDocumentSaved: (statusMessage = "Saved") => set({ isDirty: false, statusMessage }),
   setDirty: (isDirty) => set({ isDirty }),
   setCurrentPage: (page, options) => {
     const total = get().metadata?.pageCount ?? 1;
@@ -207,7 +227,7 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
   setSidebarTab: (sidebarTab) => set({ sidebarTab, showSidebar: true }),
   togglePresentationMode: () =>
     set((s) => ({ presentationMode: !s.presentationMode })),
-  applySavedDocument: ({ filePath, pdfDoc, pdfBytes }) => {
+  applySavedDocument: ({ filePath, pdfDoc, pdfBytes, metadata }) => {
     const currentPage = get().currentPage;
     set({
       filePath,
@@ -219,6 +239,7 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
       isDirty: false,
       statusMessage: "Saved",
       currentPage,
+      metadata: metadata ?? get().metadata,
     });
   },
   applyPdfStructureChange: ({ pdfDoc, pdfBytes, pageCount }) => {

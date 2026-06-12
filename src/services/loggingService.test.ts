@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import { fetchLoggingInfo, readBackendLogTail } from "./loggingService";
 import { clearLogBuffer, logger } from "@/lib/logging";
+import { APP_VERSION } from "@/lib/constants";
 
 describe("loggingService", () => {
   beforeEach(() => {
@@ -13,13 +14,13 @@ describe("loggingService", () => {
   it("fetchLoggingInfo merges backend and session metadata", async () => {
     vi.mocked(invoke).mockResolvedValue({
       logDirectory: "C:\\logs\\pdfeditor",
-      appVersion: "1.2.2",
+      appVersion: APP_VERSION,
       rustLogFilter: "info",
     });
 
     const info = await fetchLoggingInfo();
     expect(info.logDirectory).toBe("C:\\logs\\pdfeditor");
-    expect(info.appVersion).toBe("1.2.2");
+    expect(info.appVersion).toBe(APP_VERSION);
     expect(info.sessionId).toBe(logger.sessionId);
     expect(info.minLevel).toBe(logger.getLevel());
   });

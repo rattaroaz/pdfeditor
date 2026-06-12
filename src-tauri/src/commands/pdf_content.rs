@@ -1,19 +1,16 @@
 use crate::commands::pdf_pages::save_doc;
 use crate::error::{map_err, AppError, CommandResult};
+use super::pdf_common::{decode_pdf_base64, encode_pdf_bytes};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use lopdf::content::{Content, Operation};
 use lopdf::{Dictionary, Document, Object, ObjectId, Stream};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::io::Write;
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PdfBytesResult {
-  pub data_base64: String,
-}
+pub use super::pdf_common::PdfBytesResult;
 
 fn page_height(doc: &Document, page_id: ObjectId) -> f64 {
   doc
@@ -571,9 +568,7 @@ pub struct ApplyContentEditsPayload {
 }
 
 pub fn apply_content_edits_impl(payload: ApplyContentEditsPayload) -> CommandResult<PdfBytesResult> {
-  let bytes = STANDARD
-    .decode(&payload.pdf_base64)
-    .map_err(|e| map_err(AppError::InvalidInput(e.to_string())))?;
+  let bytes = decode_pdf_base64(&payload.pdf_base64).map_err(map_err)?;
   let text_edits: Vec<TextEditDto> = if payload.text_edits_json.trim().is_empty() {
     vec![]
   } else {
@@ -589,7 +584,7 @@ pub fn apply_content_edits_impl(payload: ApplyContentEditsPayload) -> CommandRes
 
   let output = apply_content_edits_in_pdf(&bytes, &text_edits, &image_edits).map_err(map_err)?;
   Ok(PdfBytesResult {
-    data_base64: STANDARD.encode(&output),
+    data_base64: encode_pdf_bytes(&output),
   })
 }
 

@@ -1,5 +1,6 @@
 import type { AppErrorPayload } from "@shared/types";
 import { E2E_PDF_PATH, MINIMAL_PDF_BASE64 } from "./fixturePdf";
+import pkg from "../../package.json";
 
 const e2eLogLines: string[] = [];
 const invokeLog: string[] = [];
@@ -77,7 +78,7 @@ export async function handleInvoke<T>(
     case "get_logging_info":
       return {
         logDirectory: "/tmp/pdfeditor-e2e-logs",
-        appVersion: "1.2.2-e2e",
+        appVersion: `${pkg.version}-e2e`,
         rustLogFilter: "info",
       } as T;
     case "read_recent_log_lines":
@@ -93,6 +94,13 @@ export async function handleInvoke<T>(
       return undefined as T;
     case "apply_content_edits":
       return { dataBase64: String(args?.pdfBase64 ?? MINIMAL_PDF_BASE64) } as T;
+    case "delete_pdf_pages":
+    case "insert_blank_pages":
+    case "reorder_pdf_pages":
+    case "rotate_pdf_pages":
+    case "extract_pdf_pages":
+    case "merge_pdfs":
+      return { dataBase64: MINIMAL_PDF_BASE64 } as T;
     case "create_form_fields":
     case "apply_form_values":
     case "flatten_pdf_forms":
@@ -101,7 +109,6 @@ export async function handleInvoke<T>(
     case "decrypt_pdf":
       return { dataBase64: String(args?.pdfBase64 ?? MINIMAL_PDF_BASE64) } as T;
     default:
-      console.warn(`[e2e-mock] unhandled invoke: ${command}`, args);
-      return {} as T;
+      appError(`E2E mock: unhandled invoke ${command}`, "UNHANDLED_INVOKE");
   }
 }

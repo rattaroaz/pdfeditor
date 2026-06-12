@@ -1,5 +1,5 @@
 use crate::error::{map_err, AppError, CommandResult};
-use base64::{engine::general_purpose::STANDARD, Engine as _};
+use super::pdf_common::{decode_pdf_base64, encode_pdf_bytes, save_doc};
 use lopdf::{Dictionary, Document, Object, ObjectId};
 use serde::Deserialize;
 use std::collections::BTreeMap;
@@ -549,9 +549,7 @@ pub fn strip_annotations_from_pdf(pdf_bytes: &[u8]) -> Result<Vec<u8>, AppError>
       page.set(b"Annots", Object::Array(kept));
     }
   }
-  let mut output = Vec::new();
-  doc.save_to(&mut output)
-    .map_err(|e| AppError::Pdf(e.to_string()))?;
+  let output = save_doc(&mut doc)?;
   tracing::info!(
     elapsed_ms = start.elapsed().as_millis() as u64,
     output_bytes = output.len(),
@@ -565,9 +563,7 @@ pub fn prepare_document_bytes(
   has_sidecar: bool,
 ) -> CommandResult<String> {
   let _span = tracing::info_span!("prepare_document_bytes", has_sidecar).entered();
-  let bytes = STANDARD
-    .decode(pdf_base64.trim())
-    .map_err(|e| map_err(AppError::InvalidInput(format!("Invalid base64: {e}"))))?;
+  let bytes = decode_pdf_base64(&pdf_base64).map_err(map_err)?;
 
   let output = if has_sidecar {
     tracing::debug!(input_bytes = bytes.len(), "stripping sidecar annotations for open");
@@ -576,7 +572,7 @@ pub fn prepare_document_bytes(
     bytes
   };
 
-  Ok(STANDARD.encode(&output))
+  Ok(encode_pdf_bytes(&output))
 }
 
 pub fn embed_annotations_in_pdf(
@@ -605,9 +601,7 @@ pub fn embed_annotations_in_pdf(
     embed_one(&mut doc, &pages, ann)?;
   }
 
-  let mut output = Vec::new();
-  doc.save_to(&mut output)
-    .map_err(|e| AppError::Pdf(e.to_string()))?;
+  let output = save_doc(&mut doc)?;
   tracing::info!(
     elapsed_ms = start.elapsed().as_millis() as u64,
     output_bytes = output.len(),
@@ -629,9 +623,7 @@ pub fn save_pdf_with_annotations(
   pdf_base64: String,
   annotations_json: String,
 ) -> CommandResult<SavePdfResult> {
-  let bytes = STANDARD
-    .decode(pdf_base64.trim())
-    .map_err(|e| map_err(AppError::InvalidInput(format!("Invalid base64: {e}"))))?;
+  let bytes = decode_pdf_base64(&pdf_base64).map_err(map_err)?;
 
   if bytes.is_empty() || bytes[0] != b'%' {
     return Err(map_err(AppError::InvalidInput("Invalid PDF data".into())));
@@ -653,7 +645,7 @@ pub fn save_pdf_with_annotations(
   );
 
   Ok(SavePdfResult {
-    data_base64: STANDARD.encode(&output),
+    data_base64: encode_pdf_bytes(&output),
     path: target_path,
   })
 }

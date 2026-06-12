@@ -1,5 +1,6 @@
 mod pdf_annotations;
 mod pdf_assembly;
+mod pdf_common;
 mod pdf_content;
 mod pdf_forms;
 mod pdf_pages;
