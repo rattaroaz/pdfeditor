@@ -20,15 +20,28 @@ function upToDateMessage(): string {
 }
 
 const UPDATE_FEED_UNAVAILABLE_MESSAGE =
-  "No update feed is published yet. Bump the app version and push a matching tag (for example v1.4.0) after adding TAURI_SIGNING_PRIVATE_KEY to GitHub Actions secrets so the Release workflow can upload latest.json.";
+  "No update feed is published yet. Bump the app version and push a matching tag (for example v1.4.1) after adding TAURI_SIGNING_PRIVATE_KEY to GitHub Actions secrets so the Release workflow can upload latest.json.";
+
+const UPDATE_PLATFORM_UNSUPPORTED_MESSAGE =
+  "In-app updates are not available for this Windows build. GitHub releases currently publish x64 installers only, but this copy is ARM64 (built locally or from an unsigned build). Download a newer release manually from GitHub, or rebuild from source.";
 
 function isUpdateFeedUnavailable(message: string): boolean {
+  if (isUnsupportedPlatformError(message)) return false;
   const lower = message.toLowerCase();
   return (
     lower.includes("could not fetch a valid release json") ||
     lower.includes("failed to fetch") ||
     lower.includes("404") ||
     lower.includes("not found")
+  );
+}
+
+function isUnsupportedPlatformError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("fallback platforms") ||
+    lower.includes("windows-aarch64") ||
+    lower.includes("were not found in the response")
   );
 }
 
@@ -121,6 +134,15 @@ export async function checkForUpdatesAndApply(): Promise<void> {
     await relaunch();
   } catch (err) {
     const payload = toAppErrorPayload(err);
+
+    if (isUnsupportedPlatformError(payload.message)) {
+      log.update.info("Update feed has no build for this platform", {
+        userAction,
+        metadata: { status: "unsupported_platform" },
+      });
+      setUpdatePhase("error", UPDATE_PLATFORM_UNSUPPORTED_MESSAGE);
+      return;
+    }
 
     if (isUpdateFeedUnavailable(payload.message)) {
       log.update.info("Update feed not published yet", {

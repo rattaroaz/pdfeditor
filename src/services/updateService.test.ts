@@ -116,4 +116,18 @@ describe("updateService", () => {
     expect(useUiStore.getState().updatePhase).toBe("error");
     expect(useUiStore.getState().updateMessage).toContain("No update feed is published yet");
   });
+
+  it("explains when the release feed has no build for this platform", async () => {
+    mockCheck.mockRejectedValue(
+      new Error(
+        'None of the fallback platforms `["windows-aarch64-msi", "windows-aarch64"]` were found in the response `platforms` object',
+      ),
+    );
+
+    await checkForUpdatesAndApply();
+
+    expect(useUiStore.getState().updatePhase).toBe("error");
+    expect(useUiStore.getState().updateMessage).toContain("ARM64");
+    expect(useUiStore.getState().updateMessage).toContain("x64");
+  });
 });

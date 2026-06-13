@@ -7,15 +7,27 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (e.g. v1.4.0)"
+        description: "Release tag (e.g. v1.4.1)"
         required: true
-        default: v1.4.0
+        default: v1.4.1
 
 permissions:
   contents: write
 
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  RELEASE_NAME: PDF Editor ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  RELEASE_BODY: |
+    Windows release for PDF Editor.
+
+    - **latest.json** — used by the in-app updater (background download + restart)
+    - **NSIS setup** (`.exe`) — first-time install or manual reinstall
+    - **MSI** — managed / enterprise deployments
+
+    Builds are published for **x64** and **ARM64** Windows. Installed copies update only when the user chooses Help → Check for updates.
+
 jobs:
-  release-windows:
+  release-windows-x64:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -69,20 +81,67 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-          releaseName: PDF Editor ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-          releaseBody: |
-            Windows release for PDF Editor.
-
-            - **latest.json** — used by the in-app updater (background download + restart)
-            - **NSIS setup** (`.exe`) — first-time install or manual reinstall
-            - **MSI** — managed / enterprise installs
-
-            Installed copies update only when the user chooses Help → Check for updates.
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: ${{ env.RELEASE_NAME }}
+          releaseBody: ${{ env.RELEASE_BODY }}
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
           updaterJsonPreferNsis: true
+          retryAttempts: 3
+          args: --bundles nsis,msi
+
+      - name: Verify MSI was built and uploaded
+        shell: pwsh
+        run: |
+          $msi = Get-ChildItem -Path src-tauri/target/release/bundle/msi -Filter *.msi -Recurse -ErrorAction SilentlyContinue
+          if (-not $msi) {
+            throw 'MSI bundle was not produced. Check the WiX/VBScript build step above.'
+          }
+          Write-Host "MSI ready: $($msi.FullName)"
+
+  release-windows-arm64:
+    needs: release-windows-x64
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Enable VBScript for MSI builds
+        shell: pwsh
+        run: |
+          $cap = Get-WindowsCapability -Online | Where-Object { $_.Name -like 'VBSCRIPT*' }
+          if (-not $cap) {
+            throw 'VBSCRIPT Windows capability not found on this runner.'
+          }
+          if ($cap.State -ne 'Installed') {
+            Add-WindowsCapability -Online -Name $cap.Name
+          }
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GIT_COMMIT_SHA: ${{ github.sha }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: ${{ env.RELEASE_NAME }}
+          releaseBody: ${{ env.RELEASE_BODY }}
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true
+          retryAttempts: 3
           args: --bundles nsis,msi
 
       - name: Verify MSI was built and uploaded
