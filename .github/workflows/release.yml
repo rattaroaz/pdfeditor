@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (e.g. v1.4.2)"
+        description: "Release tag (e.g. v1.4.3)"
         required: true
-        default: v1.4.2
+        default: v1.4.3
 
 permissions:
   contents: write
@@ -29,6 +29,8 @@ env:
 jobs:
   release-windows-x64:
     runs-on: windows-latest
+    outputs:
+      releaseId: ${{ steps.tauri.outputs.releaseId }}
     steps:
       - uses: actions/checkout@v4
 
@@ -76,7 +78,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
-      - uses: tauri-apps/tauri-action@v0
+      - id: tauri
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GIT_COMMIT_SHA: ${{ github.sha }}
@@ -137,13 +140,15 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
-      - uses: tauri-apps/tauri-action@v0
+      - id: tauri
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GIT_COMMIT_SHA: ${{ github.sha }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
+          releaseId: ${{ needs.release-windows-x64.outputs.releaseId }}
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: ${{ env.RELEASE_NAME }}
           releaseBody: ${{ env.RELEASE_BODY }}
@@ -165,3 +170,14 @@ jobs:
             throw 'NSIS bundle was not produced for ARM64.'
           }
           Write-Host "NSIS ready: $($nsis.FullName)"
+
+  verify-updater-manifest:
+    needs: release-windows-arm64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify merged latest.json includes x64 and ARM64
+        env:
+          MANIFEST_URL: https://github.com/rattaroaz/pdfeditor/releases/download/${{ env.RELEASE_TAG }}/latest.json
+        run: node scripts/verify-latest-json.mjs "$MANIFEST_URL"
