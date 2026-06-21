@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (e.g. v1.4.3)"
+        description: "Release tag (e.g. v1.4.4)"
         required: true
-        default: v1.4.3
+        default: v1.4.4
 
 permissions:
   contents: write
@@ -44,7 +44,7 @@ jobs:
           targets: x86_64-pc-windows-msvc
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm run ci:install
 
       # WiX (MSI) requires VBScript on Windows Server runners.
       - name: Enable VBScript for MSI builds
@@ -124,7 +124,7 @@ jobs:
           targets: aarch64-pc-windows-msvc
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm run ci:install
 
       - name: Verify updater signing secrets
         shell: pwsh
