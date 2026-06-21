@@ -20,7 +20,7 @@ function upToDateMessage(): string {
 }
 
 const UPDATE_FEED_UNAVAILABLE_MESSAGE =
-  "No update feed is published yet. Bump the app version and push a matching tag (for example v1.4.1) after adding TAURI_SIGNING_PRIVATE_KEY to GitHub Actions secrets so the Release workflow can upload latest.json.";
+  "No update feed is published yet. Bump the app version and push a matching tag (for example v1.4.2) after adding TAURI_SIGNING_PRIVATE_KEY to GitHub Actions secrets so the Release workflow can upload latest.json.";
 
 const UPDATE_PLATFORM_MISSING_ARM64_MESSAGE =
   "This release does not include an in-app update for Windows on ARM (ARM64). Install the ARM64 setup (.exe) from the GitHub release page, or wait until a release publishes windows-aarch64 entries in latest.json.";

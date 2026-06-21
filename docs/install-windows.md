@@ -5,7 +5,7 @@ PDF Editor is packaged for Windows using [Tauri 2](https://v2.tauri.app/distribu
 | Output | Format | Typical use |
 |--------|--------|-------------|
 | **NSIS setup** | `PDF Editor_x64-setup.exe` / `PDF Editor_arm64-setup.exe` | Recommended for end users (wizard installer) |
-| **MSI** | `PDF Editor_x64_en-US.msi` / `PDF Editor_arm64_en-US.msi` | Enterprise / Group Policy deployment |
+| **MSI** | `PDF Editor_x64_en-US.msi` | Enterprise / Group Policy deployment (x64 only) |
 | **Portable** | `pdfeditor.exe` in `target/release/` | Run without installing |
 
 Installers are written to:
@@ -85,12 +85,12 @@ npx tauri icon scripts/app-icon.png
 
 ## GitHub Releases (CI)
 
-The [Release workflow](.github/workflows/release.yml) runs a **matrix** on each tag:
+The [Release workflow](.github/workflows/release.yml) builds **x64 first**, then **ARM64** on each tag so `latest.json` merges without upload races:
 
 | Runner | Architecture | Installers |
 |--------|--------------|------------|
 | `windows-latest` | x64 (Intel/AMD) | NSIS (`.exe`) + MSI (`.msi`) |
-| `windows-11-arm` | ARM64 | NSIS (`.exe`) only |
+| `windows-11-arm` (after x64) | ARM64 | NSIS (`.exe`) only |
 
 Both jobs merge into one GitHub Release and one **`latest.json`** with `windows-x86_64-nsis` and `windows-aarch64-nsis` entries for the in-app updater. MSI is x64-only (WiX does not support ARM64). The x64 job enables **VBScript** before the build because WiX requires it for MSI packaging.
 
