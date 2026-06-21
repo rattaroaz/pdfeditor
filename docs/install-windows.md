@@ -85,7 +85,14 @@ npx tauri icon scripts/app-icon.png
 
 ## GitHub Releases (CI)
 
-The [Release workflow](.github/workflows/release.yml) builds **both** NSIS (`.exe`) and MSI (`.msi`) for **x64** and **ARM64** Windows, attaches them to each GitHub Release, and publishes a merged `latest.json` for the in-app updater. The x64 job runs on `windows-latest`; the ARM64 job runs on `windows-11-arm` after x64 so `latest.json` includes both architectures without upload races. Both runners enable **VBScript** before the build because WiX requires it for MSI packaging.
+The [Release workflow](.github/workflows/release.yml) runs a **matrix** on each tag:
+
+| Runner | Architecture | Installers |
+|--------|--------------|------------|
+| `windows-latest` | x64 (Intel/AMD) | NSIS (`.exe`) + MSI (`.msi`) |
+| `windows-11-arm` | ARM64 | NSIS (`.exe`) only |
+
+Both jobs merge into one GitHub Release and one **`latest.json`** with `windows-x86_64-nsis` and `windows-aarch64-nsis` entries for the in-app updater. MSI is x64-only (WiX does not support ARM64). The x64 job enables **VBScript** before the build because WiX requires it for MSI packaging.
 
 ## Troubleshooting
 

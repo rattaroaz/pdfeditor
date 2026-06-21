@@ -20,15 +20,29 @@ env:
   RELEASE_BODY: |
     Windows release for PDF Editor.
 
-    - **latest.json** — used by the in-app updater (background download + restart)
-    - **NSIS setup** (`.exe`) — first-time install or manual reinstall
-    - **MSI** — managed / enterprise deployments
+    - **latest.json** — used by the in-app updater (includes x64 and ARM64 entries)
+    - **NSIS setup** (`.exe`) — first-time install or manual reinstall (x64 and ARM64)
+    - **MSI** — managed / enterprise deployments (x64 only)
 
     Builds are published for **x64** and **ARM64** Windows. Installed copies update only when the user chooses Help → Check for updates.
 
 jobs:
-  release-windows-x64:
-    runs-on: windows-latest
+  release-windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runs-on: windows-latest
+            rust-target: x86_64-pc-windows-msvc
+            bundles: nsis,msi
+            verify-msi: true
+          - arch: arm64
+            runs-on: windows-11-arm
+            rust-target: aarch64-pc-windows-msvc
+            bundles: nsis
+            verify-msi: false
+    runs-on: ${{ matrix.runs-on }}
     steps:
       - uses: actions/checkout@v4
 
@@ -38,12 +52,15 @@ jobs:
           cache: npm
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-target }}
 
       - name: Install frontend dependencies
         run: npm ci
 
-      # WiX (MSI) requires VBScript on Windows Server runners.
+      # WiX (MSI) requires VBScript on Windows Server runners (x64 only).
       - name: Enable VBScript for MSI builds
+        if: matrix.verify-msi
         shell: pwsh
         run: |
           $cap = Get-WindowsCapability -Online | Where-Object { $_.Name -like 'VBSCRIPT*' }
@@ -89,66 +106,30 @@ jobs:
           includeUpdaterJson: true
           updaterJsonPreferNsis: true
           retryAttempts: 3
-          args: --bundles nsis,msi
+          args: --target ${{ matrix.rust-target }} --bundles ${{ matrix.bundles }}
 
       - name: Verify MSI was built and uploaded
+        if: matrix.verify-msi
         shell: pwsh
         run: |
-          $msi = Get-ChildItem -Path src-tauri/target/release/bundle/msi -Filter *.msi -Recurse -ErrorAction SilentlyContinue
+          $msi = Get-ChildItem -Path src-tauri/target/${{ matrix.rust-target }}/release/bundle/msi -Filter *.msi -Recurse -ErrorAction SilentlyContinue
+          if (-not $msi) {
+            $msi = Get-ChildItem -Path src-tauri/target/release/bundle/msi -Filter *.msi -Recurse -ErrorAction SilentlyContinue
+          }
           if (-not $msi) {
             throw 'MSI bundle was not produced. Check the WiX/VBScript build step above.'
           }
           Write-Host "MSI ready: $($msi.FullName)"
 
-  release-windows-arm64:
-    needs: release-windows-x64
-    runs-on: windows-11-arm
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Enable VBScript for MSI builds
+      - name: Verify NSIS was built and uploaded
+        if: ${{ !matrix.verify-msi }}
         shell: pwsh
         run: |
-          $cap = Get-WindowsCapability -Online | Where-Object { $_.Name -like 'VBSCRIPT*' }
-          if (-not $cap) {
-            throw 'VBSCRIPT Windows capability not found on this runner.'
+          $nsis = Get-ChildItem -Path src-tauri/target/${{ matrix.rust-target }}/release/bundle/nsis -Filter *.exe -Recurse -ErrorAction SilentlyContinue
+          if (-not $nsis) {
+            $nsis = Get-ChildItem -Path src-tauri/target/release/bundle/nsis -Filter *.exe -Recurse -ErrorAction SilentlyContinue
           }
-          if ($cap.State -ne 'Installed') {
-            Add-WindowsCapability -Online -Name $cap.Name
+          if (-not $nsis) {
+            throw 'NSIS bundle was not produced for ARM64.'
           }
-
-      - uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GIT_COMMIT_SHA: ${{ github.sha }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          tagName: ${{ env.RELEASE_TAG }}
-          releaseName: ${{ env.RELEASE_NAME }}
-          releaseBody: ${{ env.RELEASE_BODY }}
-          releaseDraft: false
-          prerelease: false
-          includeUpdaterJson: true
-          updaterJsonPreferNsis: true
-          retryAttempts: 3
-          args: --bundles nsis,msi
-
-      - name: Verify MSI was built and uploaded
-        shell: pwsh
-        run: |
-          $msi = Get-ChildItem -Path src-tauri/target/release/bundle/msi -Filter *.msi -Recurse -ErrorAction SilentlyContinue
-          if (-not $msi) {
-            throw 'MSI bundle was not produced. Check the WiX/VBScript build step above.'
-          }
-          Write-Host "MSI ready: $($msi.FullName)"
+          Write-Host "NSIS ready: $($nsis.FullName)"
