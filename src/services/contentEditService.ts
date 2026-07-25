@@ -8,7 +8,7 @@ import {
 import type { PdfBytesResult } from "@/lib/pdf/pdfBinary";
 import type { ImageContentEdit, TextContentEdit } from "@shared/types";
 import { useContentEditStore } from "@/stores/contentEditStore";
-import { useDocumentStore } from "@/stores/documentStore";
+import { getDocumentLoadPassword, useDocumentStore } from "@/stores/documentStore";
 import { log, reportError } from "@/lib/logging";
 import { TEXT_COVER_H_PAD, TEXT_COVER_V_PAD } from "@/lib/textEditBox";
 
@@ -109,7 +109,7 @@ export async function applyContentEdits(
     });
 
     const newBytes = decodeBase64Pdf(result.dataBase64);
-    const pdfDoc = await loadPdfFromBytes(newBytes);
+    const pdfDoc = await loadPdfFromBytes(newBytes, getDocumentLoadPassword());
     docStore.applyPdfStructureChange({
       pdfDoc,
       pdfBytes: newBytes,

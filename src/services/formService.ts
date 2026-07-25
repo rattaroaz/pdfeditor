@@ -9,7 +9,7 @@ import {
 } from "@/lib/pdf/pdfEngine";
 import type { PdfBytesResult } from "@/lib/pdf/pdfBinary";
 import { readTextFile, writeTextFile } from "@/lib/pdf/pdfStorage";
-import { useDocumentStore } from "@/stores/documentStore";
+import { getDocumentLoadPassword, useDocumentStore } from "@/stores/documentStore";
 import { useFormStore } from "@/stores/formStore";
 import { createErrorReporter, log } from "@/lib/logging";
 import { defaultDropdownOptions, normalizeDropdownOptions } from "@/lib/dropdownOptions";
@@ -156,7 +156,7 @@ export async function applyFormChanges(): Promise<boolean> {
     }
 
     const newBytes = decodeBase64Pdf(base64);
-    const pdfDoc = await loadPdfFromBytes(newBytes);
+    const pdfDoc = await loadPdfFromBytes(newBytes, getDocumentLoadPassword());
     docStore.applyPdfStructureChange({ pdfDoc, pdfBytes: newBytes, pageCount: pdfDoc.numPages });
 
     useFormStore.setState({ newFields: [] });
@@ -184,7 +184,7 @@ export async function flattenForms(): Promise<void> {
       pdfBase64: encodeBase64Pdf(sourceBytes),
     });
     const newBytes = decodeBase64Pdf(result.dataBase64);
-    const pdfDoc = await loadPdfFromBytes(newBytes);
+    const pdfDoc = await loadPdfFromBytes(newBytes, getDocumentLoadPassword());
     docStore.applyPdfStructureChange({ pdfDoc, pdfBytes: newBytes, pageCount: pdfDoc.numPages });
     useFormStore.getState().clearFormState();
     docStore.setStatusMessage("Form flattened");

@@ -6,7 +6,7 @@ import { invokeLogged } from "@/lib/tauriInvoke";
 import { decodeBase64Pdf, encodeBase64Pdf, loadPdfFromBytes, renderPageToCanvas } from "@/lib/pdf/pdfEngine";
 import { ensurePdfExtension, type PdfBytesResult } from "@/lib/pdf/pdfBinary";
 import { requireTauriDesktop } from "@/lib/tauriRuntime";
-import { useDocumentStore } from "@/stores/documentStore";
+import { getDocumentLoadPassword, useDocumentStore } from "@/stores/documentStore";
 import { useAnnotationStore } from "@/stores/annotationStore";
 import { createErrorReporter, log } from "@/lib/logging";
 import type { ReadFileResult } from "@shared/types";
@@ -36,7 +36,7 @@ async function readPdfBase64(path: string): Promise<string> {
 async function applyMergedOrNewDocument(newBytes: Uint8Array, fileName: string): Promise<void> {
   const docStore = useDocumentStore.getState();
   const annStore = useAnnotationStore.getState();
-  const pdfDoc = await loadPdfFromBytes(newBytes);
+  const pdfDoc = await loadPdfFromBytes(newBytes, getDocumentLoadPassword());
 
   docStore.setDocument({
     filePath: "",
@@ -102,13 +102,15 @@ export async function mergeIntoCurrentDocument(): Promise<void> {
     const pdfBase64List = [encodeBase64Pdf(sourceBytes), ...others];
     const result = await invokeLogged<PdfBytesResult>("merge_pdfs", { pdfBase64List });
     const bytes = decodeBase64Pdf(result.dataBase64);
-    const pdfDoc = await loadPdfFromBytes(bytes);
+    const pdfDoc = await loadPdfFromBytes(bytes, getDocumentLoadPassword());
 
     docStore.applyPdfStructureChange({
       pdfDoc,
       pdfBytes: bytes,
       pageCount: pdfDoc.numPages,
     });
+    // Appended pages shift indices; drop overlay state rather than leave stale pageIndex values.
+    useAnnotationStore.getState().clearAnnotations();
     docStore.setStatusMessage(`Appended ${paths.length} PDF(s) · ${pdfDoc.numPages} pages`);
     log.assembly.info("Merged PDFs into current document", { userAction: "append" });
   } catch (err) {

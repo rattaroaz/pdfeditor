@@ -137,12 +137,17 @@ async function openPdfFromPathImpl(filePath: string): Promise<void> {
       sidecarJson = null;
     }
 
+    const hasSidecar =
+      typeof sidecarJson === "string" &&
+      sidecarJson.trim() !== "" &&
+      sidecarJson.trim() !== "[]";
+
     const cleanBase64 = await invokeLogged<string>("prepare_document_bytes", {
       pdfBase64: encodeBase64Pdf(pdfBytes),
-      hasSidecar: !!sidecarJson,
+      hasSidecar,
     });
     const baseBytes = decodeBase64Pdf(cleanBase64);
-    const viewBytes = sidecarJson ? baseBytes : pdfBytes;
+    const viewBytes = hasSidecar ? baseBytes : pdfBytes;
 
     let security: PdfSecurityInfo = { isEncrypted: false, requiresPassword: false };
     try {
@@ -156,6 +161,13 @@ async function openPdfFromPathImpl(filePath: string): Promise<void> {
     const fileName = fileNameFromPath(filePath);
     const metadata = await fetchMetadata(filePath, pdfDoc.numPages, pdfBytes.byteLength);
     metadata.isPasswordProtected = security.isEncrypted;
+
+    // Clear overlays before swapping the document so the new pdfDoc never
+    // briefly renders with the previous file's annotations/edits/fields.
+    annStore.clearAnnotations();
+    useContentEditStore.getState().clearEdits();
+    useFormStore.getState().clearFormState();
+    clearHistory();
 
     docStore.setDocument({
       filePath,
@@ -180,15 +192,17 @@ async function openPdfFromPathImpl(filePath: string): Promise<void> {
       log.document.warn("Failed to update recent files", { userAction: "open" });
     }
 
-    if (sidecarJson) {
-      annStore.setAnnotations(JSON.parse(sidecarJson) as Annotation[]);
-    } else {
-      annStore.clearAnnotations();
+    if (hasSidecar && sidecarJson) {
+      try {
+        annStore.setAnnotations(JSON.parse(sidecarJson) as Annotation[]);
+      } catch {
+        log.document.warn("Annotation sidecar JSON was invalid; starting with empty markup", {
+          userAction: "open",
+        });
+        annStore.clearAnnotations();
+      }
     }
 
-    useContentEditStore.getState().clearEdits();
-    useFormStore.getState().clearFormState();
-    clearHistory();
     try {
       await inspectDocumentForms(baseBytes);
       await loadFormFieldsFromPdf(pdfDoc);
@@ -247,7 +261,9 @@ async function savePdfImpl(saveAs = false): Promise<void> {
 
     if (useContentEditStore.getState().hasEdits()) {
       log.document.info("Applying content edits before save", { userAction: "save" });
-      const ok = await applyContentEdits({ clearAfter: false });
+      // clearAfter: true — bytes are already mutated; keeping edits would
+      // double-apply them if a later save step fails and the user retries.
+      const ok = await applyContentEdits({ clearAfter: true });
       if (!ok) {
         docStore.setStatusMessage(null);
         return;
@@ -271,8 +287,8 @@ async function savePdfImpl(saveAs = false): Promise<void> {
     }
 
     const sourceBytes =
-      useDocumentStore.getState().pdfBytes ??
       useDocumentStore.getState().basePdfBytes ??
+      useDocumentStore.getState().pdfBytes ??
       pdfBytes;
     const result = await invokeLogged<SavePdfResult>("save_pdf_with_annotations", {
       targetPath,
@@ -286,6 +302,7 @@ async function savePdfImpl(saveAs = false): Promise<void> {
     if (securityStore.pendingSavePassword || securityStore.removePasswordOnSave) {
       newBytes = await applySecurityOnSaveBytes(newBytes);
     }
+    // Single write after optional encrypt/decrypt — Rust no longer writes plaintext first.
     await writePdfBytes(targetPath, newBytes);
 
     const updatedDoc = useDocumentStore.getState();
@@ -312,8 +329,6 @@ async function savePdfImpl(saveAs = false): Promise<void> {
     } catch {
       log.document.warn("Form reload after save failed", { userAction: "save" });
     }
-
-    useContentEditStore.getState().clearEdits();
 
     const flatten = useUiStore.getState().flattenOnSave;
     const savedAnnotations = useAnnotationStore.getState().annotations;
@@ -345,7 +360,6 @@ async function savePdfImpl(saveAs = false): Promise<void> {
     docStore.setStatusMessage(null);
     timer.fail(err);
     showError(err, "save");
-    throw err;
   }
 }
 
@@ -417,6 +431,11 @@ async function revertToSavedImpl(): Promise<void> {
       savedPdfBytes.byteLength,
     );
 
+    annStore.clearAnnotations();
+    useContentEditStore.getState().clearEdits();
+    useFormStore.getState().clearFormState();
+    clearHistory();
+
     docStore.setDocument({
       filePath,
       fileName,
@@ -438,18 +457,17 @@ async function revertToSavedImpl(): Promise<void> {
       const saved = await invokeLogged<string | null>("load_annotations", {
         filePath,
       });
-      if (saved) {
-        annStore.setAnnotations(JSON.parse(saved) as Annotation[]);
-      } else {
-        annStore.clearAnnotations();
+      if (saved && saved.trim() !== "" && saved.trim() !== "[]") {
+        try {
+          annStore.setAnnotations(JSON.parse(saved) as Annotation[]);
+        } catch {
+          annStore.clearAnnotations();
+        }
       }
     } catch {
       annStore.clearAnnotations();
     }
 
-    useContentEditStore.getState().clearEdits();
-    useFormStore.getState().clearFormState();
-    clearHistory();
     try {
       const bytes = useDocumentStore.getState().savedPdfBytes ?? savedPdfBytes;
       if (bytes) {

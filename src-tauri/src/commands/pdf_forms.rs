@@ -1035,6 +1035,21 @@ fn create_form_fields_in_pdf(pdf_bytes: &[u8], fields: &[NewFieldDto]) -> Result
   Ok(output)
 }
 
+fn annot_subtype_is_widget(doc: &Document, obj: &Object) -> bool {
+  let dict = match obj {
+    Object::Reference(id) => doc.get_dictionary(*id).ok(),
+    Object::Dictionary(d) => Some(d),
+    _ => None,
+  };
+  let Some(dict) = dict else {
+    return false;
+  };
+  let Ok(subtype) = dict.get(b"Subtype").and_then(Object::as_name) else {
+    return false;
+  };
+  subtype == b"Widget"
+}
+
 pub fn flatten_forms_in_pdf(pdf_bytes: &[u8]) -> Result<Vec<u8>, AppError> {
   let _span = tracing::info_span!("flatten_forms_in_pdf", input_bytes = pdf_bytes.len()).entered();
   let start = std::time::Instant::now();
@@ -1045,9 +1060,41 @@ pub fn flatten_forms_in_pdf(pdf_bytes: &[u8]) -> Result<Vec<u8>, AppError> {
     .map_err(|e| AppError::Pdf(e.to_string()))?;
   catalog.remove(b"AcroForm");
 
-  for (_, page_id) in doc.get_pages() {
-    if let Ok(page) = doc.get_dictionary_mut(page_id) {
+  // Remove Widget annotations only — preserve markup, links, and other Annot subtypes.
+  let page_ids: Vec<ObjectId> = doc.get_pages().values().copied().collect();
+  for page_id in page_ids {
+    let annot_objects: Option<Vec<Object>> = {
+      let page = match doc.get_dictionary(page_id) {
+        Ok(p) => p,
+        Err(_) => continue,
+      };
+      match page.get(b"Annots") {
+        Ok(Object::Array(arr)) => Some(arr.clone()),
+        Ok(Object::Reference(id)) => doc
+          .get_object(*id)
+          .ok()
+          .and_then(|o| o.as_array().ok())
+          .cloned(),
+        _ => None,
+      }
+    };
+
+    let Some(annots) = annot_objects else {
+      continue;
+    };
+
+    let kept: Vec<Object> = annots
+      .into_iter()
+      .filter(|obj| !annot_subtype_is_widget(&doc, obj))
+      .collect();
+
+    let Ok(Object::Dictionary(page)) = doc.get_object_mut(page_id) else {
+      continue;
+    };
+    if kept.is_empty() {
       page.remove(b"Annots");
+    } else {
+      page.set(b"Annots", Object::Array(kept));
     }
   }
 
@@ -1056,7 +1103,7 @@ pub fn flatten_forms_in_pdf(pdf_bytes: &[u8]) -> Result<Vec<u8>, AppError> {
   tracing::info!(
     elapsed_ms = start.elapsed().as_millis() as u64,
     output_bytes = output.len(),
-    "flattened form fields"
+    "flattened form fields (markup preserved)"
   );
   Ok(output)
 }
@@ -1123,6 +1170,7 @@ pub fn flatten_forms_impl(payload: FlattenFormsPayload) -> CommandResult<PdfByte
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::commands::pdf_annotations;
   use lopdf::Dictionary;
 
   fn blank_pdf() -> Vec<u8> {
@@ -1749,6 +1797,49 @@ mod tests {
     let saved = pdf_annotations::embed_annotations_in_pdf(&with_field, "[]").unwrap();
     let info = inspect_forms(&saved).unwrap();
     assert!(info.field_count >= 1, "form widgets must survive annotation embed on save");
+  }
+
+  #[test]
+  fn flatten_forms_preserves_markup_annotations() {
+    let input = blank_pdf();
+    let fields = vec![NewFieldDto {
+      page_index: 0,
+      name: "Name".into(),
+      field_type: "text".into(),
+      x: 72.0,
+      y: 72.0,
+      width: 200.0,
+      height: 24.0,
+      pdf_rect: None,
+      default_value: None,
+      required: false,
+      read_only: false,
+      options: None,
+    }];
+    let with_field = create_form_fields_in_pdf(&input, &fields).unwrap();
+    let with_markup = pdf_annotations::embed_annotations_in_pdf(
+      &with_field,
+      r##"[{"type":"highlight","pageIndex":0,"rects":[{"x":10,"y":10,"width":50,"height":12}],"color":"#FFEB3B","author":"User"}]"##,
+    )
+    .unwrap();
+
+    let flattened = flatten_forms_in_pdf(&with_markup).unwrap();
+    let info = inspect_forms(&flattened).unwrap();
+    assert!(!info.has_acroform, "AcroForm should be removed");
+    assert_eq!(info.field_count, 0, "widgets should be removed");
+
+    let doc = Document::load_mem(&flattened).unwrap();
+    let has_highlight = doc.objects.values().any(|obj| {
+      if let Object::Dictionary(dict) = obj {
+        dict.get(b"Subtype")
+          .ok()
+          .and_then(|s| s.as_name().ok())
+          == Some(b"Highlight")
+      } else {
+        false
+      }
+    });
+    assert!(has_highlight, "markup annotations must survive form flatten");
   }
 
   /// Resolve a page's `/Annots` array whether it is inline or an indirect reference.

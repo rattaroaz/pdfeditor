@@ -270,3 +270,8 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
   clearSecuritySaveFlags: () =>
     set({ pendingSavePassword: null, removePasswordOnSave: false }),
 }));
+
+/** Password for pdf.js / mutation reloads of the open document. */
+export function getDocumentLoadPassword(): string | undefined {
+  return useDocumentStore.getState().documentPassword ?? undefined;
+}

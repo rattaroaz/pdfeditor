@@ -3,7 +3,6 @@ use super::pdf_common::{decode_pdf_base64, encode_pdf_bytes, save_doc};
 use lopdf::{Dictionary, Document, Object, ObjectId};
 use serde::Deserialize;
 use std::collections::BTreeMap;
-use std::path::Path;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -535,10 +534,15 @@ pub fn strip_annotations_from_pdf(pdf_bytes: &[u8]) -> Result<Vec<u8>, AppError>
       continue;
     };
 
-    let kept: Vec<Object> = annots
-      .into_iter()
-      .filter(|obj| annot_subtype_is_preserved(&doc, obj))
-      .collect();
+    let mut kept: Vec<Object> = Vec::new();
+    let mut drop_ids: Vec<ObjectId> = Vec::new();
+    for obj in annots {
+      if annot_subtype_is_preserved(&doc, &obj) {
+        kept.push(obj);
+      } else if let Object::Reference(id) = obj {
+        drop_ids.push(id);
+      }
+    }
 
     let Ok(Object::Dictionary(page)) = doc.get_object_mut(page_id) else {
       continue;
@@ -547,6 +551,12 @@ pub fn strip_annotations_from_pdf(pdf_bytes: &[u8]) -> Result<Vec<u8>, AppError>
       page.remove(b"Annots");
     } else {
       page.set(b"Annots", Object::Array(kept));
+    }
+
+    // Remove stripped annot dictionaries so re-embed does not leave orphans
+    // that inflate object counts (and confuse save/round-trip checks).
+    for id in drop_ids {
+      let _ = doc.delete_object(id);
     }
   }
   let output = save_doc(&mut doc)?;
@@ -594,7 +604,10 @@ pub fn embed_annotations_in_pdf(
       .map_err(|e| AppError::InvalidInput(format!("Invalid annotations JSON: {e}")))?
   };
 
-  let mut doc = Document::load_mem(pdf_bytes).map_err(|e| AppError::Pdf(e.to_string()))?;
+  // Strip previously embedded markup so re-save does not stack duplicates.
+  // Widgets and Links are preserved (same rules as open with sidecar).
+  let cleaned = strip_annotations_from_pdf(pdf_bytes)?;
+  let mut doc = Document::load_mem(&cleaned).map_err(|e| AppError::Pdf(e.to_string()))?;
   let pages = doc.get_pages();
 
   for ann in &annotations {
@@ -629,19 +642,14 @@ pub fn save_pdf_with_annotations(
     return Err(map_err(AppError::InvalidInput("Invalid PDF data".into())));
   }
 
+  // Embed in memory only — the frontend applies optional encrypt/decrypt
+  // then performs a single atomic write via writePdfBytes / write_pdf_file.
   let output = embed_annotations_in_pdf(&bytes, &annotations_json).map_err(map_err)?;
-
-  if let Some(parent) = Path::new(&target_path).parent() {
-    std::fs::create_dir_all(parent).map_err(AppError::Io).map_err(map_err)?;
-  }
-  std::fs::write(&target_path, &output)
-    .map_err(AppError::Io)
-    .map_err(map_err)?;
 
   tracing::info!(
     path = %target_path,
     size = output.len(),
-    "saved pdf with embedded annotations"
+    "prepared pdf with embedded annotations (write deferred to frontend)"
   );
 
   Ok(SavePdfResult {
@@ -800,5 +808,103 @@ mod tests {
     assert_eq!(rect[0], 10.0);
     assert_eq!(rect[3], 780.0);
     assert_eq!(rect[1], 750.0);
+  }
+
+  fn blank_page_pdf() -> Vec<u8> {
+    let mut doc = Document::with_version("1.5");
+    let page_id = doc.new_object_id();
+    let pages_id = doc.new_object_id();
+    let catalog_id = doc.new_object_id();
+
+    let mut page_dict = Dictionary::new();
+    page_dict.set(b"Type", Object::Name(b"Page".to_vec()));
+    page_dict.set(
+      b"MediaBox",
+      Object::Array(vec![
+        Object::Integer(0),
+        Object::Integer(0),
+        Object::Integer(612),
+        Object::Integer(792),
+      ]),
+    );
+    page_dict.set(b"Parent", Object::Reference(pages_id));
+    doc.objects.insert(page_id, Object::Dictionary(page_dict));
+
+    let mut pages_dict = Dictionary::new();
+    pages_dict.set(b"Type", Object::Name(b"Pages".to_vec()));
+    pages_dict.set(b"Kids", Object::Array(vec![Object::Reference(page_id)]));
+    pages_dict.set(b"Count", Object::Integer(1));
+    doc.objects.insert(pages_id, Object::Dictionary(pages_dict));
+
+    let mut catalog_dict = Dictionary::new();
+    catalog_dict.set(b"Type", Object::Name(b"Catalog".to_vec()));
+    catalog_dict.set(b"Pages", Object::Reference(pages_id));
+    doc.objects.insert(catalog_id, Object::Dictionary(catalog_dict));
+    doc.trailer.set(b"Root", Object::Reference(catalog_id));
+
+    let mut buffer = Vec::new();
+    doc.save_to(&mut buffer).unwrap();
+    buffer
+  }
+
+  fn count_subtype(pdf: &[u8], subtype: &[u8]) -> usize {
+    let doc = Document::load_mem(pdf).unwrap();
+    doc.objects
+      .values()
+      .filter(|obj| {
+        if let Object::Dictionary(dict) = obj {
+          dict.get(b"Subtype")
+            .ok()
+            .and_then(|s| s.as_name().ok())
+            == Some(subtype)
+        } else {
+          false
+        }
+      })
+      .count()
+  }
+
+  #[test]
+  fn re_embed_does_not_duplicate_markup() {
+    let buffer = blank_page_pdf();
+    let json = r##"[{
+      "type": "highlight",
+      "pageIndex": 0,
+      "rects": [{"x": 10, "y": 10, "width": 100, "height": 20}],
+      "color": "#FFEB3B",
+      "author": "User"
+    }]"##;
+
+    let once = embed_annotations_in_pdf(&buffer, json).unwrap();
+    let twice = embed_annotations_in_pdf(&once, json).unwrap();
+    assert_eq!(
+      count_subtype(&once, b"Highlight"),
+      count_subtype(&twice, b"Highlight"),
+      "re-embedding the same annotations must not stack duplicates"
+    );
+    assert_eq!(count_subtype(&twice, b"Highlight"), 1);
+  }
+
+  #[test]
+  fn save_pdf_with_annotations_does_not_write_disk() {
+    let dir = std::env::temp_dir().join(format!(
+      "pdfeditor-save-no-write-{}",
+      std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("out.pdf");
+    assert!(!path.exists());
+
+    let result = save_pdf_with_annotations(
+      path.display().to_string(),
+      encode_pdf_bytes(&blank_page_pdf()),
+      "[]".into(),
+    )
+    .expect("save prepare");
+
+    assert!(!path.exists(), "Rust save must not write the target path");
+    assert!(!result.data_base64.is_empty());
+    let _ = std::fs::remove_dir_all(&dir);
   }
 }

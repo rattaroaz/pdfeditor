@@ -142,7 +142,7 @@ describe("documentService savePdf", () => {
 
     await savePdf();
 
-    expect(mockApplyContentEdits).toHaveBeenCalledWith({ clearAfter: false });
+    expect(mockApplyContentEdits).toHaveBeenCalledWith({ clearAfter: true });
     expect(mockApplyFormChanges).not.toHaveBeenCalled();
     expect(mockInvokeLogged).toHaveBeenCalledWith(
       "save_pdf_with_annotations",
@@ -165,7 +165,7 @@ describe("documentService savePdf", () => {
     await savePdf();
 
     expect(useUiStore.getState().appMode).toBe("document");
-    expect(mockApplyContentEdits).toHaveBeenCalledWith({ clearAfter: false });
+    expect(mockApplyContentEdits).toHaveBeenCalledWith({ clearAfter: true });
   });
 
   it("embeds markup annotations after content and form changes", async () => {

@@ -9,7 +9,7 @@ import {
   remapPageIndexedAfterInsert,
   remapPageIndexedAfterReorder,
 } from "@/lib/pageAnnotationRemap";
-import { useDocumentStore } from "@/stores/documentStore";
+import { getDocumentLoadPassword, useDocumentStore } from "@/stores/documentStore";
 import { useAnnotationStore } from "@/stores/annotationStore";
 import { useContentEditStore } from "@/stores/contentEditStore";
 import { useFormStore } from "@/stores/formStore";
@@ -61,7 +61,7 @@ async function applyPdfMutation(
   try {
     const result = await mutate(encodeBase64Pdf(sourceBytes));
     const newBytes = decodeBase64Pdf(result.dataBase64);
-    const pdfDoc = await loadPdfFromBytes(newBytes);
+    const pdfDoc = await loadPdfFromBytes(newBytes, getDocumentLoadPassword());
 
     docStore.applyPdfStructureChange({
       pdfDoc,
