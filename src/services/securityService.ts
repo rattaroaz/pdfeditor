@@ -1,5 +1,5 @@
-import { showAlert } from "@/lib/appDialog";
 import { createErrorReporter, log } from "@/lib/logging";
+import { requestPassword } from "@/lib/passwordPrompt";
 import { invokeLogged } from "@/lib/tauriInvoke";
 import { decodeBase64Pdf, encodeBase64Pdf } from "@/lib/pdf/pdfEngine";
 import type { PdfBytesResult } from "@/lib/pdf/pdfBinary";
@@ -43,32 +43,23 @@ async function decryptPdfBytes(
   return decodeBase64Pdf(result.dataBase64);
 }
 
-function promptForNewPassword(): string | null {
-  const userPassword = window.prompt(
-    "Set a password required to open this PDF.\n\nLeave blank to cancel.",
-  );
-  if (!userPassword) return null;
-
-  const confirm = window.prompt("Confirm password:");
-  if (!confirm) return null;
-  if (userPassword !== confirm) {
-    void showAlert(
-      "Passwords do not match. Password protection was not applied.",
-      "warning",
-    );
-    return null;
-  }
-  return userPassword;
+async function promptForNewPassword(): Promise<string | null> {
+  return requestPassword({
+    title: "Protect PDF",
+    message: "Set a password required to open this PDF.",
+    confirm: true,
+  });
 }
 
-function promptForCurrentPassword(hint?: string): string | null {
-  return window.prompt(
-    hint ?? "This document is password protected. Enter the current password:",
-  );
+async function promptForCurrentPassword(hint?: string): Promise<string | null> {
+  return requestPassword({
+    title: "Password required",
+    message: hint ?? "This document is password protected. Enter the current password.",
+  });
 }
 
-export function protectDocumentOnNextSave(): void {
-  const password = promptForNewPassword();
+export async function protectDocumentOnNextSave(): Promise<void> {
+  const password = await promptForNewPassword();
   if (!password) return;
 
   log.security.info("Password protection scheduled for next save", {
@@ -89,7 +80,8 @@ export async function removeDocumentPasswordProtection(): Promise<void> {
   }
 
   const password =
-    store.documentPassword ?? promptForCurrentPassword("Enter the password to remove protection:");
+    store.documentPassword ??
+    (await promptForCurrentPassword("Enter the password to remove protection."));
   if (!password) return;
 
   store.setPendingSavePassword(null);

@@ -294,6 +294,20 @@ fn apply_form_values_in_pdf(pdf_bytes: &[u8], values: &[FieldValueDto]) -> Resul
   Ok(output)
 }
 
+/// Classify `/FT /Btn` using `/Ff` bits (ISO 32000):
+/// bit 16 = Radio, bit 17 = Pushbutton; neither = Checkbox.
+fn btn_kind_from_flags(ff: i64) -> Option<&'static str> {
+  const RADIO: i64 = 1 << 15;
+  const PUSHBUTTON: i64 = 1 << 16;
+  if ff & PUSHBUTTON != 0 {
+    return None;
+  }
+  if ff & RADIO != 0 {
+    return Some("radio");
+  }
+  Some("checkbox")
+}
+
 fn collect_field_targets(doc: &Document, obj: &Object, out: &mut Vec<(ObjectId, String, String)>) {
   let id = match obj {
     Object::Reference(id) => *id,
@@ -312,7 +326,21 @@ fn collect_field_targets(doc: &Document, obj: &Object, out: &mut Vec<(ObjectId, 
   if dict.has(b"T") {
     if let Some(name) = field_name(dict) {
       let kind = match ft.as_str() {
-        "Btn" => "checkbox",
+        "Btn" => {
+          let ff = dict.get(b"Ff").ok().and_then(|o| o.as_i64().ok()).unwrap_or(0);
+          match btn_kind_from_flags(ff) {
+            Some(k) => k,
+            None => {
+              // Pushbuttons are not value targets.
+              if let Ok(kids) = dict.get(b"Kids").and_then(Object::as_array) {
+                for kid in kids {
+                  collect_field_targets(doc, kid, out);
+                }
+              }
+              return;
+            }
+          }
+        }
         "Ch" => "dropdown",
         _ => "text",
       };
@@ -1272,6 +1300,13 @@ mod tests {
     let mut buffer = Vec::new();
     doc.save_to(&mut buffer).unwrap();
     buffer
+  }
+
+  #[test]
+  fn btn_flags_classify_checkbox_radio_pushbutton() {
+    assert_eq!(btn_kind_from_flags(0), Some("checkbox"));
+    assert_eq!(btn_kind_from_flags(1 << 15), Some("radio"));
+    assert_eq!(btn_kind_from_flags(1 << 16), None);
   }
 
   #[test]

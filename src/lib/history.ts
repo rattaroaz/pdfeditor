@@ -23,6 +23,8 @@ export interface EditHistorySnapshot {
   textEdits: TextContentEdit[];
   imageEdits: ImageContentEdit[];
   formValues: Record<string, FormFieldValue>;
+  /** Baseline used for dirty detection — must round-trip with values. */
+  formValuesBaseline: Record<string, string>;
   newFields: FormFieldDefinition[];
   document: DocumentHistorySnapshot | null;
 }
@@ -52,6 +54,7 @@ export function captureEditSnapshot(): EditHistorySnapshot {
     textEdits: clone(content.textEdits),
     imageEdits: clone(content.imageEdits),
     formValues: clone(form.values),
+    formValuesBaseline: clone(form.valuesBaseline),
     newFields: clone(form.newFields),
     document,
   };
@@ -68,6 +71,7 @@ export async function applyEditSnapshot(snapshot: EditHistorySnapshot): Promise<
   });
   useFormStore.setState({
     values: clone(snapshot.formValues),
+    valuesBaseline: clone(snapshot.formValuesBaseline ?? {}),
     newFields: clone(snapshot.newFields),
     activeFieldName: null,
     renamingNewFieldId: null,

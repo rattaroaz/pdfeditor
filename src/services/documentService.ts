@@ -22,6 +22,7 @@ import type { Annotation, PdfMetadata, ReadFileResult } from "@shared/types";
 import { applyContentEdits } from "@/services/contentEditService";
 import { runDocumentOperation } from "@/services/documentOpQueue";
 import { applyFormChanges, inspectDocumentForms, loadFormFieldsFromPdf } from "@/services/formService";
+import { requestPassword } from "@/lib/passwordPrompt";
 import { applySecurityOnSaveBytes, inspectPdfSecurity, type PdfSecurityInfo } from "@/services/securityService";
 
 interface SavePdfResult extends PdfBytesResult {
@@ -81,11 +82,12 @@ async function loadPdfWithPasswordPrompt(
       return { pdfDoc, password };
     } catch (err) {
       if (err instanceof PdfPasswordRequiredError) {
-        const entered = window.prompt(
-          err.incorrect
-            ? "Incorrect password. Try again:"
-            : "This PDF is password protected. Enter the password to open it:",
-        );
+        const entered = await requestPassword({
+          title: "Password required",
+          message: err.incorrect
+            ? "Incorrect password. Try again."
+            : "This PDF is password protected. Enter the password to open it.",
+        });
         if (!entered) throw new Error("Open cancelled — password required");
         password = entered;
         continue;

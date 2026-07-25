@@ -131,7 +131,7 @@ export function useMenuContent(onAction: () => void) {
             <MenuItem
               testId="menu-protect-password"
               disabled={!hasDocument}
-              onClick={() => run(protectDocumentOnNextSave)}
+              onClick={() => run(() => void protectDocumentOnNextSave())}
             >
               Protect with Password…
             </MenuItem>

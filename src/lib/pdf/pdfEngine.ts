@@ -488,6 +488,7 @@ type PdfWidgetAnnotation = {
   rect?: number[];
   checkBox?: boolean;
   radioButton?: boolean;
+  pushButton?: boolean;
   combo?: boolean;
   options?: Array<{ displayValue?: string; exportValue?: string } | string>;
   readOnly?: boolean;
@@ -502,8 +503,10 @@ type PdfWidgetAnnotation = {
 function widgetTypeFromAnnotation(ann: PdfWidgetAnnotation): string {
   if (ann.checkBox) return "checkbox";
   if (ann.radioButton) return "radio";
+  if (ann.pushButton) return "pushbutton";
   if (ann.fieldType === "Ch") return ann.combo !== false ? "combobox" : "listbox";
-  if (ann.fieldType === "Btn") return "checkbox";
+  // Bare /Btn without pdf.js flags is usually a pushbutton; never invent a checkbox.
+  if (ann.fieldType === "Btn") return "pushbutton";
   return "text";
 }
 
@@ -538,6 +541,7 @@ function widgetFromAnnotation(
 ): FormWidgetRect | null {
   if (!ann.rect || ann.rect.length < 4 || ann.hidden) return null;
   const type = widgetTypeFromAnnotation(ann);
+  if (type === "pushbutton") return null;
   const [x1, y1, x2, y2] = ann.rect;
   const [vx1, vy1] = viewport.convertToViewportPoint(x1, y1);
   const [vx2, vy2] = viewport.convertToViewportPoint(x2, y2);
@@ -614,6 +618,7 @@ export async function collectFormFieldValuesFromPdf(
       const ann = raw as PdfWidgetAnnotation;
       if (ann.annotationType !== PDF_ANNOTATION_TYPE_WIDGET || !ann.fieldName) continue;
       const type = widgetTypeFromAnnotation(ann);
+      if (type === "pushbutton") continue;
       const value = widgetValueFromAnnotation(ann, type) ?? "";
       const existing = values[ann.fieldName];
       if (!existing || (value && !existing.value)) {

@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { ErrorDialog } from "@/components/common/ErrorDialog";
+import { PasswordDialog } from "@/components/common/PasswordDialog";
 import { SplitPdfDialog } from "@/components/document/SplitPdfDialog";
 import { HelpGuideDialog } from "@/components/help/HelpGuideDialog";
 import { UpdateDialog } from "@/components/help/UpdateDialog";
@@ -26,6 +27,7 @@ function App() {
       )}
       <AppShell />
       <ErrorDialog />
+      <PasswordDialog />
       <SplitPdfDialog />
       <HelpGuideDialog />
       <UpdateDialog />

@@ -651,21 +651,33 @@ export function PdfFormLayer({ pageNumber, scale }: PdfFormLayerProps) {
 
         if (widget.type === "checkbox" || widget.type === "radio") {
           const checked =
-            val === "true" || val === "Yes" || val === "On";
+            widget.type === "radio"
+              ? Boolean(val) && val !== "Off"
+              : val === "true" || val === "Yes" || val === "On";
           return (
             <input
               key={key}
               ref={(el) => {
                 if (el) inputRefs.current.set(key, el);
               }}
-              type="checkbox"
+              type={widget.type === "radio" ? "radio" : "checkbox"}
+              name={widget.type === "radio" ? widget.name : undefined}
               checked={checked}
               readOnly={widget.readOnly}
               className={`absolute ${borderClass} bg-white [color-scheme:light]`}
               style={commonStyle}
               onChange={(e) => {
                 recordHistory();
-                setFieldValue(widget.name, e.target.checked ? "Yes" : "Off", "checkbox");
+                if (widget.type === "radio") {
+                  const exportValue = widget.value || "Yes";
+                  setFieldValue(
+                    widget.name,
+                    e.target.checked ? exportValue : "Off",
+                    "radio",
+                  );
+                } else {
+                  setFieldValue(widget.name, e.target.checked ? "Yes" : "Off", "checkbox");
+                }
                 useDocumentStore.getState().markDocumentChanged("forms");
               }}
             />

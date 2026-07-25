@@ -38,6 +38,24 @@ describe("edit history snapshots", () => {
     expect(useFormStore.getState().newFields).toHaveLength(1);
   });
 
+  it("restores form valuesBaseline so dirty detection stays correct", async () => {
+    useFormStore.getState().setValuesFromPdf({
+      name: { name: "name", value: "Alice", type: "text", required: false },
+    });
+    useFormStore.getState().setFieldValue("name", "Bob", "text");
+    expect(useFormStore.getState().hasPendingFormChanges()).toBe(true);
+
+    const snap = captureEditSnapshot();
+    useFormStore.getState().setFieldValue("name", "Carol", "text");
+    useFormStore.getState().markValuesSaved();
+    expect(useFormStore.getState().hasPendingFormChanges()).toBe(false);
+
+    await applyEditSnapshot(snap);
+    expect(useFormStore.getState().values.name?.value).toBe("Bob");
+    expect(useFormStore.getState().valuesBaseline.name).toBe("Alice");
+    expect(useFormStore.getState().hasPendingFormChanges()).toBe(true);
+  });
+
   it("snapshotsEqual detects identical snapshots", () => {
     const a = captureEditSnapshot();
     const b = captureEditSnapshot();
