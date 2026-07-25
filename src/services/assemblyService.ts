@@ -6,6 +6,7 @@ import { invokeLogged } from "@/lib/tauriInvoke";
 import { decodeBase64Pdf, encodeBase64Pdf, loadPdfFromBytes, renderPageToCanvas } from "@/lib/pdf/pdfEngine";
 import { ensurePdfExtension, type PdfBytesResult } from "@/lib/pdf/pdfBinary";
 import { requireTauriDesktop } from "@/lib/tauriRuntime";
+import { runDocumentOperation } from "@/services/documentOpQueue";
 import { getDocumentLoadPassword, useDocumentStore } from "@/stores/documentStore";
 import { useAnnotationStore } from "@/stores/annotationStore";
 import { createErrorReporter, log } from "@/lib/logging";
@@ -54,70 +55,78 @@ async function applyMergedOrNewDocument(newBytes: Uint8Array, fileName: string):
 }
 
 export async function mergePdfFromDialog(): Promise<void> {
-  const docStore = useDocumentStore.getState();
   const paths = await pickPdfPaths(true);
   if (paths.length === 0) return;
 
-  const openBytes = getOpenDocumentBytes();
-  let pdfBase64List: string[];
+  return runDocumentOperation("merge_pdfs", async () => {
+    const docStore = useDocumentStore.getState();
+    const openBytes = getOpenDocumentBytes();
+    let pdfBase64List: string[];
 
-  if (paths.length === 1) {
-    if (!openBytes) {
-      showError(new Error("Select at least two PDF files, or open a document and pick one more to merge."));
-      return;
+    if (paths.length === 1) {
+      if (!openBytes) {
+        showError(
+          new Error(
+            "Select at least two PDF files, or open a document and pick one more to merge.",
+          ),
+        );
+        return;
+      }
+      pdfBase64List = [encodeBase64Pdf(openBytes), await readPdfBase64(paths[0]!)];
+    } else {
+      pdfBase64List = await Promise.all(paths.map(readPdfBase64));
     }
-    pdfBase64List = [encodeBase64Pdf(openBytes), await readPdfBase64(paths[0]!)];
-  } else {
-    pdfBase64List = await Promise.all(paths.map(readPdfBase64));
-  }
 
-  docStore.setLoading(true);
-  try {
-    const result = await invokeLogged<PdfBytesResult>("merge_pdfs", { pdfBase64List });
-    const bytes = decodeBase64Pdf(result.dataBase64);
-    const name = paths[0]!.split(/[/\\]/).pop()?.replace(/\.pdf$/i, "") ?? "merged";
-    await applyMergedOrNewDocument(bytes, `${name}-merged.pdf`);
-    docStore.setStatusMessage(`Merged ${pdfBase64List.length} PDF(s)`);
-  } catch (err) {
-    showError(err);
-  } finally {
-    docStore.setLoading(false);
-  }
+    docStore.setLoading(true);
+    try {
+      const result = await invokeLogged<PdfBytesResult>("merge_pdfs", { pdfBase64List });
+      const bytes = decodeBase64Pdf(result.dataBase64);
+      const name = paths[0]!.split(/[/\\]/).pop()?.replace(/\.pdf$/i, "") ?? "merged";
+      await applyMergedOrNewDocument(bytes, `${name}-merged.pdf`);
+      docStore.setStatusMessage(`Merged ${pdfBase64List.length} PDF(s)`);
+    } catch (err) {
+      showError(err);
+    } finally {
+      docStore.setLoading(false);
+    }
+  });
 }
 
 export async function mergeIntoCurrentDocument(): Promise<void> {
-  const docStore = useDocumentStore.getState();
-  const sourceBytes = getOpenDocumentBytes();
-  if (!sourceBytes) {
-    showError(new Error("No document open"));
-    return;
-  }
-
   const paths = await pickPdfPaths(true);
   if (paths.length === 0) return;
 
-  docStore.setLoading(true);
-  try {
-    const others = await Promise.all(paths.map(readPdfBase64));
-    const pdfBase64List = [encodeBase64Pdf(sourceBytes), ...others];
-    const result = await invokeLogged<PdfBytesResult>("merge_pdfs", { pdfBase64List });
-    const bytes = decodeBase64Pdf(result.dataBase64);
-    const pdfDoc = await loadPdfFromBytes(bytes, getDocumentLoadPassword());
+  return runDocumentOperation("append_pdfs", async () => {
+    const docStore = useDocumentStore.getState();
+    const sourceBytes = getOpenDocumentBytes();
+    if (!sourceBytes) {
+      showError(new Error("No document open"));
+      return;
+    }
 
-    docStore.applyPdfStructureChange({
-      pdfDoc,
-      pdfBytes: bytes,
-      pageCount: pdfDoc.numPages,
-    });
-    // Appended pages shift indices; drop overlay state rather than leave stale pageIndex values.
-    useAnnotationStore.getState().clearAnnotations();
-    docStore.setStatusMessage(`Appended ${paths.length} PDF(s) · ${pdfDoc.numPages} pages`);
-    log.assembly.info("Merged PDFs into current document", { userAction: "append" });
-  } catch (err) {
-    showError(err);
-  } finally {
-    docStore.setLoading(false);
-  }
+    docStore.setLoading(true);
+    try {
+      const others = await Promise.all(paths.map(readPdfBase64));
+      const pdfBase64List = [encodeBase64Pdf(sourceBytes), ...others];
+      const result = await invokeLogged<PdfBytesResult>("merge_pdfs", { pdfBase64List });
+      const bytes = decodeBase64Pdf(result.dataBase64);
+      const pdfDoc = await loadPdfFromBytes(bytes, getDocumentLoadPassword());
+
+      docStore.applyPdfStructureChange({
+        pdfDoc,
+        pdfBytes: bytes,
+        pageCount: pdfDoc.numPages,
+      });
+      // Appended pages shift indices; drop overlay state rather than leave stale pageIndex values.
+      useAnnotationStore.getState().clearAnnotations();
+      docStore.setStatusMessage(`Appended ${paths.length} PDF(s) · ${pdfDoc.numPages} pages`);
+      log.assembly.info("Merged PDFs into current document", { userAction: "append" });
+    } catch (err) {
+      showError(err);
+    } finally {
+      docStore.setLoading(false);
+    }
+  });
 }
 
 export async function extractPagesToFile(pageNumbers: number[]): Promise<void> {

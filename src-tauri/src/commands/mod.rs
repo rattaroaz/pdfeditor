@@ -12,7 +12,7 @@ use crate::logging::data_directory;
 use lopdf::{Document, Object};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
 
@@ -112,13 +112,36 @@ fn pdf_string(obj: Option<&Object>) -> Option<String> {
   })
 }
 
+/// Reject relative paths and `..` traversal for Rust file commands.
+/// (Plugin-fs scopes do not apply to these std::fs APIs.)
+fn validate_user_file_path(path: &str) -> Result<PathBuf, AppError> {
+  let trimmed = path.trim();
+  if trimmed.is_empty() {
+    return Err(AppError::InvalidInput("Empty file path".into()));
+  }
+  if trimmed.contains('\0') {
+    return Err(AppError::InvalidInput("Invalid file path".into()));
+  }
+  let p = PathBuf::from(trimmed);
+  if !p.is_absolute() {
+    return Err(AppError::InvalidInput("File path must be absolute".into()));
+  }
+  if p.components().any(|c| matches!(c, Component::ParentDir)) {
+    return Err(AppError::InvalidInput(
+      "File path must not contain '..'".into(),
+    ));
+  }
+  Ok(p)
+}
+
 #[tauri::command]
 pub fn read_pdf_file(path: String) -> CommandResult<ReadFileResult> {
   let span = tracing::info_span!("read_pdf_file", path = %path);
   let _guard = span.enter();
   let start = std::time::Instant::now();
 
-  let bytes = fs::read(&path).map_err(AppError::Io)?;
+  let path_buf = validate_user_file_path(&path).map_err(crate::error::map_err)?;
+  let bytes = fs::read(&path_buf).map_err(AppError::Io)?;
   tracing::info!(
     duration_ms = start.elapsed().as_millis() as u64,
     size = bytes.len(),
@@ -127,7 +150,7 @@ pub fn read_pdf_file(path: String) -> CommandResult<ReadFileResult> {
 
   Ok(ReadFileResult {
     data_base64: STANDARD.encode(&bytes),
-    path,
+    path: path_buf.to_string_lossy().into_owned(),
   })
 }
 
@@ -135,6 +158,8 @@ pub fn read_pdf_file(path: String) -> CommandResult<ReadFileResult> {
 pub fn write_pdf_file(path: String, data_base64: String) -> CommandResult<()> {
   let span = tracing::info_span!("write_pdf_file", path = %path);
   let _guard = span.enter();
+
+  let path_buf = validate_user_file_path(&path).map_err(crate::error::map_err)?;
 
   let bytes = STANDARD
     .decode(data_base64.trim())
@@ -147,10 +172,10 @@ pub fn write_pdf_file(path: String, data_base64: String) -> CommandResult<()> {
     return Err(AppError::InvalidInput("Invalid PDF header".into()).into());
   }
 
-  if let Some(parent) = Path::new(&path).parent() {
+  if let Some(parent) = path_buf.parent() {
     fs::create_dir_all(parent).map_err(AppError::Io)?;
   }
-  fs::write(&path, &bytes).map_err(AppError::Io)?;
+  fs::write(&path_buf, &bytes).map_err(AppError::Io)?;
   tracing::info!(size = bytes.len(), "wrote pdf file");
   Ok(())
 }
@@ -160,12 +185,13 @@ pub fn get_pdf_info(path: String) -> CommandResult<PdfInfoResult> {
   let span = tracing::info_span!("get_pdf_info", path = %path);
   let _guard = span.enter();
   let start = std::time::Instant::now();
-  let metadata = fs::metadata(&path).map_err(AppError::Io)?;
+  let path_buf = validate_user_file_path(&path).map_err(crate::error::map_err)?;
+  let metadata = fs::metadata(&path_buf).map_err(AppError::Io)?;
   let file_size = metadata.len();
-  let file_bytes = fs::read(&path).map_err(AppError::Io)?;
+  let file_bytes = fs::read(&path_buf).map_err(AppError::Io)?;
   let security = pdf_security::inspect_pdf_security(&file_bytes);
 
-  let doc_result = Document::load(&path);
+  let doc_result = Document::load(&path_buf);
   let (page_count, title, author, subject, keywords, creator, producer) = match doc_result {
     Ok(doc) => {
       let page_count = doc.get_pages().len() as u32;

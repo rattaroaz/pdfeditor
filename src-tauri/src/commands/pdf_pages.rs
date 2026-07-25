@@ -33,6 +33,36 @@ pub(crate) fn validate_page_numbers(pages: &BTreeMap<u32, ObjectId>, numbers: &[
   Ok(())
 }
 
+/// Rebuild the root pages tree as a flat Kids list in the given order.
+/// Updates each page's `/Parent` so nested trees survive insert/reorder.
+pub(crate) fn rebuild_flat_pages_tree(
+  doc: &mut Document,
+  page_ids: &[ObjectId],
+) -> Result<(), AppError> {
+  let pages_id = root_pages_id(doc)?;
+  for &page_id in page_ids {
+    let page_dict = doc
+      .get_dictionary_mut(page_id)
+      .map_err(|e| AppError::Pdf(e.to_string()))?;
+    page_dict.set("Parent", Object::Reference(pages_id));
+  }
+
+  let pages_dict = doc
+    .get_dictionary_mut(pages_id)
+    .map_err(|e| AppError::Pdf(e.to_string()))?;
+  pages_dict.set(
+    "Kids",
+    Object::Array(
+      page_ids
+        .iter()
+        .map(|id| Object::Reference(*id))
+        .collect(),
+    ),
+  );
+  pages_dict.set("Count", Object::Integer(page_ids.len() as i64));
+  Ok(())
+}
+
 pub fn delete_pages_in_pdf(pdf_bytes: &[u8], page_numbers: &[u32]) -> Result<Vec<u8>, AppError> {
   let _span = tracing::info_span!(
     "delete_pages_in_pdf",
@@ -156,20 +186,7 @@ pub fn reorder_pages_in_pdf(pdf_bytes: &[u8], new_order: &[u32]) -> Result<Vec<u
     .map(|n| pages[n])
     .collect();
 
-  let pages_id = root_pages_id(&doc)?;
-  let pages_dict = doc
-    .get_dictionary_mut(pages_id)
-    .map_err(|e| AppError::Pdf(e.to_string()))?;
-  pages_dict.set(
-    "Kids",
-    Object::Array(
-      page_ids
-        .iter()
-        .map(|id| Object::Reference(*id))
-        .collect(),
-    ),
-  );
-  pages_dict.set("Count", Object::Integer(page_ids.len() as i64));
+  rebuild_flat_pages_tree(&mut doc, &page_ids)?;
 
   let output = save_doc(&mut doc)?;
   tracing::info!(
@@ -328,6 +345,88 @@ mod tests {
     let output = reorder_pages_in_pdf(&input, &[3, 1, 2]).unwrap();
     let doc = Document::load_mem(&output).unwrap();
     assert_eq!(doc.get_pages().len(), 3);
+  }
+
+  fn nested_two_page_pdf() -> Vec<u8> {
+    let mut doc = Document::with_version("1.5");
+    let root_pages = doc.new_object_id();
+    let branch = doc.new_object_id();
+    let page_a = doc.new_object_id();
+    let page_b = doc.new_object_id();
+    let catalog_id = doc.new_object_id();
+
+    for (page_id, w) in [(page_a, 111i64), (page_b, 222i64)] {
+      let mut page_dict = Dictionary::new();
+      page_dict.set("Type", Object::Name(b"Page".to_vec()));
+      page_dict.set("Parent", Object::Reference(branch));
+      page_dict.set(
+        "MediaBox",
+        Object::Array(vec![
+          Object::Integer(0),
+          Object::Integer(0),
+          Object::Integer(w),
+          Object::Integer(792),
+        ]),
+      );
+      doc.objects.insert(page_id, Object::Dictionary(page_dict));
+    }
+
+    let mut branch_dict = Dictionary::new();
+    branch_dict.set("Type", Object::Name(b"Pages".to_vec()));
+    branch_dict.set("Parent", Object::Reference(root_pages));
+    branch_dict.set(
+      "Kids",
+      Object::Array(vec![
+        Object::Reference(page_a),
+        Object::Reference(page_b),
+      ]),
+    );
+    branch_dict.set("Count", Object::Integer(2));
+    doc.objects.insert(branch, Object::Dictionary(branch_dict));
+
+    let mut root = Dictionary::new();
+    root.set("Type", Object::Name(b"Pages".to_vec()));
+    root.set("Kids", Object::Array(vec![Object::Reference(branch)]));
+    root.set("Count", Object::Integer(2));
+    doc.objects.insert(root_pages, Object::Dictionary(root));
+
+    let mut catalog = Dictionary::new();
+    catalog.set("Type", Object::Name(b"Catalog".to_vec()));
+    catalog.set("Pages", Object::Reference(root_pages));
+    doc.objects.insert(catalog_id, Object::Dictionary(catalog));
+    doc.trailer.set("Root", Object::Reference(catalog_id));
+
+    let mut buffer = Vec::new();
+    doc.save_to(&mut buffer).unwrap();
+    buffer
+  }
+
+  #[test]
+  fn reorder_nested_tree_sets_page_parents_to_root() {
+    let input = nested_two_page_pdf();
+    let output = reorder_pages_in_pdf(&input, &[2, 1]).unwrap();
+    let doc = Document::load_mem(&output).unwrap();
+    let pages = doc.get_pages();
+    assert_eq!(pages.len(), 2);
+    let root = root_pages_id(&doc).unwrap();
+    for page_id in pages.values() {
+      let parent = doc
+        .get_dictionary(*page_id)
+        .unwrap()
+        .get(b"Parent")
+        .and_then(Object::as_reference)
+        .unwrap();
+      assert_eq!(parent, root);
+    }
+    let w1 = doc
+      .get_dictionary(pages[&1])
+      .unwrap()
+      .get(b"MediaBox")
+      .and_then(Object::as_array)
+      .unwrap()[2]
+      .as_i64()
+      .unwrap();
+    assert_eq!(w1, 222, "page 2 should now be first");
   }
 
   #[test]

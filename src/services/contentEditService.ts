@@ -8,6 +8,7 @@ import {
 import type { PdfBytesResult } from "@/lib/pdf/pdfBinary";
 import type { ImageContentEdit, TextContentEdit } from "@shared/types";
 import { useContentEditStore } from "@/stores/contentEditStore";
+import { runDocumentOperation } from "@/services/documentOpQueue";
 import { getDocumentLoadPassword, useDocumentStore } from "@/stores/documentStore";
 import { log, reportError } from "@/lib/logging";
 import { TEXT_COVER_H_PAD, TEXT_COVER_V_PAD } from "@/lib/textEditBox";
@@ -91,39 +92,41 @@ export type ApplyContentEditsOptions = {
 export async function applyContentEdits(
   options: ApplyContentEditsOptions = {},
 ): Promise<boolean> {
-  const { clearAfter = true } = options;
-  const docStore = useDocumentStore.getState();
-  const editStore = useContentEditStore.getState();
-  const sourceBytes = docStore.basePdfBytes ?? docStore.pdfBytes;
+  return runDocumentOperation("content_edit", async () => {
+    const { clearAfter = true } = options;
+    const docStore = useDocumentStore.getState();
+    const editStore = useContentEditStore.getState();
+    const sourceBytes = docStore.basePdfBytes ?? docStore.pdfBytes;
 
-  if (!sourceBytes || !editStore.hasEdits()) return true;
+    if (!sourceBytes || !editStore.hasEdits()) return true;
 
-  docStore.setLoading(true);
-  try {
-    const textEdits = await textEditsPayload(editStore.textEdits);
-    const imageEdits = await imageEditsPayload(editStore.imageEdits);
-    const result = await invokeLogged<PdfBytesResult>("apply_content_edits", {
-      pdfBase64: encodeBase64Pdf(sourceBytes),
-      textEditsJson: JSON.stringify(textEdits),
-      imageEditsJson: JSON.stringify(imageEdits),
-    });
+    docStore.setLoading(true);
+    try {
+      const textEdits = await textEditsPayload(editStore.textEdits);
+      const imageEdits = await imageEditsPayload(editStore.imageEdits);
+      const result = await invokeLogged<PdfBytesResult>("apply_content_edits", {
+        pdfBase64: encodeBase64Pdf(sourceBytes),
+        textEditsJson: JSON.stringify(textEdits),
+        imageEditsJson: JSON.stringify(imageEdits),
+      });
 
-    const newBytes = decodeBase64Pdf(result.dataBase64);
-    const pdfDoc = await loadPdfFromBytes(newBytes, getDocumentLoadPassword());
-    docStore.applyPdfStructureChange({
-      pdfDoc,
-      pdfBytes: newBytes,
-      pageCount: pdfDoc.numPages,
-    });
-    if (clearAfter) {
-      editStore.clearEdits();
+      const newBytes = decodeBase64Pdf(result.dataBase64);
+      const pdfDoc = await loadPdfFromBytes(newBytes, getDocumentLoadPassword());
+      docStore.applyPdfStructureChange({
+        pdfDoc,
+        pdfBytes: newBytes,
+        pageCount: pdfDoc.numPages,
+      });
+      if (clearAfter) {
+        editStore.clearEdits();
+      }
+      log.content.info("Content edits applied", { userAction: "content_edit" });
+      return true;
+    } catch (err) {
+      reportError(err, { category: "content", userAction: "content_edit" });
+      return false;
+    } finally {
+      docStore.setLoading(false);
     }
-    log.content.info("Content edits applied", { userAction: "content_edit" });
-    return true;
-  } catch (err) {
-    reportError(err, { category: "content", userAction: "content_edit" });
-    return false;
-  } finally {
-    docStore.setLoading(false);
-  }
+  });
 }

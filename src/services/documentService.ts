@@ -20,6 +20,7 @@ import { useFormStore } from "@/stores/formStore";
 import { clearHistory } from "@/stores/historyStore";
 import type { Annotation, PdfMetadata, ReadFileResult } from "@shared/types";
 import { applyContentEdits } from "@/services/contentEditService";
+import { runDocumentOperation } from "@/services/documentOpQueue";
 import { applyFormChanges, inspectDocumentForms, loadFormFieldsFromPdf } from "@/services/formService";
 import { applySecurityOnSaveBytes, inspectPdfSecurity, type PdfSecurityInfo } from "@/services/securityService";
 
@@ -32,18 +33,6 @@ interface PdfInfoResponse {
 }
 
 const showError = createErrorReporter("document", "document");
-let documentOperationQueue: Promise<unknown> = Promise.resolve();
-
-function runDocumentOperation<T>(operation: string, task: () => Promise<T>): Promise<T> {
-  const run = documentOperationQueue.then(task, task);
-  documentOperationQueue = run.catch((err) => {
-    log.document.warn("Document operation failed", {
-      userAction: operation,
-      metadata: { error: errorMessage(err) },
-    });
-  });
-  return run;
-}
 
 export async function confirmDiscardDocumentChanges(message: string): Promise<boolean> {
   if (!useDocumentStore.getState().isDirty) return true;

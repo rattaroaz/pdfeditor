@@ -9,6 +9,7 @@ import {
 } from "@/lib/pdf/pdfEngine";
 import type { PdfBytesResult } from "@/lib/pdf/pdfBinary";
 import { readTextFile, writeTextFile } from "@/lib/pdf/pdfStorage";
+import { runDocumentOperation } from "@/services/documentOpQueue";
 import { getDocumentLoadPassword, useDocumentStore } from "@/stores/documentStore";
 import { useFormStore } from "@/stores/formStore";
 import { createErrorReporter, log } from "@/lib/logging";
@@ -82,6 +83,7 @@ function mapFieldType(type?: string): FormFieldDefinition["kind"] {
 }
 
 export async function applyFormChanges(): Promise<boolean> {
+  return runDocumentOperation("apply_form_changes", async () => {
   const docStore = useDocumentStore.getState();
   const sourceBytes = docStore.basePdfBytes ?? docStore.pdfBytes;
   if (!sourceBytes) return true;
@@ -170,9 +172,11 @@ export async function applyFormChanges(): Promise<boolean> {
   } finally {
     docStore.setLoading(false);
   }
+  });
 }
 
 export async function flattenForms(): Promise<void> {
+  return runDocumentOperation("flatten_forms", async () => {
   const docStore = useDocumentStore.getState();
   const sourceBytes = docStore.basePdfBytes ?? docStore.pdfBytes;
   if (!sourceBytes) return;
@@ -193,6 +197,7 @@ export async function flattenForms(): Promise<void> {
   } finally {
     docStore.setLoading(false);
   }
+  });
 }
 
 export async function exportFormDataCsv(): Promise<void> {

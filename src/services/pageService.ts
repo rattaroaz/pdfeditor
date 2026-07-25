@@ -9,6 +9,7 @@ import {
   remapPageIndexedAfterInsert,
   remapPageIndexedAfterReorder,
 } from "@/lib/pageAnnotationRemap";
+import { runDocumentOperation } from "@/services/documentOpQueue";
 import { getDocumentLoadPassword, useDocumentStore } from "@/stores/documentStore";
 import { useAnnotationStore } from "@/stores/annotationStore";
 import { useContentEditStore } from "@/stores/contentEditStore";
@@ -45,51 +46,53 @@ async function applyPdfMutation(
   mutate: (base64: string) => Promise<PdfBytesResult>,
   remap?: (state: PageIndexedState) => PageIndexedState,
 ): Promise<void> {
-  const docStore = useDocumentStore.getState();
-  const annStore = useAnnotationStore.getState();
-  const contentStore = useContentEditStore.getState();
-  const formStore = useFormStore.getState();
-  const sourceBytes = docStore.basePdfBytes ?? docStore.pdfBytes;
+  return runDocumentOperation("page_mutation", async () => {
+    const docStore = useDocumentStore.getState();
+    const annStore = useAnnotationStore.getState();
+    const contentStore = useContentEditStore.getState();
+    const formStore = useFormStore.getState();
+    const sourceBytes = docStore.basePdfBytes ?? docStore.pdfBytes;
 
-  if (!sourceBytes) {
-    throw new Error("No document open");
-  }
-
-  recordHistory();
-
-  docStore.setLoading(true);
-  try {
-    const result = await mutate(encodeBase64Pdf(sourceBytes));
-    const newBytes = decodeBase64Pdf(result.dataBase64);
-    const pdfDoc = await loadPdfFromBytes(newBytes, getDocumentLoadPassword());
-
-    docStore.applyPdfStructureChange({
-      pdfDoc,
-      pdfBytes: newBytes,
-      pageCount: pdfDoc.numPages,
-    });
-
-    if (remap) {
-      remapAllPageIndexedState(
-        remap({
-          annotations: annStore.annotations,
-          textEdits: contentStore.textEdits,
-          imageEdits: contentStore.imageEdits,
-          newFields: formStore.newFields,
-        }),
-      );
+    if (!sourceBytes) {
+      throw new Error("No document open");
     }
 
-    log.document.info("Page mutation applied", {
-      userAction: "page_edit",
-      pageCount: pdfDoc.numPages,
-    });
-  } catch (err) {
-    showError(err);
-    throw err;
-  } finally {
-    docStore.setLoading(false);
-  }
+    recordHistory();
+
+    docStore.setLoading(true);
+    try {
+      const result = await mutate(encodeBase64Pdf(sourceBytes));
+      const newBytes = decodeBase64Pdf(result.dataBase64);
+      const pdfDoc = await loadPdfFromBytes(newBytes, getDocumentLoadPassword());
+
+      docStore.applyPdfStructureChange({
+        pdfDoc,
+        pdfBytes: newBytes,
+        pageCount: pdfDoc.numPages,
+      });
+
+      if (remap) {
+        remapAllPageIndexedState(
+          remap({
+            annotations: annStore.annotations,
+            textEdits: contentStore.textEdits,
+            imageEdits: contentStore.imageEdits,
+            newFields: formStore.newFields,
+          }),
+        );
+      }
+
+      log.document.info("Page mutation applied", {
+        userAction: "page_edit",
+        pageCount: pdfDoc.numPages,
+      });
+    } catch (err) {
+      showError(err);
+      throw err;
+    } finally {
+      docStore.setLoading(false);
+    }
+  });
 }
 
 export async function deletePages(pageNumbers: number[]): Promise<void> {

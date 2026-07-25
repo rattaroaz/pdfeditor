@@ -1,7 +1,7 @@
 {
   "name": "pdfeditor",
   "private": true,
-  "version": "1.4.5",
+  "version": "1.4.6",
   "type": "module",
   "scripts": {
     "dev": "node ./node_modules/vite/bin/vite.js",

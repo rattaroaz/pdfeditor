@@ -1,4 +1,6 @@
-use crate::commands::pdf_pages::{root_pages_id, save_doc, validate_page_numbers};
+use crate::commands::pdf_pages::{
+  rebuild_flat_pages_tree, root_pages_id, save_doc, validate_page_numbers,
+};
 use crate::error::{map_err, AppError, CommandResult};
 use super::pdf_common::{decode_pdf_base64, encode_pdf_bytes};
 use lopdf::{Dictionary, Document, Object, ObjectId};
@@ -75,28 +77,14 @@ pub fn insert_blank_pages_in_pdf(
   let reference_page = if after_page == 0 { 1 } else { after_page.min(total) };
   let media_box = page_media_box(&doc, pages[&reference_page]);
 
-  let pages_dict = doc
-    .get_dictionary(pages_id)
-    .map_err(|e| AppError::Pdf(e.to_string()))?;
-  let kids = pages_dict
-    .get(b"Kids")
-    .and_then(Object::as_array)
-    .map_err(|_| AppError::Pdf("pages tree missing Kids".into()))?
-    .clone();
-
+  // Flatten via leaf order from get_pages() so nested /Pages trees insert correctly.
+  let mut page_ids: Vec<ObjectId> = pages.values().copied().collect();
   let insert_at = after_page as usize;
-  let mut new_kids = kids;
-  for _ in 0..count {
+  for i in 0..count {
     let page_id = create_blank_page(&mut doc, pages_id, media_box.clone());
-    new_kids.insert(insert_at, Object::Reference(page_id));
+    page_ids.insert(insert_at + i as usize, page_id);
   }
-
-  let new_count = new_kids.len() as i64;
-  let pages_dict = doc
-    .get_dictionary_mut(pages_id)
-    .map_err(|e| AppError::Pdf(e.to_string()))?;
-  pages_dict.set("Kids", Object::Array(new_kids));
-  pages_dict.set("Count", Object::Integer(new_count));
+  rebuild_flat_pages_tree(&mut doc, &page_ids)?;
 
   let output = save_doc(&mut doc)?;
   tracing::info!(
@@ -164,7 +152,8 @@ pub fn merge_pdf_bytes_list(doc_bytes_list: &[Vec<u8>]) -> Result<Vec<u8>, AppEr
     return Ok(doc_bytes_list[0].clone());
   }
 
-  let mut documents_pages: BTreeMap<ObjectId, Object> = BTreeMap::new();
+  // Preserve document/page order — do not sort by ObjectId (BTreeMap keys).
+  let mut documents_pages: Vec<(ObjectId, Object)> = Vec::new();
   let mut documents_objects: BTreeMap<ObjectId, Object> = BTreeMap::new();
   let mut document = Document::with_version("1.5");
   let mut max_id = 1u32;
@@ -179,7 +168,7 @@ pub fn merge_pdf_bytes_list(doc_bytes_list: &[Vec<u8>]) -> Result<Vec<u8>, AppEr
         .get_object(page_id)
         .map_err(|e| AppError::Pdf(e.to_string()))?
         .to_owned();
-      documents_pages.insert(page_id, object);
+      documents_pages.push((page_id, object));
     }
     documents_objects.extend(doc.objects);
   }
@@ -227,18 +216,20 @@ pub fn merge_pdf_bytes_list(doc_bytes_list: &[Vec<u8>]) -> Result<Vec<u8>, AppEr
     dictionary.set(
       "Kids",
       documents_pages
-        .keys()
-        .map(|id| Object::Reference(*id))
+        .iter()
+        .map(|(id, _)| Object::Reference(*id))
         .collect::<Vec<_>>(),
     );
     document.objects.insert(page_id, Object::Dictionary(dictionary));
   }
 
-  for (object_id, object) in documents_pages {
+  for (object_id, object) in &documents_pages {
     if let Ok(dictionary) = object.as_dict() {
       let mut dictionary = dictionary.clone();
       dictionary.set("Parent", page_id);
-      document.objects.insert(object_id, Object::Dictionary(dictionary));
+      document
+        .objects
+        .insert(*object_id, Object::Dictionary(dictionary));
     }
   }
 
@@ -388,5 +379,197 @@ mod tests {
     let output = merge_pdf_bytes_list(&[a, b]).unwrap();
     let doc = Document::load_mem(&output).unwrap();
     assert_eq!(doc.get_pages().len(), 6);
+  }
+
+  /// Build a 1-page PDF whose page object id is deliberately high so that
+  /// ObjectId-sorted merge would put it before a normal low-id page.
+  fn one_page_pdf_with_high_page_id() -> Vec<u8> {
+    let mut doc = Document::with_version("1.5");
+    let pages_id = (1, 0);
+    let catalog_id = (2, 0);
+    let page_id = (50, 0);
+    doc.objects.insert(
+      pages_id,
+      Object::Dictionary({
+        let mut d = Dictionary::new();
+        d.set("Type", Object::Name(b"Pages".to_vec()));
+        d.set("Kids", Object::Array(vec![Object::Reference(page_id)]));
+        d.set("Count", Object::Integer(1));
+        d
+      }),
+    );
+    doc.objects.insert(
+      catalog_id,
+      Object::Dictionary({
+        let mut d = Dictionary::new();
+        d.set("Type", Object::Name(b"Catalog".to_vec()));
+        d.set("Pages", Object::Reference(pages_id));
+        d
+      }),
+    );
+    doc.objects.insert(
+      page_id,
+      Object::Dictionary({
+        let mut d = Dictionary::new();
+        d.set("Type", Object::Name(b"Page".to_vec()));
+        d.set("Parent", Object::Reference(pages_id));
+        d.set(
+          "MediaBox",
+          Object::Array(vec![
+            Object::Integer(0),
+            Object::Integer(0),
+            Object::Integer(400),
+            Object::Integer(400),
+          ]),
+        );
+        d
+      }),
+    );
+    doc.trailer.set("Root", Object::Reference(catalog_id));
+    doc.max_id = 50;
+    let mut buffer = Vec::new();
+    doc.save_to(&mut buffer).unwrap();
+    buffer
+  }
+
+  fn one_page_pdf_with_low_page_id() -> Vec<u8> {
+    let mut doc = Document::with_version("1.5");
+    let pages_id = (1, 0);
+    let catalog_id = (2, 0);
+    let page_id = (3, 0);
+    doc.objects.insert(
+      pages_id,
+      Object::Dictionary({
+        let mut d = Dictionary::new();
+        d.set("Type", Object::Name(b"Pages".to_vec()));
+        d.set("Kids", Object::Array(vec![Object::Reference(page_id)]));
+        d.set("Count", Object::Integer(1));
+        d
+      }),
+    );
+    doc.objects.insert(
+      catalog_id,
+      Object::Dictionary({
+        let mut d = Dictionary::new();
+        d.set("Type", Object::Name(b"Catalog".to_vec()));
+        d.set("Pages", Object::Reference(pages_id));
+        d
+      }),
+    );
+    doc.objects.insert(
+      page_id,
+      Object::Dictionary({
+        let mut d = Dictionary::new();
+        d.set("Type", Object::Name(b"Page".to_vec()));
+        d.set("Parent", Object::Reference(pages_id));
+        d.set(
+          "MediaBox",
+          Object::Array(vec![
+            Object::Integer(0),
+            Object::Integer(0),
+            Object::Integer(200),
+            Object::Integer(200),
+          ]),
+        );
+        d
+      }),
+    );
+    doc.trailer.set("Root", Object::Reference(catalog_id));
+    doc.max_id = 3;
+    let mut buffer = Vec::new();
+    doc.save_to(&mut buffer).unwrap();
+    buffer
+  }
+
+  fn media_box_width(doc: &Document, page_num: u32) -> i64 {
+    let page_id = doc.get_pages()[&page_num];
+    let box_arr = doc
+      .get_dictionary(page_id)
+      .unwrap()
+      .get(b"MediaBox")
+      .and_then(Object::as_array)
+      .unwrap();
+    box_arr[2].as_i64().unwrap()
+  }
+
+  #[test]
+  fn merge_preserves_source_document_order() {
+    // First doc has a high page object id; second has a low one.
+    // ObjectId-sorted Kids would reverse them; Vec order must keep first-first.
+    let high = one_page_pdf_with_high_page_id();
+    let low = one_page_pdf_with_low_page_id();
+    let output = merge_pdf_bytes_list(&[high, low]).unwrap();
+    let doc = Document::load_mem(&output).unwrap();
+    assert_eq!(doc.get_pages().len(), 2);
+    assert_eq!(media_box_width(&doc, 1), 400, "first input page must stay first");
+    assert_eq!(media_box_width(&doc, 2), 200, "second input page must stay second");
+  }
+
+  fn nested_two_page_pdf() -> Vec<u8> {
+    let mut doc = Document::with_version("1.5");
+    let root_pages = doc.new_object_id();
+    let branch_a = doc.new_object_id();
+    let branch_b = doc.new_object_id();
+    let page_a = doc.new_object_id();
+    let page_b = doc.new_object_id();
+    let catalog_id = doc.new_object_id();
+
+    for (page_id, parent, w) in [(page_a, branch_a, 111), (page_b, branch_b, 222)] {
+      let mut page_dict = Dictionary::new();
+      page_dict.set("Type", Object::Name(b"Page".to_vec()));
+      page_dict.set("Parent", Object::Reference(parent));
+      page_dict.set(
+        "MediaBox",
+        Object::Array(vec![
+          Object::Integer(0),
+          Object::Integer(0),
+          Object::Integer(w),
+          Object::Integer(792),
+        ]),
+      );
+      doc.objects.insert(page_id, Object::Dictionary(page_dict));
+    }
+
+    for (branch_id, page_id) in [(branch_a, page_a), (branch_b, page_b)] {
+      let mut branch = Dictionary::new();
+      branch.set("Type", Object::Name(b"Pages".to_vec()));
+      branch.set("Parent", Object::Reference(root_pages));
+      branch.set("Kids", Object::Array(vec![Object::Reference(page_id)]));
+      branch.set("Count", Object::Integer(1));
+      doc.objects.insert(branch_id, Object::Dictionary(branch));
+    }
+
+    let mut root = Dictionary::new();
+    root.set("Type", Object::Name(b"Pages".to_vec()));
+    root.set(
+      "Kids",
+      Object::Array(vec![
+        Object::Reference(branch_a),
+        Object::Reference(branch_b),
+      ]),
+    );
+    root.set("Count", Object::Integer(2));
+    doc.objects.insert(root_pages, Object::Dictionary(root));
+
+    let mut catalog = Dictionary::new();
+    catalog.set("Type", Object::Name(b"Catalog".to_vec()));
+    catalog.set("Pages", Object::Reference(root_pages));
+    doc.objects.insert(catalog_id, Object::Dictionary(catalog));
+    doc.trailer.set("Root", Object::Reference(catalog_id));
+
+    let mut buffer = Vec::new();
+    doc.save_to(&mut buffer).unwrap();
+    buffer
+  }
+
+  #[test]
+  fn insert_into_nested_pages_tree() {
+    let input = nested_two_page_pdf();
+    let output = insert_blank_pages_in_pdf(&input, 1, 1).unwrap();
+    let doc = Document::load_mem(&output).unwrap();
+    assert_eq!(doc.get_pages().len(), 3);
+    assert_eq!(media_box_width(&doc, 1), 111);
+    // Inserted blank uses letter size from reference page.
+    assert_eq!(media_box_width(&doc, 3), 222);
   }
 }
