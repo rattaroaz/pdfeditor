@@ -418,8 +418,10 @@ fn text_edit_operations(edit: &TextEditDto, page_height: f64) -> Vec<Operation> 
     ops.push(Operation::new("f", vec![]));
   }
 
-  // Baseline sits above the bottom of the glyph box in PDF user space.
-  let baseline_y = y1 + (edit.font_size * 0.22).min(h * 0.45);
+  // Match form-field baseline: descender room + slight font ascent fudge from box bottom.
+  // Keeps embedded text aligned with the UI box (top pad + fontSize + descender).
+  let descender = (edit.font_size * 0.22).ceil().max(2.0);
+  let baseline_y = y1 + descender + edit.font_size * 0.22;
 
   ops.push(Operation::new("BT", vec![]));
   ops.push(Operation::new(

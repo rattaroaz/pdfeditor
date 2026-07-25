@@ -380,9 +380,9 @@ const FORM_DA: &str = "/Helv 12 Tf 0 g";
 
 const MIN_TEXT_FONT_SIZE: f64 = 6.0;
 const MAX_TEXT_FONT_SIZE: f64 = 144.0;
-const TEXT_BOX_TOP_PAD: f64 = 2.0;
-const TEXT_BOX_BOTTOM_PAD: f64 = 5.0;
-const DESCENDER_RATIO: f64 = 0.28;
+const TEXT_BOX_TOP_PAD: f64 = 1.0;
+const TEXT_BOX_BOTTOM_PAD: f64 = 2.0;
+const DESCENDER_RATIO: f64 = 0.22;
 const DROPDOWN_EXTRA_BOTTOM_PAD: f64 = 2.0;
 const DROPDOWN_MIN_DESCENDER_PAD: f64 = 2.0;
 
@@ -1345,9 +1345,9 @@ mod tests {
 
   #[test]
   fn dropdown_layout_matches_frontend() {
-    assert_eq!(dropdown_descender_padding(12.0), 6.0);
-    assert_eq!(dropdown_box_height_from_font_size(12.0), 20.0);
-    assert_eq!(dropdown_font_size_from_box_height(20.0), 12.0);
+    assert_eq!(dropdown_descender_padding(12.0), 5.0);
+    assert_eq!(dropdown_box_height_from_font_size(12.0), 18.0);
+    assert_eq!(dropdown_font_size_from_box_height(18.0), 12.0);
   }
 
   #[test]

@@ -50,6 +50,23 @@ describe("PasswordDialog", () => {
     await user.click(screen.getByTestId("password-submit"));
 
     expect(screen.getByTestId("password-mismatch")).toBeInTheDocument();
+    expect(screen.getByTestId("password-dialog")).toBeInTheDocument();
+    resolvePasswordPrompt(null);
+    await expect(pending).resolves.toBeNull();
+  });
+
+  it("keeps dialog open when confirm password is empty", async () => {
+    const user = userEvent.setup();
+    const pending = requestPassword({
+      title: "Protect PDF",
+      message: "Set a password",
+      confirm: true,
+    });
+    render(<PasswordDialog />);
+
+    await user.click(screen.getByTestId("password-submit"));
+    expect(screen.getByTestId("password-mismatch")).toHaveTextContent("Enter a password.");
+    expect(screen.getByTestId("password-dialog")).toBeInTheDocument();
     resolvePasswordPrompt(null);
     await expect(pending).resolves.toBeNull();
   });

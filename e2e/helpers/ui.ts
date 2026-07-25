@@ -95,10 +95,21 @@ export async function fillPasswordDialog(
 ): Promise<void> {
   const dialog = page.getByTestId("password-dialog");
   await dialog.waitFor({ state: "visible", timeout: 10_000 });
-  await page.getByTestId("password-input").fill(password);
+  // Wait out backdrop click-through guard after menu open.
+  await page.waitForTimeout(120);
+
+  const passwordInput = page.getByTestId("password-input");
+  await passwordInput.click();
+  await passwordInput.fill(password);
+  await expect(passwordInput).toHaveValue(password);
+
   if (confirm !== undefined) {
-    await page.getByTestId("password-confirm-input").fill(confirm);
+    const confirmInput = page.getByTestId("password-confirm-input");
+    await confirmInput.click();
+    await confirmInput.fill(confirm);
+    await expect(confirmInput).toHaveValue(confirm);
   }
+
   await page.getByTestId("password-submit").click();
   await expect(dialog).toBeHidden({ timeout: 10_000 });
 }

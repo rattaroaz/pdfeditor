@@ -11,7 +11,6 @@ import { useContentEditStore } from "@/stores/contentEditStore";
 import { runDocumentOperation } from "@/services/documentOpQueue";
 import { getDocumentLoadPassword, useDocumentStore } from "@/stores/documentStore";
 import { log, reportError } from "@/lib/logging";
-import { TEXT_COVER_H_PAD, TEXT_COVER_V_PAD } from "@/lib/textEditBox";
 
 async function textEditsPayload(edits: TextContentEdit[]) {
   const { pdfDoc, rotation } = useDocumentStore.getState();
@@ -21,14 +20,13 @@ async function textEditsPayload(edits: TextContentEdit[]) {
   for (const edit of edits) {
     if (!edit.coverOld && !edit.newText.trim()) continue;
     const page = await pdfDoc.getPage(edit.pageIndex + 1);
-    const pad = edit.coverOld ? TEXT_COVER_H_PAD : 0;
-    const vPad = edit.coverOld ? TEXT_COVER_V_PAD : 0;
+    // Pass the UI box as-is. Rust applies cover white-out padding once.
     const [pdfX1, pdfY1, pdfX2, pdfY2] = viewportRectToPdfRect(
       page,
-      edit.x - pad,
-      edit.y - vPad,
-      edit.width + pad * 2,
-      edit.height + vPad * 2,
+      edit.x,
+      edit.y,
+      edit.width,
+      edit.height,
       rotation,
     );
 

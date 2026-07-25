@@ -27,8 +27,11 @@ test.describe("document security", () => {
     await protectDocumentFromMenu(page);
     await fillPasswordDialog(page, "secret123", "secret123");
 
+    // Persistent badge is the source of truth; status toast is ephemeral.
+    await expect(page.getByTestId("status-bar")).toContainText("Will protect on save", {
+      timeout: 15_000,
+    });
     await expectStatusMessage(page, "Password protection will be applied when you save");
-    await expect(page.getByTestId("status-bar")).toContainText("Will protect on save");
     await expectDocumentDirty(page, true);
 
     await saveDocumentFromMenu(page);

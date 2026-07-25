@@ -7,11 +7,11 @@ export const TEXT_COVER_H_PAD = 1;
 /** Vertical padding for PDF white-out cover (PDF points). */
 export const TEXT_COVER_V_PAD = 0.5;
 /** Padding above text in markup/form boxes (PDF points). Matches Rust `TEXT_BOX_TOP_PAD`. */
-export const TEXT_BOX_TOP_PAD = 2;
+export const TEXT_BOX_TOP_PAD = 1;
 /** Minimum bottom padding (PDF points); larger fonts get more via {@link DESCENDER_RATIO}. */
-export const TEXT_BOX_BOTTOM_PAD = 5;
+export const TEXT_BOX_BOTTOM_PAD = 2;
 /** Fraction of font size reserved below the baseline for descenders (g, j, p, y). */
-export const DESCENDER_RATIO = 0.28;
+export const DESCENDER_RATIO = 0.22;
 /** @deprecated Use TEXT_BOX_TOP_PAD + descender padding */
 export const TEXT_BOX_V_PAD = TEXT_BOX_TOP_PAD;
 
@@ -241,17 +241,16 @@ export function coverLayoutMinimums(
   newText = "",
 ): { minWidth?: number; minHeight?: number } {
   if (!edit.coverOld) return {};
-  const contentWidth =
-    measureTextWidth(newText, edit.fontSize) + TEXT_COVER_H_PAD * 2 + TEXT_BOX_WIDTH_BUFFER;
-  const originalWidth =
-    measureTextWidth(edit.oldText ?? "", edit.fontSize) + TEXT_COVER_H_PAD * 2 + TEXT_BOX_WIDTH_BUFFER;
+  const contentWidth = measureTextWidth(newText, edit.fontSize) + TEXT_BOX_WIDTH_BUFFER;
+  const originalWidth = measureTextWidth(edit.oldText ?? "", edit.fontSize) + TEXT_BOX_WIDTH_BUFFER;
   const textMinWidth = Math.max(contentWidth, originalWidth);
-  const lines = newText.split("\n").length || 1;
-  const textMinHeight = lines * edit.fontSize + TEXT_COVER_V_PAD * 2;
+  const lines = Math.max(1, newText.split("\n").length);
+  const textMinHeight =
+    TEXT_BOX_TOP_PAD + lines * edit.fontSize + descenderPadding(edit.fontSize);
   return {
     // Width stays at least the original cover so shorter replacements still white-out old text.
     minWidth: Math.max(edit.coverWidth ?? 0, textMinWidth),
-    // Height follows content only so the box does not overlap lines above/below.
+    // Height matches the CSS padding model used by textBoxContentStyle.
     minHeight: textMinHeight,
   };
 }
@@ -262,8 +261,9 @@ export function layoutCoverTextEdit(
   fontSize: number,
   hit: { x: number; y: number; width: number; height: number },
 ): { x: number; y: number; width: number; height: number } {
-  const tight = computeTextEditBox(text, fontSize, { coverOld: true });
-  return alignBoxToHit(hit, tight, true);
+  // Prefer the pdf.js hit width so the white-out covers the original glyphs.
+  const tight = computeTextEditBox(text, fontSize, { minWidth: hit.width });
+  return alignBoxToHit(hit, tight);
 }
 
 export function measureTextBoxFromTextarea(
@@ -298,22 +298,19 @@ export function measureTextBoxFromTextarea(
   measureMirror.style.boxSizing = style.boxSizing;
   measureMirror.textContent = el.value.length > 0 ? el.value : "\u00a0";
 
-  const hPad = opts?.coverOld ? TEXT_COVER_H_PAD : 0;
-  const vPad = opts?.coverOld ? TEXT_COVER_V_PAD : 0;
-  const widthPx = measureMirror.offsetWidth;
-  const heightPx = measureMirror.offsetHeight;
-  const measuredWidth = widthPx / scale + hPad * 2;
-  const measuredHeight = heightPx / scale + vPad * 2;
+  // Mirror already includes textBoxContentStyle padding — do not add cover pads again.
+  const measuredWidth = measureMirror.offsetWidth / scale;
+  const measuredHeight = measureMirror.offsetHeight / scale;
 
   const width = Math.max(opts?.minWidth ?? 4, measuredWidth + TEXT_BOX_WIDTH_BUFFER);
-  const defaultMinHeight = opts?.coverOld
-    ? fontSize + vPad * 2
-    : boxHeightFromFontSize(fontSize);
-  const height = Math.max(opts?.minHeight ?? defaultMinHeight, measuredHeight);
+  const height = Math.max(
+    opts?.minHeight ?? boxHeightFromFontSize(fontSize),
+    measuredHeight,
+  );
 
   return {
     width: Number.isFinite(width) ? width : opts?.minWidth ?? 4,
-    height: Number.isFinite(height) ? height : opts?.minHeight ?? fontSize + vPad * 2,
+    height: Number.isFinite(height) ? height : opts?.minHeight ?? boxHeightFromFontSize(fontSize),
   };
 }
 
@@ -322,29 +319,29 @@ export function computeTextEditBox(
   fontSize: number,
   opts?: { coverOld?: boolean; minWidth?: number; minHeight?: number },
 ): { width: number; height: number } {
-  const hPad = opts?.coverOld ? TEXT_COVER_H_PAD : 0;
-  const vPad = opts?.coverOld ? TEXT_COVER_V_PAD : 0;
   const lines = text.split("\n");
   const measured = measureMultilineWidth(text, fontSize);
-  const width = Math.max(opts?.minWidth ?? 4, measured + hPad * 2 + TEXT_BOX_WIDTH_BUFFER);
-  const defaultMinHeight = opts?.coverOld
-    ? fontSize + vPad * 2
-    : boxHeightFromFontSize(fontSize);
-  const lineBlockHeight = opts?.coverOld
-    ? lines.length * fontSize + vPad * 2
-    : TEXT_BOX_TOP_PAD + lines.length * fontSize + descenderPadding(fontSize);
-  const height = Math.max(opts?.minHeight ?? defaultMinHeight, lineBlockHeight);
+  // Cover pads are applied once on save for PDF white-out, not in the UI box.
+  const width = Math.max(opts?.minWidth ?? 4, measured + TEXT_BOX_WIDTH_BUFFER);
+  const lineBlockHeight =
+    TEXT_BOX_TOP_PAD + lines.length * fontSize + descenderPadding(fontSize);
+  const height = Math.max(opts?.minHeight ?? boxHeightFromFontSize(fontSize), lineBlockHeight);
   return { width, height };
 }
 
-/** Center a tight box vertically inside a looser PDF.js hit rect. */
+/**
+ * Pin the content area to the pdf.js hit: after TEXT_BOX_TOP_PAD, glyphs sit on hit.y.
+ * Cover white-out padding is applied later on save, not by shifting the overlay.
+ */
 export function alignBoxToHit(
   hit: { x: number; y: number; width: number; height: number },
   box: { width: number; height: number },
-  coverOld: boolean,
+  _coverOld = false,
 ): { x: number; y: number; width: number; height: number } {
-  const hPad = coverOld ? TEXT_COVER_H_PAD : 0;
-  const x = hit.x - hPad;
-  const y = hit.y + (hit.height - box.height) / 2;
-  return { x, y, width: box.width, height: box.height };
+  return {
+    x: hit.x,
+    y: hit.y - TEXT_BOX_TOP_PAD,
+    width: box.width,
+    height: box.height,
+  };
 }

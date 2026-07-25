@@ -1,4 +1,11 @@
-import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type MouseEvent,
+} from "react";
 import {
   getPasswordPromptState,
   resolvePasswordPrompt,
@@ -9,8 +16,10 @@ export function PasswordDialog() {
   const options = useSyncExternalStore(subscribePasswordPrompt, getPasswordPromptState, () => null);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [mismatch, setMismatch] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  /** Ignore backdrop dismiss for one frame so menu click-through cannot cancel. */
+  const allowBackdropDismissRef = useRef(false);
   const titleId = useId();
   const messageId = useId();
 
@@ -18,9 +27,16 @@ export function PasswordDialog() {
     if (!options) return;
     setPassword("");
     setConfirm("");
-    setMismatch(false);
-    const id = window.setTimeout(() => inputRef.current?.focus(), 0);
-    return () => window.clearTimeout(id);
+    setError(null);
+    allowBackdropDismissRef.current = false;
+    const focusId = window.setTimeout(() => inputRef.current?.focus(), 0);
+    const allowId = window.setTimeout(() => {
+      allowBackdropDismissRef.current = true;
+    }, 100);
+    return () => {
+      window.clearTimeout(focusId);
+      window.clearTimeout(allowId);
+    };
   }, [options]);
 
   if (!options) return null;
@@ -28,11 +44,11 @@ export function PasswordDialog() {
   const submit = () => {
     if (options.confirm) {
       if (!password) {
-        resolvePasswordPrompt(null);
+        setError("Enter a password.");
         return;
       }
       if (password !== confirm) {
-        setMismatch(true);
+        setError("Passwords do not match.");
         return;
       }
     }
@@ -41,11 +57,17 @@ export function PasswordDialog() {
 
   const cancel = () => resolvePasswordPrompt(null);
 
+  const onBackdropMouseDown = (e: MouseEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return;
+    if (!allowBackdropDismissRef.current) return;
+    cancel();
+  };
+
   return (
     <div
       data-testid="password-dialog"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-      onClick={cancel}
+      onMouseDown={onBackdropMouseDown}
     >
       <div
         role="dialog"
@@ -53,7 +75,7 @@ export function PasswordDialog() {
         aria-labelledby={titleId}
         aria-describedby={messageId}
         className="w-full max-w-md rounded-lg border border-zinc-700 bg-zinc-900 p-5 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
           if (e.key === "Escape") cancel();
           if (e.key === "Enter") submit();
@@ -72,11 +94,11 @@ export function PasswordDialog() {
             ref={inputRef}
             data-testid="password-input"
             type="password"
-            autoComplete="current-password"
+            autoComplete="off"
             value={password}
             onChange={(e) => {
               setPassword(e.target.value);
-              setMismatch(false);
+              setError(null);
             }}
             className="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-blue-500"
           />
@@ -88,20 +110,20 @@ export function PasswordDialog() {
             <input
               data-testid="password-confirm-input"
               type="password"
-              autoComplete="new-password"
+              autoComplete="off"
               value={confirm}
               onChange={(e) => {
                 setConfirm(e.target.value);
-                setMismatch(false);
+                setError(null);
               }}
               className="mt-1 w-full rounded-md border border-zinc-600 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-blue-500"
             />
           </label>
         )}
 
-        {mismatch && (
+        {error && (
           <p className="mt-2 text-xs text-red-400" data-testid="password-mismatch">
-            Passwords do not match.
+            {error}
           </p>
         )}
 
