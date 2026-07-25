@@ -31,9 +31,13 @@ vi.mock("@/services/contentEditService", () => ({
   applyContentEdits: vi.fn(),
 }));
 
+const mockInspectPdfSecurity = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ isEncrypted: false, requiresPassword: false }),
+);
+
 vi.mock("@/services/securityService", () => ({
   applySecurityOnSaveBytes: vi.fn(async (bytes: Uint8Array) => bytes),
-  inspectPdfSecurity: vi.fn(),
+  inspectPdfSecurity: mockInspectPdfSecurity,
 }));
 
 vi.mock("@/lib/pdf/pdfStorage", () => ({
@@ -51,6 +55,8 @@ vi.mock("@/lib/pdf/pdfEngine", () => ({
 import {
   closeDocument,
   confirmDiscardDocumentChanges,
+  hasUnsavedDocumentChanges,
+  openPdfFromPath,
   revertToSaved,
   savePdf,
 } from "./documentService";
@@ -83,6 +89,7 @@ describe("documentService lifecycle", () => {
     useUiStore.setState({ appMode: "document", showSearch: false, searchQuery: "", searchMatches: [], activeMatchIndex: 0 });
     useAnnotationStore.setState({ annotations: [] });
     mockLoadPdf.mockResolvedValue(mockPdfDoc);
+    mockInspectPdfSecurity.mockResolvedValue({ isEncrypted: false, requiresPassword: false });
     mockInvokeLogged.mockImplementation(async (command: string) => {
       if (command === "save_pdf_with_annotations") {
         return { dataBase64: PDF_BASE64, path: "C:\\docs\\test.pdf" };
@@ -95,6 +102,15 @@ describe("documentService lifecycle", () => {
       }
       if (command === "load_annotations") {
         return null;
+      }
+      if (command === "read_pdf_file") {
+        return { dataBase64: PDF_BASE64, path: "C:\\docs\\other.pdf" };
+      }
+      if (command === "prepare_document_bytes") {
+        return PDF_BASE64;
+      }
+      if (command === "add_recent_file") {
+        return undefined;
       }
       throw new Error(`unexpected invoke: ${command}`);
     });
@@ -114,6 +130,85 @@ describe("documentService lifecycle", () => {
       vi.mocked(ask).mockResolvedValue(false);
       await expect(confirmDiscardDocumentChanges("Discard?")).resolves.toBe(false);
       expect(ask).toHaveBeenCalledWith("Discard?", expect.objectContaining({ kind: "warning" }));
+    });
+
+    it("prompts when only form values changed (isDirty false)", async () => {
+      useDocumentStore.setState({ isDirty: false });
+      useFormStore.getState().setValuesFromPdf({
+        name: { name: "name", value: "Alice", type: "text", required: false },
+      });
+      useFormStore.getState().setFieldValue("name", "Bob", "text");
+      expect(hasUnsavedDocumentChanges()).toBe(true);
+      vi.mocked(ask).mockResolvedValue(true);
+      await expect(confirmDiscardDocumentChanges("Discard?")).resolves.toBe(true);
+      expect(ask).toHaveBeenCalled();
+    });
+  });
+
+  describe("openPdfFromPath", () => {
+    it("loads sidecar annotations and prepares stripped base bytes", async () => {
+      useDocumentStore.setState({ pdfDoc: null, isDirty: false });
+      const sidecar = JSON.stringify([
+        {
+          id: "a1",
+          type: "highlight",
+          pageIndex: 0,
+          rects: [{ x: 1, y: 2, width: 3, height: 4 }],
+          author: "User",
+          color: "#FFEB3B",
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+      mockInvokeLogged.mockImplementation(async (command: string, args?: Record<string, unknown>) => {
+        if (command === "read_pdf_file") {
+          return { dataBase64: PDF_BASE64, path: "C:\\docs\\other.pdf" };
+        }
+        if (command === "load_annotations") {
+          return sidecar;
+        }
+        if (command === "prepare_document_bytes") {
+          expect(args?.hasSidecar).toBe(true);
+          return PDF_BASE64;
+        }
+        if (command === "get_pdf_info") {
+          return { metadata: { pageCount: 1, fileSize: PDF_BYTES.length } };
+        }
+        if (command === "add_recent_file") {
+          return undefined;
+        }
+        throw new Error(`unexpected invoke: ${command}`);
+      });
+
+      await openPdfFromPath("C:\\docs\\other.pdf");
+
+      expect(useDocumentStore.getState().filePath).toBe("C:\\docs\\other.pdf");
+      expect(useAnnotationStore.getState().annotations).toHaveLength(1);
+      expect(useAnnotationStore.getState().annotations[0]?.type).toBe("highlight");
+    });
+
+    it("ignores invalid sidecar JSON", async () => {
+      useDocumentStore.setState({ pdfDoc: null, isDirty: false });
+      mockInvokeLogged.mockImplementation(async (command: string) => {
+        if (command === "read_pdf_file") {
+          return { dataBase64: PDF_BASE64, path: "C:\\docs\\bad.pdf" };
+        }
+        if (command === "load_annotations") {
+          return "{not-json";
+        }
+        if (command === "prepare_document_bytes") {
+          return PDF_BASE64;
+        }
+        if (command === "get_pdf_info") {
+          return { metadata: { pageCount: 1, fileSize: PDF_BYTES.length } };
+        }
+        if (command === "add_recent_file") {
+          return undefined;
+        }
+        throw new Error(`unexpected invoke: ${command}`);
+      });
+
+      await openPdfFromPath("C:\\docs\\bad.pdf");
+      expect(useAnnotationStore.getState().annotations).toHaveLength(0);
     });
   });
 

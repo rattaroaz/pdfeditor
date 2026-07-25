@@ -2,7 +2,8 @@ import { errorMessage } from "@/lib/parseInvokeError";
 import { ask, open, save } from "@tauri-apps/plugin-dialog";
 import { flushSync } from "react-dom";
 import { invokeLogged } from "@/lib/tauriInvoke";
-import { createCorrelationId, createErrorReporter, log, startTimer } from "@/lib/logging";
+import { createCorrelationId, runWithCorrelationId } from "@/lib/correlation";
+import { createErrorReporter, log, startTimer } from "@/lib/logging";
 import { loadPdfFromBytes, decodeBase64Pdf, PdfPasswordRequiredError, documentHasExtractableText } from "@/lib/pdf/pdfEngine";
 import {
   ensurePdfExtension,
@@ -35,8 +36,17 @@ interface PdfInfoResponse {
 
 const showError = createErrorReporter("document", "document");
 
+/** True when document flag, pending forms, or content edits need discard confirmation. */
+export function hasUnsavedDocumentChanges(): boolean {
+  return (
+    useDocumentStore.getState().isDirty ||
+    useFormStore.getState().hasPendingFormChanges() ||
+    useContentEditStore.getState().hasEdits()
+  );
+}
+
 export async function confirmDiscardDocumentChanges(message: string): Promise<boolean> {
-  if (!useDocumentStore.getState().isDirty) return true;
+  if (!hasUnsavedDocumentChanges()) return true;
   return ask(message, { title: APP_NAME, kind: "warning" });
 }
 
@@ -242,132 +252,155 @@ async function savePdfImpl(saveAs = false): Promise<void> {
 
   docStore.setStatusMessage("Saving…");
 
-  try {
-    if (useUiStore.getState().appMode === "edit") {
-      flushSync(() => {
-        useUiStore.getState().setAppMode("document");
-      });
-    }
-    useContentEditStore.getState().finalizeTextEdits();
-
-    if (useContentEditStore.getState().hasEdits()) {
-      log.document.info("Applying content edits before save", { userAction: "save" });
-      // clearAfter: true — bytes are already mutated; keeping edits would
-      // double-apply them if a later save step fails and the user retries.
-      const ok = await applyContentEdits({ clearAfter: true });
-      if (!ok) {
-        docStore.setStatusMessage(null);
-        return;
-      }
-    }
-
-    const formStore = useFormStore.getState();
-    if (formStore.hasPendingFormChanges()) {
-      log.document.info("Applying form changes before save", {
-        userAction: "save",
-        metadata: {
-          newFields: formStore.newFields.length > 0,
-          changedValues: formStore.getChangedValuesArray().length,
-        },
-      });
-      const ok = await applyFormChanges();
-      if (!ok) {
-        docStore.setStatusMessage(null);
-        return;
-      }
-    }
-
-    const sourceBytes =
-      useDocumentStore.getState().basePdfBytes ??
-      useDocumentStore.getState().pdfBytes ??
-      pdfBytes;
-    const result = await invokeLogged<SavePdfResult>("save_pdf_with_annotations", {
-      targetPath,
-      pdfBase64: encodeBase64Pdf(sourceBytes),
-      annotationsJson: JSON.stringify(useAnnotationStore.getState().annotations),
-    });
-
-    let newBytes = decodeBase64Pdf(result.dataBase64);
-
-    const securityStore = useDocumentStore.getState();
-    if (securityStore.pendingSavePassword || securityStore.removePasswordOnSave) {
-      newBytes = await applySecurityOnSaveBytes(newBytes);
-    }
-    // Single write after optional encrypt/decrypt — Rust no longer writes plaintext first.
-    await writePdfBytes(targetPath, newBytes);
-
-    const updatedDoc = useDocumentStore.getState();
-    const reloadPassword = useDocumentStore.getState().documentPassword ?? undefined;
-    const reloadedDoc = await loadPdfFromBytes(newBytes, reloadPassword);
-
-    docStore.applySavedDocument({
-      filePath: targetPath,
-      pdfDoc: reloadedDoc,
-      pdfBytes: newBytes,
-      metadata: updatedDoc.metadata
-        ? {
-            ...updatedDoc.metadata,
-            isPasswordProtected: useDocumentStore.getState().isPasswordProtected,
-            fileSize: newBytes.byteLength,
-          }
-        : updatedDoc.metadata,
-    });
-
+  await runWithCorrelationId(correlationId, async () => {
     try {
-      await inspectDocumentForms(newBytes);
-      await loadFormFieldsFromPdf(reloadedDoc);
-      useFormStore.setState({ newFields: [] });
-    } catch {
-      log.document.warn("Form reload after save failed", { userAction: "save" });
-    }
-
-    const flatten = useUiStore.getState().flattenOnSave;
-    const savedAnnotations = useAnnotationStore.getState().annotations;
-    if (flatten) {
-      useAnnotationStore.getState().clearAnnotations();
-      try {
-        await invokeLogged("save_annotations", {
-          filePath: targetPath,
-          json: "[]",
+      if (useUiStore.getState().appMode === "edit") {
+        flushSync(() => {
+          useUiStore.getState().setAppMode("document");
         });
-      } catch {
-        // sidecar optional when flattened
       }
-    } else {
-      try {
-        await invokeLogged("save_annotations", {
-          filePath: targetPath,
-          json: JSON.stringify(savedAnnotations),
-        });
-      } catch {
-        log.document.warn("Annotation sidecar save failed", { userAction: "save" });
-      }
-    }
+      useContentEditStore.getState().finalizeTextEdits();
 
-    timer.end("Document saved with embedded annotations", {
-      metadata: { path: targetPath },
-    });
-  } catch (err) {
-    docStore.setStatusMessage(null);
-    timer.fail(err);
-    showError(err, "save");
-  }
+      if (useContentEditStore.getState().hasEdits()) {
+        log.document.info("Applying content edits before save", {
+          userAction: "save",
+          correlationId,
+        });
+        // clearAfter: true — bytes are already mutated; keeping edits would
+        // double-apply them if a later save step fails and the user retries.
+        const ok = await applyContentEdits({ clearAfter: true });
+        if (!ok) {
+          docStore.setStatusMessage(null);
+          return;
+        }
+      }
+
+      const formStore = useFormStore.getState();
+      if (formStore.hasPendingFormChanges()) {
+        log.document.info("Applying form changes before save", {
+          userAction: "save",
+          correlationId,
+          metadata: {
+            newFields: formStore.newFields.length > 0,
+            changedValues: formStore.getChangedValuesArray().length,
+          },
+        });
+        const ok = await applyFormChanges();
+        if (!ok) {
+          docStore.setStatusMessage(null);
+          return;
+        }
+      }
+
+      const sourceBytes =
+        useDocumentStore.getState().basePdfBytes ??
+        useDocumentStore.getState().pdfBytes ??
+        pdfBytes;
+      const result = await invokeLogged<SavePdfResult>(
+        "save_pdf_with_annotations",
+        {
+          targetPath,
+          pdfBase64: encodeBase64Pdf(sourceBytes),
+          annotationsJson: JSON.stringify(useAnnotationStore.getState().annotations),
+        },
+        { correlationId },
+      );
+
+      let newBytes = decodeBase64Pdf(result.dataBase64);
+
+      const securityStore = useDocumentStore.getState();
+      if (securityStore.pendingSavePassword || securityStore.removePasswordOnSave) {
+        newBytes = await applySecurityOnSaveBytes(newBytes);
+      }
+      // Single write after optional encrypt/decrypt — Rust no longer writes plaintext first.
+      await writePdfBytes(targetPath, newBytes);
+
+      const updatedDoc = useDocumentStore.getState();
+      const reloadPassword = useDocumentStore.getState().documentPassword ?? undefined;
+      const reloadedDoc = await loadPdfFromBytes(newBytes, reloadPassword);
+
+      docStore.applySavedDocument({
+        filePath: targetPath,
+        pdfDoc: reloadedDoc,
+        pdfBytes: newBytes,
+        metadata: updatedDoc.metadata
+          ? {
+              ...updatedDoc.metadata,
+              isPasswordProtected: useDocumentStore.getState().isPasswordProtected,
+              fileSize: newBytes.byteLength,
+            }
+          : updatedDoc.metadata,
+      });
+
+      try {
+        await inspectDocumentForms(newBytes);
+        await loadFormFieldsFromPdf(reloadedDoc);
+        useFormStore.setState({ newFields: [] });
+      } catch {
+        log.document.warn("Form reload after save failed", {
+          userAction: "save",
+          correlationId,
+        });
+      }
+
+      const flatten = useUiStore.getState().flattenOnSave;
+      const savedAnnotations = useAnnotationStore.getState().annotations;
+      if (flatten) {
+        useAnnotationStore.getState().clearAnnotations();
+        try {
+          await invokeLogged(
+            "save_annotations",
+            { filePath: targetPath, json: "[]" },
+            { correlationId },
+          );
+        } catch {
+          // sidecar optional when flattened
+        }
+      } else {
+        try {
+          await invokeLogged(
+            "save_annotations",
+            {
+              filePath: targetPath,
+              json: JSON.stringify(savedAnnotations),
+            },
+            { correlationId },
+          );
+        } catch {
+          log.document.warn("Annotation sidecar save failed", {
+            userAction: "save",
+            correlationId,
+          });
+        }
+      }
+
+      timer.end("Document saved with embedded annotations", {
+        metadata: { path: targetPath },
+      });
+    } catch (err) {
+      docStore.setStatusMessage(null);
+      timer.fail(err);
+      showError(err, "save");
+    }
+  });
 }
 
 export async function persistAnnotations(): Promise<void> {
-  const { filePath } = useDocumentStore.getState();
-  const { annotations } = useAnnotationStore.getState();
-  if (!filePath) return;
+  return runDocumentOperation("persist_annotations", async () => {
+    const { filePath } = useDocumentStore.getState();
+    const { annotations } = useAnnotationStore.getState();
+    if (!filePath) return;
 
-  try {
-    await invokeLogged("save_annotations", {
-      filePath,
-      json: JSON.stringify(annotations),
-    });
-    useDocumentStore.getState().markDocumentChanged("annotations");
-  } catch (err) {
-    showError(err);
-  }
+    try {
+      await invokeLogged("save_annotations", {
+        filePath,
+        json: JSON.stringify(annotations),
+      });
+      useDocumentStore.getState().markDocumentChanged("annotations");
+    } catch (err) {
+      showError(err);
+    }
+  });
 }
 
 export async function closeDocument(): Promise<void> {

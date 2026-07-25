@@ -87,6 +87,22 @@ export async function protectDocumentFromMenu(page: Page): Promise<void> {
   await page.getByTestId("menu-protect-password").click(menuClick);
 }
 
+/** Fill the in-app PasswordDialog (replaces native window.prompt). */
+export async function fillPasswordDialog(
+  page: Page,
+  password: string,
+  confirm?: string,
+): Promise<void> {
+  const dialog = page.getByTestId("password-dialog");
+  await dialog.waitFor({ state: "visible", timeout: 10_000 });
+  await page.getByTestId("password-input").fill(password);
+  if (confirm !== undefined) {
+    await page.getByTestId("password-confirm-input").fill(confirm);
+  }
+  await page.getByTestId("password-submit").click();
+  await expect(dialog).toBeHidden({ timeout: 10_000 });
+}
+
 export async function openLogPanel(page: Page): Promise<void> {
   await openViewMenu(page);
   const logMenu = page.getByTestId("menu-log-panel");

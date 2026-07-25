@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
+import { runWithCorrelationId } from "@/lib/correlation";
 import { clearLogBuffer, getLogEntries, logger } from "@/lib/logging";
 import { AppInvokeError, invokeLogged } from "./tauriInvoke";
 
@@ -23,6 +24,15 @@ describe("invokeLogged", () => {
     await invokeLogged("get_pdf_info", { path: "/a.pdf" }, { correlationId: "trace-42" });
     const start = getLogEntries().find((e) => e.message.includes("invoke start"));
     expect(start?.context?.correlationId).toBe("trace-42");
+  });
+
+  it("inherits active correlation id from runWithCorrelationId", async () => {
+    vi.mocked(invoke).mockResolvedValue({});
+    await runWithCorrelationId("save-trace", async () => {
+      await invokeLogged("save_annotations", { filePath: "/a.pdf", json: "[]" });
+    });
+    const start = getLogEntries().find((e) => e.message.includes("invoke start"));
+    expect(start?.context?.correlationId).toBe("save-trace");
   });
 
   it("throws AppInvokeError for structured failures", async () => {

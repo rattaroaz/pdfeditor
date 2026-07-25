@@ -19,6 +19,12 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
   ask: mockAsk,
 }));
 
+const mockHasUnsavedDocumentChanges = vi.hoisted(() => vi.fn(() => false));
+
+vi.mock("@/services/documentService", () => ({
+  hasUnsavedDocumentChanges: () => mockHasUnsavedDocumentChanges(),
+}));
+
 import { clearLogBuffer, getLogEntries } from "@/lib/logging";
 import { parseSemver } from "@/lib/semver";
 import { checkForUpdatesAndApply } from "./updateService";
@@ -44,6 +50,7 @@ describe("updateService", () => {
       updateMessage: "",
     });
     useDocumentStore.setState({ isDirty: false });
+    mockHasUnsavedDocumentChanges.mockReturnValue(false);
   });
 
   it("shows up to date message when no update is returned", async () => {
@@ -85,6 +92,7 @@ describe("updateService", () => {
 
   it("cancels when the user declines discarding unsaved changes", async () => {
     useDocumentStore.setState({ isDirty: true });
+    mockHasUnsavedDocumentChanges.mockReturnValue(true);
     mockAsk.mockResolvedValueOnce(false);
     mockCheck.mockResolvedValue({
       version: newerRemoteVersion(),

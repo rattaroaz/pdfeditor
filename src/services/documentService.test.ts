@@ -106,6 +106,7 @@ describe("documentService savePdf", () => {
         targetPath: "C:\\docs\\test.pdf",
         annotationsJson: "[]",
       }),
+      expect.objectContaining({ correlationId: expect.any(String) }),
     );
   });
 
@@ -116,6 +117,7 @@ describe("documentService savePdf", () => {
     expect(mockInvokeLogged).toHaveBeenCalledWith(
       "save_pdf_with_annotations",
       expect.any(Object),
+      expect.objectContaining({ correlationId: expect.any(String) }),
     );
   });
 
@@ -147,6 +149,7 @@ describe("documentService savePdf", () => {
     expect(mockInvokeLogged).toHaveBeenCalledWith(
       "save_pdf_with_annotations",
       expect.any(Object),
+      expect.objectContaining({ correlationId: expect.any(String) }),
     );
   });
 
@@ -190,6 +193,7 @@ describe("documentService savePdf", () => {
       expect.objectContaining({
         annotationsJson: expect.stringContaining("highlight"),
       }),
+      expect.objectContaining({ correlationId: expect.any(String) }),
     );
   });
 });

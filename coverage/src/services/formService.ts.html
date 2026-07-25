@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">65.77% </span>
+                <span class="strong">65.65% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>148/225</span>
+                <span class='fraction'>151/230</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">51.16% </span>
+                <span class="strong">52.27% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>22/43</span>
+                <span class='fraction'>23/44</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">65.77% </span>
+                <span class="strong">65.65% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>148/225</span>
+                <span class='fraction'>151/230</span>
             </div>
         
             
@@ -325,7 +325,12 @@
 <a name='L260'></a><a href='#L260'>260</a>
 <a name='L261'></a><a href='#L261'>261</a>
 <a name='L262'></a><a href='#L262'>262</a>
-<a name='L263'></a><a href='#L263'>263</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L263'></a><a href='#L263'>263</a>
+<a name='L264'></a><a href='#L264'>264</a>
+<a name='L265'></a><a href='#L265'>265</a>
+<a name='L266'></a><a href='#L266'>266</a>
+<a name='L267'></a><a href='#L267'>267</a>
+<a name='L268'></a><a href='#L268'>268</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -335,6 +340,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -412,6 +418,7 @@
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">6x</span>
@@ -498,12 +505,15 @@
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -598,7 +608,8 @@ import {
 } from "@/lib/pdf/pdfEngine";
 import type { PdfBytesResult } from "@/lib/pdf/pdfBinary";
 import { readTextFile, writeTextFile } from "@/lib/pdf/pdfStorage";
-import { useDocumentStore } from "@/stores/documentStore";
+import { runDocumentOperation } from "@/services/documentOpQueue";
+import { getDocumentLoadPassword, useDocumentStore } from "@/stores/documentStore";
 import { useFormStore } from "@/stores/formStore";
 import { createErrorReporter, log } from "@/lib/logging";
 import { defaultDropdownOptions, normalizeDropdownOptions } from "@/lib/dropdownOptions";
@@ -671,6 +682,7 @@ function mapFieldType(type?: string): FormFieldDefinition["kind"] {
 }
 &nbsp;
 export async function applyFormChanges(): Promise&lt;boolean&gt; {
+  return runDocumentOperation("apply_form_changes", async () =&gt; {
   const docStore = useDocumentStore.getState();
   const sourceBytes = docStore.<span class="branch-0 cbranch-no" title="branch not covered" >basePdfBytes ?? docStore.pdfBytes;</span>
   if (!sourceBytes) <span class="branch-0 cbranch-no" title="branch not covered" >return true;</span>
@@ -745,7 +757,7 @@ export async function applyFormChanges(): Promise&lt;boolean&gt; {
     }
 &nbsp;
     const newBytes = decodeBase64Pdf(base64);
-    const pdfDoc = await loadPdfFromBytes(newBytes);
+    const pdfDoc = await loadPdfFromBytes(newBytes, getDocumentLoadPassword());
     docStore.applyPdfStructureChange({ pdfDoc, pdfBytes: newBytes, pageCount: pdfDoc.numPages });
 &nbsp;
     useFormStore.setState({ newFields: [] });
@@ -759,9 +771,11 @@ export async function applyFormChanges(): Promise&lt;boolean&gt; {
   } finally {
     docStore.setLoading(false);
   }
+  });
 }
 &nbsp;
 <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >export async function flattenForms(): Promise&lt;void&gt; {</span></span>
+<span class="cstat-no" title="statement not covered" >  return runDocumentOperation("flatten_forms", async () =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >  const docStore = useDocumentStore.getState();</span>
 <span class="cstat-no" title="statement not covered" >  const sourceBytes = docStore.basePdfBytes ?? docStore.pdfBytes;</span>
 <span class="cstat-no" title="statement not covered" >  if (!sourceBytes) return;</span>
@@ -773,7 +787,7 @@ export async function applyFormChanges(): Promise&lt;boolean&gt; {
 <span class="cstat-no" title="statement not covered" >      pdfBase64: encodeBase64Pdf(sourceBytes),</span>
 <span class="cstat-no" title="statement not covered" >    });</span>
 <span class="cstat-no" title="statement not covered" >    const newBytes = decodeBase64Pdf(result.dataBase64);</span>
-<span class="cstat-no" title="statement not covered" >    const pdfDoc = await loadPdfFromBytes(newBytes);</span>
+<span class="cstat-no" title="statement not covered" >    const pdfDoc = await loadPdfFromBytes(newBytes, getDocumentLoadPassword());</span>
 <span class="cstat-no" title="statement not covered" >    docStore.applyPdfStructureChange({ pdfDoc, pdfBytes: newBytes, pageCount: pdfDoc.numPages });</span>
 <span class="cstat-no" title="statement not covered" >    useFormStore.getState().clearFormState();</span>
 <span class="cstat-no" title="statement not covered" >    docStore.setStatusMessage("Form flattened");</span>
@@ -782,6 +796,7 @@ export async function applyFormChanges(): Promise&lt;boolean&gt; {
 <span class="cstat-no" title="statement not covered" >  } finally {</span>
 <span class="cstat-no" title="statement not covered" >    docStore.setLoading(false);</span>
 <span class="cstat-no" title="statement not covered" >  }</span>
+<span class="cstat-no" title="statement not covered" >  });</span>
 <span class="cstat-no" title="statement not covered" >}</span>
 &nbsp;
 export async function exportFormDataCsv(): Promise&lt;void&gt; {
@@ -856,7 +871,7 @@ export async function importFormDataCsv(): Promise&lt;void&gt; {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-06-12T03:48:43.288Z
+                at 2026-07-25T06:06:50.481Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

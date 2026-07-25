@@ -38,3 +38,9 @@ async function runWithDepth<T>(task: () => Promise<T>): Promise<T> {
     documentOperationDepth -= 1;
   }
 }
+
+/** Test-only: reset queue between cases. */
+export function __resetDocumentOperationQueueForTests(): void {
+  documentOperationQueue = Promise.resolve();
+  documentOperationDepth = 0;
+}

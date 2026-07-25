@@ -8,6 +8,7 @@ import {
 import {
   expectDocumentDirty,
   expectStatusMessage,
+  fillPasswordDialog,
   protectDocumentFromMenu,
   saveDocumentFromMenu,
   waitForPageReady,
@@ -23,17 +24,9 @@ test.describe("document security", () => {
   });
 
   test("schedules password protection and applies it on save", async ({ page }) => {
-    let promptCount = 0;
-    page.on("dialog", async (dialog) => {
-      if (dialog.type() === "prompt") {
-        promptCount += 1;
-        await dialog.accept(promptCount === 1 ? "secret123" : "secret123");
-        return;
-      }
-      await dialog.accept();
-    });
-
     await protectDocumentFromMenu(page);
+    await fillPasswordDialog(page, "secret123", "secret123");
+
     await expectStatusMessage(page, "Password protection will be applied when you save");
     await expect(page.getByTestId("status-bar")).toContainText("Will protect on save");
     await expectDocumentDirty(page, true);
@@ -45,5 +38,13 @@ test.describe("document security", () => {
     expect(invokeLog).toContain("encrypt_pdf");
     expect(invokeLog).toContain("save_pdf_with_annotations");
     await expect(page.getByTestId("status-bar")).toContainText("Password protected");
+  });
+
+  test("cancelling password dialog does not schedule protection", async ({ page }) => {
+    await protectDocumentFromMenu(page);
+    await page.getByTestId("password-dialog").waitFor({ state: "visible", timeout: 10_000 });
+    await page.getByTestId("password-cancel").click();
+    await expect(page.getByTestId("password-dialog")).toBeHidden();
+    await expect(page.getByTestId("status-bar")).not.toContainText("Will protect on save");
   });
 });

@@ -6,9 +6,14 @@ const PDF_BYTES = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34
 const PDF_BASE64 = encodeBase64Pdf(PDF_BYTES);
 
 const mockInvokeLogged = vi.hoisted(() => vi.fn());
+const mockRequestPassword = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/tauriInvoke", () => ({
   invokeLogged: mockInvokeLogged,
+}));
+
+vi.mock("@/lib/passwordPrompt", () => ({
+  requestPassword: mockRequestPassword,
 }));
 
 vi.mock("@/lib/pdf/pdfEngine", () => ({
@@ -20,6 +25,8 @@ import {
   applySecurityOnSaveBytes,
   encryptPdfBytes,
   inspectPdfSecurity,
+  protectDocumentOnNextSave,
+  removeDocumentPasswordProtection,
 } from "./securityService";
 
 describe("securityService", () => {
@@ -88,5 +95,33 @@ describe("securityService", () => {
     const out = await applySecurityOnSaveBytes(PDF_BYTES);
     expect(out).toBe(PDF_BYTES);
     expect(mockInvokeLogged).not.toHaveBeenCalled();
+  });
+
+  it("protectDocumentOnNextSave schedules pending password", async () => {
+    mockRequestPassword.mockResolvedValue("new-pass");
+    await protectDocumentOnNextSave();
+    expect(mockRequestPassword).toHaveBeenCalledWith(
+      expect.objectContaining({ confirm: true }),
+    );
+    expect(useDocumentStore.getState().pendingSavePassword).toBe("new-pass");
+    expect(useDocumentStore.getState().isDirty).toBe(true);
+  });
+
+  it("protectDocumentOnNextSave does nothing when cancelled", async () => {
+    mockRequestPassword.mockResolvedValue(null);
+    await protectDocumentOnNextSave();
+    expect(useDocumentStore.getState().pendingSavePassword).toBeNull();
+  });
+
+  it("removeDocumentPasswordProtection schedules removal", async () => {
+    useDocumentStore.setState({
+      isPasswordProtected: true,
+      documentPassword: null,
+      isDirty: false,
+    });
+    mockRequestPassword.mockResolvedValue("current");
+    await removeDocumentPasswordProtection();
+    expect(useDocumentStore.getState().removePasswordOnSave).toBe(true);
+    expect(useDocumentStore.getState().documentPassword).toBe("current");
   });
 });

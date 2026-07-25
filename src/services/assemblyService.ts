@@ -9,6 +9,9 @@ import { requireTauriDesktop } from "@/lib/tauriRuntime";
 import { runDocumentOperation } from "@/services/documentOpQueue";
 import { getDocumentLoadPassword, useDocumentStore } from "@/stores/documentStore";
 import { useAnnotationStore } from "@/stores/annotationStore";
+import { useContentEditStore } from "@/stores/contentEditStore";
+import { useFormStore } from "@/stores/formStore";
+import { clearHistory } from "@/stores/historyStore";
 import { createErrorReporter, log } from "@/lib/logging";
 import type { ReadFileResult } from "@shared/types";
 
@@ -17,6 +20,14 @@ const showError = createErrorReporter("assembly", "assembly");
 function getOpenDocumentBytes(): Uint8Array | null {
   const { pdfBytes, basePdfBytes } = useDocumentStore.getState();
   return basePdfBytes ?? pdfBytes ?? null;
+}
+
+/** Merge/append invalidates page-indexed overlays — clear rather than leave stale indices. */
+function clearOverlaysAfterAssembly(): void {
+  useAnnotationStore.getState().clearAnnotations();
+  useContentEditStore.getState().clearEdits();
+  useFormStore.setState({ newFields: [] });
+  clearHistory();
 }
 
 async function pickPdfPaths(multiple: boolean): Promise<string[]> {
@@ -36,7 +47,6 @@ async function readPdfBase64(path: string): Promise<string> {
 
 async function applyMergedOrNewDocument(newBytes: Uint8Array, fileName: string): Promise<void> {
   const docStore = useDocumentStore.getState();
-  const annStore = useAnnotationStore.getState();
   const pdfDoc = await loadPdfFromBytes(newBytes, getDocumentLoadPassword());
 
   docStore.setDocument({
@@ -50,7 +60,7 @@ async function applyMergedOrNewDocument(newBytes: Uint8Array, fileName: string):
     },
   });
   useDocumentStore.getState().markDocumentChanged("assembly");
-  annStore.clearAnnotations();
+  clearOverlaysAfterAssembly();
   log.assembly.info("Document loaded from assembly operation", { userAction: "assembly" });
 }
 
@@ -117,8 +127,7 @@ export async function mergeIntoCurrentDocument(): Promise<void> {
         pdfBytes: bytes,
         pageCount: pdfDoc.numPages,
       });
-      // Appended pages shift indices; drop overlay state rather than leave stale pageIndex values.
-      useAnnotationStore.getState().clearAnnotations();
+      clearOverlaysAfterAssembly();
       docStore.setStatusMessage(`Appended ${paths.length} PDF(s) · ${pdfDoc.numPages} pages`);
       log.assembly.info("Merged PDFs into current document", { userAction: "append" });
     } catch (err) {

@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">98.13% </span>
+                <span class="strong">98.18% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>105/107</span>
+                <span class='fraction'>108/110</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">80% </span>
+                <span class="strong">80.95% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>16/20</span>
+                <span class='fraction'>17/21</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">98.13% </span>
+                <span class="strong">98.18% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>105/107</span>
+                <span class='fraction'>108/110</span>
             </div>
         
             
@@ -192,7 +192,10 @@
 <a name='L127'></a><a href='#L127'>127</a>
 <a name='L128'></a><a href='#L128'>128</a>
 <a name='L129'></a><a href='#L129'>129</a>
-<a name='L130'></a><a href='#L130'>130</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -201,6 +204,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -282,6 +286,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">5x</span>
@@ -320,6 +325,7 @@
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { invokeLogged } from "@/lib/tauriInvoke";
 import {
@@ -331,7 +337,8 @@ import {
 import type { PdfBytesResult } from "@/lib/pdf/pdfBinary";
 import type { ImageContentEdit, TextContentEdit } from "@shared/types";
 import { useContentEditStore } from "@/stores/contentEditStore";
-import { useDocumentStore } from "@/stores/documentStore";
+import { runDocumentOperation } from "@/services/documentOpQueue";
+import { getDocumentLoadPassword, useDocumentStore } from "@/stores/documentStore";
 import { log, reportError } from "@/lib/logging";
 import { TEXT_COVER_H_PAD, TEXT_COVER_V_PAD } from "@/lib/textEditBox";
 &nbsp;
@@ -414,41 +421,43 @@ export type ApplyContentEditsOptions = {
 export async function applyContentEdits(
   options: ApplyContentEditsOptions = {},
 ): Promise&lt;boolean&gt; {
-  const { clearAfter = true } = options;
-  const docStore = useDocumentStore.getState();
-  const editStore = useContentEditStore.getState();
-  const sourceBytes = docStore.<span class="branch-0 cbranch-no" title="branch not covered" >basePdfBytes ?? docStore.pdfBytes;</span>
+  return runDocumentOperation("content_edit", async () =&gt; {
+    const { clearAfter = true } = options;
+    const docStore = useDocumentStore.getState();
+    const editStore = useContentEditStore.getState();
+    const sourceBytes = docStore.<span class="branch-0 cbranch-no" title="branch not covered" >basePdfBytes ?? docStore.pdfBytes;</span>
 &nbsp;
-  if (!sourceBytes || !editStore.hasEdits()) return true;
+    if (!sourceBytes || !editStore.hasEdits()) return true;
 &nbsp;
-  docStore.setLoading(true);
-  try {
-    const textEdits = await textEditsPayload(editStore.textEdits);
-    const imageEdits = await imageEditsPayload(editStore.imageEdits);
-    const result = await invokeLogged&lt;PdfBytesResult&gt;("apply_content_edits", {
-      pdfBase64: encodeBase64Pdf(sourceBytes),
-      textEditsJson: JSON.stringify(textEdits),
-      imageEditsJson: JSON.stringify(imageEdits),
-    });
+    docStore.setLoading(true);
+    try {
+      const textEdits = await textEditsPayload(editStore.textEdits);
+      const imageEdits = await imageEditsPayload(editStore.imageEdits);
+      const result = await invokeLogged&lt;PdfBytesResult&gt;("apply_content_edits", {
+        pdfBase64: encodeBase64Pdf(sourceBytes),
+        textEditsJson: JSON.stringify(textEdits),
+        imageEditsJson: JSON.stringify(imageEdits),
+      });
 &nbsp;
-    const newBytes = decodeBase64Pdf(result.dataBase64);
-    const pdfDoc = await loadPdfFromBytes(newBytes);
-    docStore.applyPdfStructureChange({
-      pdfDoc,
-      pdfBytes: newBytes,
-      pageCount: pdfDoc.numPages,
-    });
-    if (clearAfter) {
-      editStore.clearEdits();
+      const newBytes = decodeBase64Pdf(result.dataBase64);
+      const pdfDoc = await loadPdfFromBytes(newBytes, getDocumentLoadPassword());
+      docStore.applyPdfStructureChange({
+        pdfDoc,
+        pdfBytes: newBytes,
+        pageCount: pdfDoc.numPages,
+      });
+      if (clearAfter) {
+        editStore.clearEdits();
+      }
+      log.content.info("Content edits applied", { userAction: "content_edit" });
+      return true;
+<span class="branch-0 cbranch-no" title="branch not covered" >    } catch (err) {</span>
+<span class="cstat-no" title="statement not covered" >      reportError(err, { category: "content", userAction: "content_edit" });</span>
+<span class="cstat-no" title="statement not covered" >      return false;</span>
+    } finally {
+      docStore.setLoading(false);
     }
-    log.content.info("Content edits applied", { userAction: "content_edit" });
-    return true;
-<span class="branch-0 cbranch-no" title="branch not covered" >  } catch (err) {</span>
-<span class="cstat-no" title="statement not covered" >    reportError(err, { category: "content", userAction: "content_edit" });</span>
-<span class="cstat-no" title="statement not covered" >    return false;</span>
-  } finally {
-    docStore.setLoading(false);
-  }
+  });
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -457,7 +466,7 @@ export async function applyContentEdits(
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-06-12T03:48:43.288Z
+                at 2026-07-25T06:06:50.481Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

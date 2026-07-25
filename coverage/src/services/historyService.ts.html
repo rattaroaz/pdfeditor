@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">70.83% </span>
+                <span class="strong">79.31% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>17/24</span>
+                <span class='fraction'>23/29</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">50% </span>
+                <span class="strong">66.66% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>2/4</span>
+                <span class='fraction'>4/6</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">70.83% </span>
+                <span class="strong">79.31% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>17/24</span>
+                <span class='fraction'>23/29</span>
             </div>
         
             
@@ -89,17 +89,12 @@
 <a name='L24'></a><a href='#L24'>24</a>
 <a name='L25'></a><a href='#L25'>25</a>
 <a name='L26'></a><a href='#L26'>26</a>
-<a name='L27'></a><a href='#L27'>27</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -108,39 +103,59 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { persistAnnotations } from "@/services/documentService";
+import { runDocumentOperation } from "@/services/documentOpQueue";
 import { log } from "@/lib/logging";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useHistoryStore } from "@/stores/historyStore";
 &nbsp;
 export async function undoEdit(): Promise&lt;void&gt; {
-  const history = useHistoryStore.getState();
-  if (!(await history.undo())) <span class="branch-0 cbranch-no" title="branch not covered" >return;</span>
-  log.ui.info("Undo", {
-    userAction: "undo",
-    metadata: { canRedo: history.canRedo() },
+  return runDocumentOperation("undo", async () =&gt; {
+    const history = useHistoryStore.getState();
+    if (!(await history.undo())) <span class="branch-0 cbranch-no" title="branch not covered" >return;</span>
+    log.ui.info("Undo", {
+      userAction: "undo",
+      metadata: { canRedo: history.canRedo() },
+    });
+    useDocumentStore.getState().markDocumentChanged("history");
+    void persistAnnotations();
   });
-  useDocumentStore.getState().markDocumentChanged("history");
-  void persistAnnotations();
 }
 &nbsp;
 export async function redoEdit(): Promise&lt;void&gt; {
-  const history = useHistoryStore.getState();
-  if (!(await history.redo())) <span class="branch-0 cbranch-no" title="branch not covered" >return;</span>
-<span class="cstat-no" title="statement not covered" >  log.ui.info("Redo", {</span>
-<span class="cstat-no" title="statement not covered" >    userAction: "redo",</span>
-<span class="cstat-no" title="statement not covered" >    metadata: { canUndo: history.canUndo() },</span>
-<span class="cstat-no" title="statement not covered" >  });</span>
-<span class="cstat-no" title="statement not covered" >  useDocumentStore.getState().markDocumentChanged("history");</span>
-<span class="cstat-no" title="statement not covered" >  void persistAnnotations();</span>
-<span class="cstat-no" title="statement not covered" >}</span>
+  return runDocumentOperation("redo", async () =&gt; {
+    const history = useHistoryStore.getState();
+    if (!(await history.redo())) <span class="branch-0 cbranch-no" title="branch not covered" >return;</span>
+<span class="cstat-no" title="statement not covered" >    log.ui.info("Redo", {</span>
+<span class="cstat-no" title="statement not covered" >      userAction: "redo",</span>
+<span class="cstat-no" title="statement not covered" >      metadata: { canUndo: history.canUndo() },</span>
+<span class="cstat-no" title="statement not covered" >    });</span>
+<span class="cstat-no" title="statement not covered" >    useDocumentStore.getState().markDocumentChanged("history");</span>
+<span class="cstat-no" title="statement not covered" >    void persistAnnotations();</span>
+  });
+}
 &nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
@@ -148,7 +163,7 @@ export async function redoEdit(): Promise&lt;void&gt; {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-06-12T03:48:43.288Z
+                at 2026-07-25T06:06:50.481Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

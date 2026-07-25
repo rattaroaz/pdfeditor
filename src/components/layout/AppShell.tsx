@@ -1,6 +1,10 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef } from "react";
-import { confirmDiscardDocumentChanges, openPdfFromPath } from "@/services/documentService";
+import {
+  confirmDiscardDocumentChanges,
+  hasUnsavedDocumentChanges,
+  openPdfFromPath,
+} from "@/services/documentService";
 import { MenuBar } from "./MenuBar";
 import { Toolbar } from "./Toolbar";
 import { StatusBar } from "./StatusBar";
@@ -42,7 +46,7 @@ export function AppShell() {
       ) {
         return;
       }
-      if (useDocumentStore.getState().isDirty) {
+      if (hasUnsavedDocumentChanges()) {
         forceClosingRef.current = true;
       }
 

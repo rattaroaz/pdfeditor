@@ -5,7 +5,7 @@ import { APP_NAME, APP_VERSION } from "@/lib/constants";
 import { log } from "@/lib/logging";
 import { isVersionNewer } from "@/lib/semver";
 import { toAppErrorPayload } from "@/lib/reportError";
-import { useDocumentStore } from "@/stores/documentStore";
+import { hasUnsavedDocumentChanges } from "@/services/documentService";
 import { useUiStore } from "@/stores/uiStore";
 
 function setUpdatePhase(
@@ -72,8 +72,7 @@ function resolveUpdateErrorMessage(message: string): string | null {
 }
 
 async function confirmDiscardUnsavedChanges(): Promise<boolean> {
-  const { isDirty } = useDocumentStore.getState();
-  if (!isDirty) return true;
+  if (!hasUnsavedDocumentChanges()) return true;
 
   const confirmed = await ask("You have unsaved changes. Continue updating without saving?", {
     title: APP_NAME,

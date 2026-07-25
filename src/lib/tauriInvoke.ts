@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { AppErrorPayload } from "@shared/types";
-import { createCorrelationId } from "./correlation";
+import { createCorrelationId, getActiveCorrelationId } from "./correlation";
 import { log } from "./logging";
 import { normalizeInvokeError } from "./parseInvokeError";
 
@@ -26,7 +26,8 @@ export async function invokeLogged<T>(
   args?: Record<string, unknown>,
   options?: InvokeLoggedOptions,
 ): Promise<T> {
-  const correlationId = options?.correlationId ?? createCorrelationId();
+  const correlationId =
+    options?.correlationId ?? getActiveCorrelationId() ?? createCorrelationId();
   const start = performance.now();
   log.invoke.debug(`invoke start: ${command}`, { userAction: command, correlationId });
 
