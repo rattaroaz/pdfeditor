@@ -569,6 +569,7 @@ mod tests {
         component: Some("mod_tests".into()),
         correlation_id: None,
         error_id: None,
+        outcome: None,
         metadata_json: Some(r#"{"key":"value"}"#.into()),
       };
       log_frontend_payload(&payload);
