@@ -3,9 +3,13 @@ import type { LogEntry, LogLevel } from "@shared/types";
 import {
   clearLogBuffer,
   getLogEntries,
+  getMetricsSnapshot,
   logger,
+  resetMetrics,
   subscribeLogBuffer,
+  subscribeMetrics,
 } from "@/lib/logging";
+import type { MetricsSnapshot } from "@/lib/logging";
 import { fetchLoggingInfo, readBackendLogTail } from "@/services/loggingService";
 
 const LEVEL_CLASS: Record<LogLevel, string> = {
@@ -24,7 +28,8 @@ export function LogViewerPanel({ onClose }: LogViewerPanelProps) {
   const [filter, setFilter] = useState<LogLevel | "all">("all");
   const [logDir, setLogDir] = useState("");
   const [backendTail, setBackendTail] = useState<string[]>([]);
-  const [tab, setTab] = useState<"session" | "file">("session");
+  const [tab, setTab] = useState<"session" | "file" | "metrics">("session");
+  const [metrics, setMetrics] = useState<MetricsSnapshot>(() => getMetricsSnapshot());
 
   const refresh = useCallback(() => {
     setEntries(getLogEntries());
@@ -33,6 +38,10 @@ export function LogViewerPanel({ onClose }: LogViewerPanelProps) {
   useEffect(() => {
     return subscribeLogBuffer(refresh);
   }, [refresh]);
+
+  useEffect(() => {
+    return subscribeMetrics(() => setMetrics(getMetricsSnapshot()));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,10 +117,26 @@ export function LogViewerPanel({ onClose }: LogViewerPanelProps) {
         </button>
         <button
           type="button"
+          data-testid="log-tab-metrics"
+          className={`rounded px-2 py-1 ${tab === "metrics" ? "bg-zinc-800 text-zinc-100" : "text-zinc-500"}`}
+          onClick={() => {
+            setTab("metrics");
+            setMetrics(getMetricsSnapshot());
+          }}
+        >
+          Metrics
+        </button>
+        <button
+          type="button"
           className="rounded px-2 py-1 text-zinc-500 hover:bg-zinc-800"
           onClick={() => {
-            clearLogBuffer();
-            refresh();
+            if (tab === "metrics") {
+              resetMetrics();
+              setMetrics(getMetricsSnapshot());
+            } else {
+              clearLogBuffer();
+              refresh();
+            }
           }}
         >
           Clear
@@ -135,6 +160,12 @@ export function LogViewerPanel({ onClose }: LogViewerPanelProps) {
               {e.context?.userAction && (
                 <span className="text-zinc-500"> · {e.context.userAction}</span>
               )}
+              {e.context?.outcome && (
+                <span className={e.context.outcome === "fail" ? "text-red-400" : "text-emerald-500"}>
+                  {" "}
+                  · {e.context.outcome}
+                </span>
+              )}
               {e.context?.durationMs != null && (
                 <span className="text-zinc-600"> · {e.context.durationMs}ms</span>
               )}
@@ -154,6 +185,27 @@ export function LogViewerPanel({ onClose }: LogViewerPanelProps) {
               {line}
             </div>
           ))}
+        {tab === "metrics" && (
+          <div data-testid="metrics-panel">
+            <p className="mb-2 text-zinc-400">
+              {metrics.totals.events} events · {metrics.totals.ok} ok · {metrics.totals.fail} fail
+            </p>
+            {metrics.operations.length === 0 && (
+              <p className="text-zinc-600">No metrics yet. Open or save a PDF to populate this view.</p>
+            )}
+            {metrics.operations.map((op) => (
+              <div key={op.name} className="mb-2 border-b border-zinc-900/80 pb-1 text-zinc-300">
+                <div className="text-zinc-100">{op.name}</div>
+                <div className="text-zinc-500">
+                  n={op.count} ok={op.ok} fail={op.fail}
+                  {op.avgMs != null && ` · avg ${op.avgMs}ms`}
+                  {op.p95Ms != null && ` · p95 ${op.p95Ms}ms`}
+                  {op.lastDurationMs != null && ` · last ${op.lastDurationMs}ms`}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {tab === "session" && filtered.length === 0 && (
           <p className="text-zinc-600">No log entries yet.</p>
         )}

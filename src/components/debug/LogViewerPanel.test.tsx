@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { log } from "@/lib/logging";
+import { log, recordMetric, resetMetrics } from "@/lib/logging";
 import { LogViewerPanel } from "./LogViewerPanel";
 
 vi.mock("@/services/loggingService", () => ({
@@ -21,6 +21,17 @@ describe("LogViewerPanel", () => {
 
     await user.click(screen.getByRole("button", { name: "Close" }));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("shows session metrics", async () => {
+    resetMetrics();
+    recordMetric({ name: "open_pdf", durationMs: 12, outcome: "ok" });
+    const user = userEvent.setup();
+    render(<LogViewerPanel onClose={vi.fn()} />);
+
+    await user.click(screen.getByTestId("log-tab-metrics"));
+    expect(screen.getByTestId("metrics-panel")).toHaveTextContent("open_pdf");
+    expect(screen.getByTestId("metrics-panel")).toHaveTextContent("n=1");
   });
 
   it("switches to file tail tab", async () => {

@@ -24,7 +24,12 @@ import { applyContentEdits } from "@/services/contentEditService";
 import { runDocumentOperation } from "@/services/documentOpQueue";
 import { applyFormChanges, inspectDocumentForms, loadFormFieldsFromPdf } from "@/services/formService";
 import { requestPassword } from "@/lib/passwordPrompt";
-import { applySecurityOnSaveBytes, inspectPdfSecurity, type PdfSecurityInfo } from "@/services/securityService";
+import {
+  applySecurityOnSaveBytes,
+  inspectPdfSecurity,
+  unlockPdfBytesIfEncrypted,
+  type PdfSecurityInfo,
+} from "@/services/securityService";
 
 interface SavePdfResult extends PdfBytesResult {
   path: string;
@@ -122,6 +127,7 @@ async function openPdfFromPathImpl(filePath: string): Promise<void> {
   docStore.setLoading(true);
   docStore.setLoadError(null);
   docStore.setStatusMessage(null);
+  const timer = startTimer(log.document, "open_pdf", { userAction: "open" });
 
   try {
     const pdfBytes = await readPdfBytes(filePath);
@@ -158,7 +164,19 @@ async function openPdfFromPathImpl(filePath: string): Promise<void> {
         userAction: "open",
       });
     }
-    const { pdfDoc, password } = await loadPdfWithPasswordPrompt(viewBytes);
+    const { pdfDoc: loadedDoc, password } = await loadPdfWithPasswordPrompt(viewBytes);
+    let pdfDoc = loadedDoc;
+    let workingView = viewBytes;
+    let workingBase = baseBytes;
+    if (password && security.isEncrypted) {
+      workingView = await unlockPdfBytesIfEncrypted(viewBytes, password, true);
+      workingBase = hasSidecar
+        ? await unlockPdfBytesIfEncrypted(baseBytes, password, true)
+        : workingView;
+      if (workingView !== viewBytes) {
+        pdfDoc = await loadPdfFromBytes(workingView);
+      }
+    }
     const fileName = fileNameFromPath(filePath);
     const metadata = await fetchMetadata(filePath, pdfDoc.numPages, pdfBytes.byteLength);
     metadata.isPasswordProtected = security.isEncrypted;
@@ -174,8 +192,8 @@ async function openPdfFromPathImpl(filePath: string): Promise<void> {
       filePath,
       fileName,
       pdfDoc,
-      pdfBytes: viewBytes,
-      basePdfBytes: baseBytes,
+      pdfBytes: workingView,
+      basePdfBytes: workingBase,
       documentPassword: password ?? null,
       metadata,
     });
@@ -211,15 +229,20 @@ async function openPdfFromPathImpl(filePath: string): Promise<void> {
       log.document.warn("Form inspection failed", { userAction: "open" });
     }
 
-    log.document.info("Document opened", {
+    timer.end("Document opened", {
       documentId: useDocumentStore.getState().documentId ?? undefined,
-      userAction: "open",
+      metadata: {
+        pageCount: pdfDoc.numPages,
+        fileSize: pdfBytes.byteLength,
+        encrypted: security.isEncrypted,
+        hasSidecar,
+      },
     });
   } catch (err) {
     const message = errorMessage(err);
     showError(err);
     docStore.setLoadError(message);
-    log.document.error("Open failed", { userAction: "open" });
+    timer.fail(err);
   } finally {
     docStore.setLoading(false);
   }
@@ -307,11 +330,7 @@ async function savePdfImpl(saveAs = false): Promise<void> {
       );
 
       let newBytes = decodeBase64Pdf(result.dataBase64);
-
-      const securityStore = useDocumentStore.getState();
-      if (securityStore.pendingSavePassword || securityStore.removePasswordOnSave) {
-        newBytes = await applySecurityOnSaveBytes(newBytes);
-      }
+      newBytes = await applySecurityOnSaveBytes(newBytes);
       // Single write after optional encrypt/decrypt — Rust no longer writes plaintext first.
       await writePdfBytes(targetPath, newBytes);
 
@@ -445,6 +464,7 @@ async function revertToSavedImpl(): Promise<void> {
   }
 
   docStore.setLoading(true);
+  const timer = startTimer(log.document, "revert_pdf", { userAction: "revert" });
   try {
     const reloadPassword = docStore.documentPassword ?? undefined;
     const pdfDoc = await loadPdfFromBytes(savedPdfBytes, reloadPassword);
@@ -502,12 +522,9 @@ async function revertToSavedImpl(): Promise<void> {
       // forms optional on revert
     }
 
-    log.document.info("Document reverted to saved", { userAction: "revert" });
+    timer.end("Document reverted to saved");
   } catch (err) {
-    log.document.error("Revert to saved failed", {
-      userAction: "revert",
-      metadata: { filePath, error: String(err) },
-    });
+    timer.fail(err, { metadata: { filePath } });
     showError(err);
   } finally {
     docStore.setLoading(false);

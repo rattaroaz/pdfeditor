@@ -43,6 +43,23 @@ async function decryptPdfBytes(
   return decodeBase64Pdf(result.dataBase64);
 }
 
+/** Decrypt an opened file so later lopdf mutations run on plaintext. */
+export async function unlockPdfBytesIfEncrypted(
+  pdfBytes: Uint8Array,
+  password: string | undefined,
+  isEncrypted: boolean,
+): Promise<Uint8Array> {
+  if (!isEncrypted || !password) return pdfBytes;
+  try {
+    return await decryptPdfBytes(pdfBytes, password);
+  } catch {
+    log.security.warn("Could not decrypt working copy; edits and save may fail", {
+      userAction: "open",
+    });
+    return pdfBytes;
+  }
+}
+
 async function promptForNewPassword(): Promise<string | null> {
   return requestPassword({
     title: "Protect PDF",
@@ -117,6 +134,11 @@ export async function applySecurityOnSaveBytes(pdfBytes: Uint8Array): Promise<Ui
     store.setPasswordProtected(true);
     store.setDocumentPassword(store.pendingSavePassword);
     return encrypted;
+  }
+
+  // Working copy is plaintext after open; write the file encrypted again.
+  if (store.isPasswordProtected && store.documentPassword) {
+    return encryptPdfBytes(pdfBytes, store.documentPassword);
   }
 
   return pdfBytes;

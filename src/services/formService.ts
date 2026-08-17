@@ -12,7 +12,7 @@ import { readTextFile, writeTextFile } from "@/lib/pdf/pdfStorage";
 import { runDocumentOperation } from "@/services/documentOpQueue";
 import { getDocumentLoadPassword, useDocumentStore } from "@/stores/documentStore";
 import { useFormStore } from "@/stores/formStore";
-import { createErrorReporter, log } from "@/lib/logging";
+import { createErrorReporter, log, startTimer } from "@/lib/logging";
 import { defaultDropdownOptions, normalizeDropdownOptions } from "@/lib/dropdownOptions";
 import type { FormFieldDefinition, FormFieldValue, FormInfo } from "@shared/types";
 import type { PdfDocument } from "@/lib/pdf/pdfEngine";
@@ -97,6 +97,7 @@ export async function applyFormChanges(): Promise<boolean> {
   }
 
   docStore.setLoading(true);
+  const timer = startTimer(log.form, "apply_form_changes", { userAction: "form_save" });
   try {
     let base64 = encodeBase64Pdf(sourceBytes);
 
@@ -164,9 +165,15 @@ export async function applyFormChanges(): Promise<boolean> {
     useFormStore.setState({ newFields: [] });
     await inspectDocumentForms(newBytes);
     await loadFormFieldsFromPdf(pdfDoc);
-    log.form.info("Form changes applied", { userAction: "form_save" });
+    timer.end("Form changes applied", {
+      metadata: {
+        newFields: pendingFields.length,
+        changedValues: changedValues.length,
+      },
+    });
     return true;
   } catch (err) {
+    timer.fail(err);
     showError(err);
     return false;
   } finally {
@@ -181,7 +188,7 @@ export async function flattenForms(): Promise<void> {
   const sourceBytes = docStore.basePdfBytes ?? docStore.pdfBytes;
   if (!sourceBytes) return;
 
-  log.form.info("Flattening form fields", { userAction: "flatten_forms" });
+  const timer = startTimer(log.form, "flatten_forms", { userAction: "flatten_forms" });
   docStore.setLoading(true);
   try {
     const result = await invokeLogged<PdfBytesResult>("flatten_pdf_forms", {
@@ -192,7 +199,9 @@ export async function flattenForms(): Promise<void> {
     docStore.applyPdfStructureChange({ pdfDoc, pdfBytes: newBytes, pageCount: pdfDoc.numPages });
     useFormStore.getState().clearFormState();
     docStore.setStatusMessage("Form flattened");
+    timer.end("Form flattened");
   } catch (err) {
+    timer.fail(err);
     showError(err);
   } finally {
     docStore.setLoading(false);

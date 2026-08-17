@@ -432,11 +432,25 @@ fn text_edit_operations(edit: &TextEditDto, page_height: f64) -> Vec<Operation> 
     "Tf",
     vec![PDFEDITOR_FONT_NAME.into(), edit.font_size.into()],
   ));
-  ops.push(Operation::new("Td", vec![x1.into(), baseline_y.into()]));
-  ops.push(Operation::new(
-    "Tj",
-    vec![Object::string_literal(edit.new_text.clone())],
-  ));
+  let lines: Vec<&str> = if edit.new_text.is_empty() {
+    Vec::new()
+  } else {
+    edit.new_text.split('\n').collect()
+  };
+  for (i, line) in lines.iter().enumerate() {
+    if i == 0 {
+      ops.push(Operation::new("Td", vec![x1.into(), baseline_y.into()]));
+    } else {
+      ops.push(Operation::new(
+        "Td",
+        vec![0.into(), (-edit.font_size).into()],
+      ));
+    }
+    ops.push(Operation::new(
+      "Tj",
+      vec![Object::string_literal((*line).to_string())],
+    ));
+  }
   ops.push(Operation::new("ET", vec![]));
   ops.push(Operation::new("Q", vec![]));
   ops
@@ -645,6 +659,35 @@ mod tests {
     let mut buffer = Vec::new();
     doc.save_to(&mut buffer).unwrap();
     buffer
+  }
+
+  #[test]
+  fn writes_multiline_text_as_separate_tj_ops() {
+    let input = one_page_pdf();
+    let edits = vec![TextEditDto {
+      page_index: 0,
+      x: 90.0,
+      y: 90.0,
+      width: 200.0,
+      height: 40.0,
+      pdf_x1: None,
+      pdf_y1: None,
+      pdf_x2: None,
+      pdf_y2: None,
+      new_text: "Hello\nWorld".into(),
+      font_size: 14.0,
+      color: "#000000".into(),
+      cover_old: false,
+    }];
+    let output = apply_content_edits_in_pdf(&input, &edits, &[]).unwrap();
+    let tj_count = page_operators(&output)
+      .into_iter()
+      .filter(|op| op == "Tj")
+      .count();
+    assert!(
+      tj_count >= 3,
+      "expected original plus two multiline Tj operators, got {tj_count}"
+    );
   }
 
   #[test]

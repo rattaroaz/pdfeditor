@@ -1,6 +1,19 @@
 import type { LogContext } from "@shared/types";
 import { useDocumentStore } from "@/stores/documentStore";
 
+const SENSITIVE_KEY = /password|passwd|secret|token|authorization/i;
+
+function redactMetadata(
+  metadata?: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  if (!metadata) return metadata;
+  const next: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(metadata)) {
+    next[key] = SENSITIVE_KEY.test(key) ? "[redacted]" : value;
+  }
+  return next;
+}
+
 /** Merge store state and base context for every log line. */
 export function enrichLogContext(context?: LogContext): LogContext {
   let documentId = context?.documentId;
@@ -15,7 +28,7 @@ export function enrichLogContext(context?: LogContext): LogContext {
   }
 
   const metadata: Record<string, unknown> = {
-    ...context?.metadata,
+    ...redactMetadata(context?.metadata),
   };
   if (fileName) metadata.fileName = fileName;
 

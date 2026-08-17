@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { AppErrorPayload } from "@shared/types";
 import { createCorrelationId, getActiveCorrelationId } from "./correlation";
-import { log } from "./logging";
+import { log, recordMetric } from "./logging";
 import { normalizeInvokeError } from "./parseInvokeError";
 
 export class AppInvokeError extends Error {
@@ -34,10 +34,12 @@ export async function invokeLogged<T>(
   try {
     const result = await invoke<T>(command, args);
     const durationMs = Math.round(performance.now() - start);
+    recordMetric({ name: `invoke.${command}`, durationMs, outcome: "ok", category: "invoke" });
     const payload = {
       userAction: command,
       durationMs,
       correlationId,
+      outcome: "ok" as const,
     };
     if (durationMs >= 2000) {
       log.invoke.warn(`invoke slow: ${command}`, payload);
@@ -47,6 +49,7 @@ export async function invokeLogged<T>(
     return result;
   } catch (err) {
     const durationMs = Math.round(performance.now() - start);
+    recordMetric({ name: `invoke.${command}`, durationMs, outcome: "fail", category: "invoke" });
     const payload = normalizeInvokeError(err);
     if (payload) {
       log.invoke.error(`invoke failed: ${command}`, {
@@ -54,6 +57,7 @@ export async function invokeLogged<T>(
         errorId: payload.errorId,
         durationMs,
         correlationId,
+        outcome: "fail",
       });
       throw new AppInvokeError(payload);
     }
@@ -61,6 +65,7 @@ export async function invokeLogged<T>(
       userAction: command,
       durationMs,
       correlationId,
+      outcome: "fail",
     });
     throw err;
   }

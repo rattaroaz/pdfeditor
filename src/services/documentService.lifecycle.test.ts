@@ -38,6 +38,7 @@ const mockInspectPdfSecurity = vi.hoisted(() =>
 vi.mock("@/services/securityService", () => ({
   applySecurityOnSaveBytes: vi.fn(async (bytes: Uint8Array) => bytes),
   inspectPdfSecurity: mockInspectPdfSecurity,
+  unlockPdfBytesIfEncrypted: vi.fn(async (bytes: Uint8Array) => bytes),
 }));
 
 vi.mock("@/lib/pdf/pdfStorage", () => ({

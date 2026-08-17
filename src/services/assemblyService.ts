@@ -155,23 +155,25 @@ export async function extractPagesToFile(pageNumbers: number[]): Promise<void> {
   });
   if (!target) return;
 
-  docStore.setLoading(true);
-  try {
-    const result = await invokeLogged<PdfBytesResult>("extract_pdf_pages", {
-      pdfBase64: encodeBase64Pdf(sourceBytes),
-      pageNumbers: [...pageNumbers].sort((a, b) => a - b),
-    });
-    await invokeLogged("write_pdf_file", {
-      path: ensurePdfExtension(target),
-      dataBase64: result.dataBase64,
-    });
-    docStore.setStatusMessage(`Extracted ${pageNumbers.length} page(s)`);
-    log.assembly.info("Extracted pages to file", { userAction: "extract", path: target });
-  } catch (err) {
-    showError(err);
-  } finally {
-    docStore.setLoading(false);
-  }
+  return runDocumentOperation("extract_pages", async () => {
+    docStore.setLoading(true);
+    try {
+      const result = await invokeLogged<PdfBytesResult>("extract_pdf_pages", {
+        pdfBase64: encodeBase64Pdf(sourceBytes),
+        pageNumbers: [...pageNumbers].sort((a, b) => a - b),
+      });
+      await invokeLogged("write_pdf_file", {
+        path: ensurePdfExtension(target),
+        dataBase64: result.dataBase64,
+      });
+      docStore.setStatusMessage(`Extracted ${pageNumbers.length} page(s)`);
+      log.assembly.info("Extracted pages to file", { userAction: "extract", path: target });
+    } catch (err) {
+      showError(err);
+    } finally {
+      docStore.setLoading(false);
+    }
+  });
 }
 
 /** Parse comma-separated page ranges (1-based), e.g. `1-3, 5, 7-10`. */
@@ -311,33 +313,35 @@ async function writeSplitParts(ranges: number[][]): Promise<void> {
 
   const outputDir = await dirname(firstPart);
 
-  docStore.setLoading(true);
-  try {
-    for (let i = 0; i < ranges.length; i++) {
-      const pages = ranges[i];
-      const result = await invokeLogged<PdfBytesResult>("extract_pdf_pages", {
-        pdfBase64: encodeBase64Pdf(sourceBytes),
-        pageNumbers: pages,
+  return runDocumentOperation("split_pdf", async () => {
+    docStore.setLoading(true);
+    try {
+      for (let i = 0; i < ranges.length; i++) {
+        const pages = ranges[i];
+        const result = await invokeLogged<PdfBytesResult>("extract_pdf_pages", {
+          pdfBase64: encodeBase64Pdf(sourceBytes),
+          pageNumbers: pages,
+        });
+        const partPath =
+          ranges.length === 1
+            ? ensurePdfExtension(firstPart)
+            : ensurePdfExtension(await join(outputDir, `${baseName}-part${i + 1}.pdf`));
+        await invokeLogged("write_pdf_file", {
+          path: partPath,
+          dataBase64: result.dataBase64,
+        });
+      }
+      docStore.setStatusMessage(`Split into ${ranges.length} file(s)`);
+      log.assembly.info("Split PDF into parts", {
+        userAction: "split",
+        metadata: { parts: ranges.length },
       });
-      const partPath =
-        ranges.length === 1
-          ? ensurePdfExtension(firstPart)
-          : ensurePdfExtension(await join(outputDir, `${baseName}-part${i + 1}.pdf`));
-      await invokeLogged("write_pdf_file", {
-        path: partPath,
-        dataBase64: result.dataBase64,
-      });
+    } catch (err) {
+      showError(err);
+    } finally {
+      docStore.setLoading(false);
     }
-    docStore.setStatusMessage(`Split into ${ranges.length} file(s)`);
-    log.assembly.info("Split PDF into parts", {
-      userAction: "split",
-      metadata: { parts: ranges.length },
-    });
-  } catch (err) {
-    showError(err);
-  } finally {
-    docStore.setLoading(false);
-  }
+  });
 }
 
 export async function exportPageAsPng(pageNumber: number, dpi = 150): Promise<void> {

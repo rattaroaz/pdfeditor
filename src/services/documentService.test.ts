@@ -34,6 +34,7 @@ vi.mock("@/services/contentEditService", () => ({
 vi.mock("@/services/securityService", () => ({
   applySecurityOnSaveBytes: vi.fn(async (bytes: Uint8Array) => bytes),
   inspectPdfSecurity: vi.fn(),
+  unlockPdfBytesIfEncrypted: vi.fn(async (bytes: Uint8Array) => bytes),
 }));
 
 vi.mock("@/lib/pdf/pdfStorage", () => ({

@@ -1,4 +1,4 @@
-import { log } from "@/lib/logging";
+import { log, recordMetric } from "@/lib/logging";
 import { errorMessage } from "@/lib/parseInvokeError";
 
 /**
@@ -18,8 +18,8 @@ export function runDocumentOperation<T>(
   }
 
   const run = documentOperationQueue.then(
-    () => runWithDepth(task),
-    () => runWithDepth(task),
+    () => runWithDepth(operation, task),
+    () => runWithDepth(operation, task),
   );
   documentOperationQueue = run.catch((err) => {
     log.document.warn("Document operation failed", {
@@ -30,10 +30,26 @@ export function runDocumentOperation<T>(
   return run;
 }
 
-async function runWithDepth<T>(task: () => Promise<T>): Promise<T> {
+async function runWithDepth<T>(operation: string, task: () => Promise<T>): Promise<T> {
   documentOperationDepth += 1;
+  const start = performance.now();
   try {
-    return await task();
+    const result = await task();
+    recordMetric({
+      name: `document.${operation}`,
+      durationMs: Math.round(performance.now() - start),
+      outcome: "ok",
+      category: "document",
+    });
+    return result;
+  } catch (err) {
+    recordMetric({
+      name: `document.${operation}`,
+      durationMs: Math.round(performance.now() - start),
+      outcome: "fail",
+      category: "document",
+    });
+    throw err;
   } finally {
     documentOperationDepth -= 1;
   }

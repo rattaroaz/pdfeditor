@@ -79,6 +79,8 @@ pub struct LogEventPayload {
   #[serde(default)]
   pub error_id: Option<String>,
   #[serde(default)]
+  pub outcome: Option<String>,
+  #[serde(default)]
   pub metadata_json: Option<String>,
 }
 
@@ -476,6 +478,7 @@ fn log_frontend_payload(payload: &LogEventPayload) {
       component = ?payload.component,
       correlation_id = ?payload.correlation_id,
       error_id = ?payload.error_id,
+      outcome = ?payload.outcome,
       metadata = %meta,
       "{}", payload.message
     ),
@@ -489,6 +492,7 @@ fn log_frontend_payload(payload: &LogEventPayload) {
       component = ?payload.component,
       correlation_id = ?payload.correlation_id,
       error_id = ?payload.error_id,
+      outcome = ?payload.outcome,
       metadata = %meta,
       "{}", payload.message
     ),
@@ -502,6 +506,7 @@ fn log_frontend_payload(payload: &LogEventPayload) {
       component = ?payload.component,
       correlation_id = ?payload.correlation_id,
       error_id = ?payload.error_id,
+      outcome = ?payload.outcome,
       metadata = %meta,
       "{}", payload.message
     ),
@@ -515,6 +520,7 @@ fn log_frontend_payload(payload: &LogEventPayload) {
       component = ?payload.component,
       correlation_id = ?payload.correlation_id,
       error_id = ?payload.error_id,
+      outcome = ?payload.outcome,
       metadata = %meta,
       "{}", payload.message
     ),

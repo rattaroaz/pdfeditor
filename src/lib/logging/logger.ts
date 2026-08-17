@@ -64,6 +64,7 @@ async function shipToRust(
       component: context.component ?? null,
       correlationId: context.correlationId ?? null,
       errorId: context.errorId ?? null,
+      outcome: context.outcome ?? null,
       metadataJson:
         context.metadata && Object.keys(context.metadata).length > 0
           ? JSON.stringify(context.metadata)

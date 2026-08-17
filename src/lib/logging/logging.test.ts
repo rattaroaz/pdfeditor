@@ -4,9 +4,11 @@ import {
   clearLogBuffer,
   createLogger,
   getLogEntries,
+  getMetricsSnapshot,
   logger,
   log,
   logUserAction,
+  resetMetrics,
   startTimer,
 } from "./index";
 
@@ -14,6 +16,7 @@ describe("logging framework", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearLogBuffer();
+    resetMetrics();
     logger.setBackendShipping(false);
     logger.setLevel("debug");
   });
@@ -52,13 +55,21 @@ describe("logging framework", () => {
     );
   });
 
-  it("records timer duration", () => {
-    const spy = vi.spyOn(console, "debug").mockImplementation(() => {});
+  it("records timer duration at info with metrics", () => {
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
     const timer = startTimer(log.perf, "unit-op", { userAction: "test" });
     timer.end("done");
     const entries = getLogEntries();
     const entry = entries[entries.length - 1];
+    expect(entry?.level).toBe("info");
+    expect(entry?.context?.category).toBe("perf");
     expect(entry?.context?.durationMs).toBeGreaterThanOrEqual(0);
+    expect(entry?.context?.outcome).toBe("ok");
+    expect(getMetricsSnapshot().operations[0]).toMatchObject({
+      name: "unit-op",
+      ok: 1,
+      fail: 0,
+    });
     spy.mockRestore();
   });
 
@@ -118,6 +129,18 @@ describe("logging framework", () => {
     expect(entry?.context?.durationMs).toBeGreaterThanOrEqual(0);
     expect(entry?.context?.metadata?.error).toBe("boom");
     expect(entry?.context?.metadata?.step).toBe("write");
+    expect(entry?.context?.outcome).toBe("fail");
+    expect(getMetricsSnapshot().operations[0]?.fail).toBe(1);
+  });
+
+  it("redacts password-like metadata", () => {
+    log.security.info("scheduled", {
+      userAction: "protect_on_save",
+      metadata: { password: "secret123", pageCount: 2 },
+    });
+    const entry = getLogEntries()[getLogEntries().length - 1];
+    expect(entry?.context?.metadata?.password).toBe("[redacted]");
+    expect(entry?.context?.metadata?.pageCount).toBe(2);
   });
 
   it("persists min level in localStorage", () => {

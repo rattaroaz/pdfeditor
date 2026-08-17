@@ -27,6 +27,7 @@ import {
   inspectPdfSecurity,
   protectDocumentOnNextSave,
   removeDocumentPasswordProtection,
+  unlockPdfBytesIfEncrypted,
 } from "./securityService";
 
 describe("securityService", () => {
@@ -93,6 +94,34 @@ describe("securityService", () => {
 
   it("applySecurityOnSaveBytes passes through when no flags", async () => {
     const out = await applySecurityOnSaveBytes(PDF_BYTES);
+    expect(out).toBe(PDF_BYTES);
+    expect(mockInvokeLogged).not.toHaveBeenCalled();
+  });
+
+  it("applySecurityOnSaveBytes re-encrypts an already protected working copy", async () => {
+    useDocumentStore.setState({
+      isPasswordProtected: true,
+      documentPassword: "keep-secret",
+    });
+    const out = await applySecurityOnSaveBytes(PDF_BYTES);
+    expect(out).toEqual(PDF_BYTES);
+    expect(mockInvokeLogged).toHaveBeenCalledWith(
+      "encrypt_pdf",
+      expect.objectContaining({ userPassword: "keep-secret" }),
+    );
+  });
+
+  it("unlockPdfBytesIfEncrypted decrypts when the file is protected", async () => {
+    const out = await unlockPdfBytesIfEncrypted(PDF_BYTES, "secret", true);
+    expect(out).toEqual(PDF_BYTES);
+    expect(mockInvokeLogged).toHaveBeenCalledWith(
+      "decrypt_pdf",
+      expect.objectContaining({ password: "secret" }),
+    );
+  });
+
+  it("unlockPdfBytesIfEncrypted skips decrypt when not encrypted", async () => {
+    const out = await unlockPdfBytesIfEncrypted(PDF_BYTES, "secret", false);
     expect(out).toBe(PDF_BYTES);
     expect(mockInvokeLogged).not.toHaveBeenCalled();
   });

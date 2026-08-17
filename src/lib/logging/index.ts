@@ -8,6 +8,13 @@ export {
   clearLogBuffer,
   subscribeLogBuffer,
 } from "./buffer";
+export {
+  recordMetric,
+  getMetricsSnapshot,
+  resetMetrics,
+  subscribeMetrics,
+} from "./metrics";
+export type { MetricEvent, MetricSummary, MetricsSnapshot } from "./metrics";
 export { createCorrelationId } from "../correlation";
 export { reportError, toAppErrorPayload, createErrorReporter } from "../reportError";
 export type { ReportErrorOptions } from "../reportError";

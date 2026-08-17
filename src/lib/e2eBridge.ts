@@ -1,5 +1,6 @@
 import type { AppErrorPayload, LogEntry } from "@shared/types";
 import { getLogEntries } from "@/lib/logging/buffer";
+import { getMetricsSnapshot, type MetricsSnapshot } from "@/lib/logging/metrics";
 import { reportError } from "@/lib/reportError";
 import { openPdfFromPath } from "@/services/documentService";
 import { useUiStore } from "@/stores/uiStore";
@@ -9,6 +10,7 @@ const E2E_PDF_PATH = "e2e://minimal.pdf";
 export interface PdfEditorE2eBridge {
   readonly enabled: true;
   getLogEntries(): readonly LogEntry[];
+  getMetricsSnapshot(): MetricsSnapshot;
   getInvokeLog(): readonly string[];
   clearInvokeLog(): void;
   reportTestError(message?: string): AppErrorPayload;
@@ -30,6 +32,7 @@ export function registerE2eBridge(): void {
     window.__PDFEDITOR_E2E__ = {
       enabled: true,
       getLogEntries: () => getLogEntries(),
+      getMetricsSnapshot,
       getInvokeLog: () => handlers.getE2eInvokeLog(),
       clearInvokeLog: () => handlers.clearE2eInvokeLog(),
       reportTestError: (message = "E2E test error") =>

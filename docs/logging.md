@@ -33,7 +33,7 @@ log.invoke.debug("…"); // used by invokeLogged automatically
 const logPalette = createLogger({ category: "ui", component: "ToolPalette" });
 logPalette.info("Tool selected", { userAction: "select_tool", metadata: { tool: "highlight" } });
 
-// Performance timing
+// Performance timing — success logs at info with durationMs + outcome
 const timer = startTimer(log.pdf, "renderPage", { userAction: "render" });
 try {
   await renderPageToCanvas(page, canvas, scale);
@@ -41,6 +41,10 @@ try {
 } catch (e) {
   timer.fail(e);
 }
+
+// In-session metrics (also shown in View → Show logs → Metrics)
+import { getMetricsSnapshot } from "@/lib/logging";
+getMetricsSnapshot(); // { totals, operations: [{ name, count, ok, fail, avgMs, p95Ms }] }
 
 // High-level UI actions
 logUserAction("save", "User saved document");
@@ -143,9 +147,26 @@ import { fetchLoggingInfo, readBackendLogTail } from "@/services/loggingService"
 
 Tauri commands: `get_logging_info`, `read_recent_log_lines`.
 
+## Metrics
+
+Session metrics accumulate in memory (not shipped as a separate backend store). `startTimer`, `invokeLogged`, and `runDocumentOperation` all call `recordMetric`.
+
+| Name prefix | Source |
+|-------------|--------|
+| `open_pdf`, `save_pdf`, `revert_pdf` | document service timers |
+| `apply_content_edits`, `apply_form_changes`, `flatten_forms` | edit/form timers |
+| `invoke.<command>` | every Tauri invoke |
+| `document.<operation>` | document op queue (open/save/page/…) |
+
+Each operation tracks `count`, `ok`, `fail`, last/min/max/avg duration, and p95 of the last 64 samples.
+
+**View → Show logs → Metrics** lists the snapshot. Passwords and similar keys in log `metadata` are replaced with `[redacted]`.
+
+Timer completions now log at **info** (with `outcome` and `durationMs`) so production builds keep timings. Invokes stay debug unless they are slow (≥ 2s) or fail.
+
 ## Log Viewer (UI)
 
-**View → Show logs** — opens the right-side log panel with the live session buffer and on-disk log file tail; shows `correlationId` and `errorId` when present. The panel footer shows the log directory path on disk.
+**View → Show logs** — session buffer, on-disk log tail, and **Metrics**. Session lines show `outcome`, `durationMs`, `correlationId`, and `errorId` when present. The panel footer shows the log directory path on disk.
 
 ## Log file locations
 
@@ -161,7 +182,8 @@ Files are named `pdfeditor.log.YYYY-MM-DD` (JSON per line in the file appender).
 
 Tests disable backend shipping via `logger.setBackendShipping(false)` when needed. See:
 
-- `src/lib/logging/logging.test.ts` — buffer, scoping, Rust shipping, timers, document context enrichment
+- `src/lib/logging/logging.test.ts` — buffer, scoping, Rust shipping, timers, redaction, document context enrichment
+- `src/lib/logging/metrics.test.ts` — counters, duration stats, p95
 - `src/lib/reportError.test.ts` — error id + correlation in logs and UI
 - `src/lib/tauriInvoke.test.ts` — invoke success/failure + correlationId
 - `src/lib/logger.test.ts` — console output + Rust shipping via the `logger` root

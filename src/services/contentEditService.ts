@@ -10,7 +10,7 @@ import type { ImageContentEdit, TextContentEdit } from "@shared/types";
 import { useContentEditStore } from "@/stores/contentEditStore";
 import { runDocumentOperation } from "@/services/documentOpQueue";
 import { getDocumentLoadPassword, useDocumentStore } from "@/stores/documentStore";
-import { log, reportError } from "@/lib/logging";
+import { log, reportError, startTimer } from "@/lib/logging";
 
 async function textEditsPayload(edits: TextContentEdit[]) {
   const { pdfDoc, rotation } = useDocumentStore.getState();
@@ -99,6 +99,7 @@ export async function applyContentEdits(
     if (!sourceBytes || !editStore.hasEdits()) return true;
 
     docStore.setLoading(true);
+    const timer = startTimer(log.content, "apply_content_edits", { userAction: "content_edit" });
     try {
       const textEdits = await textEditsPayload(editStore.textEdits);
       const imageEdits = await imageEditsPayload(editStore.imageEdits);
@@ -118,9 +119,12 @@ export async function applyContentEdits(
       if (clearAfter) {
         editStore.clearEdits();
       }
-      log.content.info("Content edits applied", { userAction: "content_edit" });
+      timer.end("Content edits applied", {
+        metadata: { textEdits: textEdits.length, imageEdits: imageEdits.length },
+      });
       return true;
     } catch (err) {
+      timer.fail(err);
       reportError(err, { category: "content", userAction: "content_edit" });
       return false;
     } finally {

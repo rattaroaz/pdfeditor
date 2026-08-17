@@ -1,5 +1,6 @@
 import type { LogContext } from "@shared/types";
 import type { ScopedLogger } from "./logger";
+import { recordMetric } from "./metrics";
 
 export interface LogTimer {
   end: (message?: string, extra?: LogContext) => void;
@@ -14,24 +15,39 @@ export function startTimer(
   const start = performance.now();
   const base: LogContext = {
     ...context,
-    category: context?.category ?? "perf",
     userAction: context?.userAction ?? operation,
   };
 
   return {
     end(message, extra) {
-      scoped.debug(message ?? `${operation} completed`, {
+      const durationMs = Math.round(performance.now() - start);
+      recordMetric({
+        name: operation,
+        durationMs,
+        outcome: "ok",
+        category: extra?.category ?? base.category,
+      });
+      scoped.info(message ?? `${operation} completed`, {
         ...base,
         ...extra,
-        durationMs: Math.round(performance.now() - start),
+        durationMs,
+        outcome: "ok",
       });
     },
     fail(error, extra) {
+      const durationMs = Math.round(performance.now() - start);
       const errMsg = error instanceof Error ? error.message : String(error);
+      recordMetric({
+        name: operation,
+        durationMs,
+        outcome: "fail",
+        category: extra?.category ?? base.category,
+      });
       scoped.error(`${operation} failed: ${errMsg}`, {
         ...base,
         ...extra,
-        durationMs: Math.round(performance.now() - start),
+        durationMs,
+        outcome: "fail",
         metadata: {
           ...base.metadata,
           ...extra?.metadata,

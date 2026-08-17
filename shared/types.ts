@@ -16,6 +16,8 @@ export type LogCategory =
   | "system"
   | "update";
 
+export type LogOutcome = "ok" | "fail";
+
 export interface LogContext {
   sessionId?: string;
   documentId?: string;
@@ -25,6 +27,7 @@ export interface LogContext {
   category?: LogCategory;
   component?: string;
   correlationId?: string;
+  outcome?: LogOutcome;
   /** Extra structured fields (serialized to JSON in file logs). */
   metadata?: Record<string, unknown>;
   [key: string]: unknown;
