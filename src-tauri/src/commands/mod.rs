@@ -3,8 +3,10 @@ mod pdf_assembly;
 mod pdf_common;
 mod pdf_content;
 mod pdf_forms;
+mod pdf_images;
 mod pdf_pages;
 mod pdf_security;
+mod scanner;
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use crate::error::{AppError, CommandResult};
@@ -390,6 +392,79 @@ pub fn extract_pdf_pages(
 #[tauri::command]
 pub fn merge_pdfs(pdf_base64_list: Vec<String>) -> CommandResult<pdf_assembly::PdfBytesResult> {
   pdf_assembly::merge_pdfs_impl(pdf_assembly::MergePdfsPayload { pdf_base64_list })
+}
+
+#[tauri::command]
+pub fn images_to_pdf(
+  images: Vec<pdf_images::ImagePageInput>,
+  dpi: Option<u32>,
+  paper_size: Option<String>,
+) -> CommandResult<pdf_images::PdfBytesResult> {
+  pdf_images::images_to_pdf_impl(pdf_images::ImagesToPdfPayload {
+    images,
+    dpi: dpi.unwrap_or(300),
+    paper_size: paper_size.unwrap_or_else(|| "auto".into()),
+  })
+}
+
+#[tauri::command]
+pub fn insert_image_pages(
+  pdf_base64: String,
+  images: Vec<pdf_images::ImagePageInput>,
+  after_page: u32,
+  dpi: Option<u32>,
+  paper_size: Option<String>,
+) -> CommandResult<pdf_images::PdfBytesResult> {
+  pdf_images::insert_image_pages_impl(pdf_images::InsertImagePagesPayload {
+    pdf_base64,
+    images,
+    after_page,
+    dpi: dpi.unwrap_or(300),
+    paper_size: paper_size.unwrap_or_else(|| "auto".into()),
+  })
+}
+
+#[tauri::command]
+pub async fn list_scanners() -> CommandResult<scanner::ListScannersResult> {
+  tauri::async_runtime::spawn_blocking(scanner::list_scanners_impl)
+    .await
+    .map_err(|e| crate::error::map_err(AppError::Pdf(format!("Failed to list scanners: {e}"))))?
+}
+
+#[tauri::command]
+pub async fn scan_pages(
+  dpi: Option<u32>,
+  color_mode: Option<String>,
+  source: Option<String>,
+  device_id: Option<String>,
+  max_pages: Option<u32>,
+  preview: Option<bool>,
+  region_x: Option<f64>,
+  region_y: Option<f64>,
+  region_width: Option<f64>,
+  region_height: Option<f64>,
+) -> CommandResult<scanner::ScanPagesResult> {
+  tauri::async_runtime::spawn_blocking(move || {
+    scanner::scan_pages_impl(scanner::ScanPagesPayload {
+      dpi: dpi.unwrap_or(300),
+      color_mode: color_mode.unwrap_or_else(|| "color".into()),
+      source: source.unwrap_or_else(|| "auto".into()),
+      device_id,
+      max_pages: max_pages.unwrap_or(1),
+      preview: preview.unwrap_or(false),
+      region_x: region_x.unwrap_or(0.0),
+      region_y: region_y.unwrap_or(0.0),
+      region_width: region_width.unwrap_or(1.0),
+      region_height: region_height.unwrap_or(1.0),
+    })
+  })
+  .await
+  .map_err(|e| crate::error::map_err(AppError::Pdf(format!("Scan failed: {e}"))))?
+}
+
+#[tauri::command]
+pub fn read_image_file(path: String) -> CommandResult<scanner::ReadImageFileResult> {
+  scanner::read_image_file_impl(path)
 }
 
 #[tauri::command]

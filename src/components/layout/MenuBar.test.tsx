@@ -40,7 +40,13 @@ describe("MenuBar", () => {
       viewMode: "single",
       presentationMode: false,
     });
-    useUiStore.setState({ showSearch: false, showHelpGuide: false, helpSectionId: "overview" });
+    useUiStore.setState({
+      showSearch: false,
+      showHelpGuide: false,
+      helpSectionId: "overview",
+      showScanDialog: false,
+      showPrintDialog: false,
+    });
   });
 
   it("opens the user guide from the Help menu", () => {
@@ -120,6 +126,18 @@ describe("MenuBar", () => {
     fireEvent.click(screen.getByTestId("menu-view"));
     fireEvent.click(screen.getByTestId("menu-find"));
     expect(useUiStore.getState().showSearch).toBe(true);
+  });
+
+  it("opens scan and print dialogs from the File menu", () => {
+    render(<MenuBar />);
+    fireEvent.click(screen.getByTestId("menu-file"));
+    fireEvent.click(screen.getByTestId("menu-scan"));
+    expect(useUiStore.getState().showScanDialog).toBe(true);
+    expect(useUiStore.getState().scanDialogMode).toBe("new");
+
+    fireEvent.click(screen.getByTestId("menu-file"));
+    fireEvent.click(screen.getByTestId("menu-print"));
+    expect(useUiStore.getState().showPrintDialog).toBe(true);
   });
 
   it("toggles the logs panel from the View menu", () => {

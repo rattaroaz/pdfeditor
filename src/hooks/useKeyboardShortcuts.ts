@@ -46,6 +46,14 @@ export function useKeyboardShortcuts() {
         void savePdf(e.shiftKey);
         return;
       }
+      if (mod && e.key === "p") {
+        e.preventDefault();
+        if (hasDocument) {
+          logUserAction("print", "Print shortcut");
+          useUiStore.getState().openPrintDialog();
+        }
+        return;
+      }
       if (mod && e.key === "z" && !e.shiftKey) {
         e.preventDefault();
         logUserAction("undo", "Undo shortcut");

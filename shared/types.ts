@@ -286,6 +286,45 @@ export interface PdfInfoResult {
   metadata: PdfMetadata;
 }
 
+export type ScanColorMode = "color" | "grayscale" | "blackwhite";
+export type ScanSource = "auto" | "flatbed" | "feeder";
+export type ScanPaperSize = "auto" | "letter" | "a4" | "legal";
+export type ScanDialogMode = "new" | "insert";
+export type PrintPageMode = "all" | "current" | "range";
+
+export interface ScannerDevice {
+  id: string;
+  name: string;
+}
+
+export interface ScannedImage {
+  dataBase64: string;
+  mimeType: string;
+  /** PDF page width in inches when this image becomes a page. */
+  pageWidthIn?: number;
+  /** PDF page height in inches when this image becomes a page. */
+  pageHeightIn?: number;
+}
+
+export interface ScanRegion {
+  /** Normalized 0–1 rectangle relative to the full preview / scanner bed. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface ScanOptions {
+  dpi: number;
+  colorMode: ScanColorMode;
+  source: ScanSource;
+  paperSize: ScanPaperSize;
+  deviceId?: string;
+  maxPages?: number;
+  preview?: boolean;
+  region?: ScanRegion;
+}
+
 export type UpdateStatus = "up_to_date" | "update_available" | "error";
 
 export type UpdateDialogPhase =

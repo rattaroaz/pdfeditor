@@ -20,6 +20,8 @@ function collectFrontendInvokes() {
     "src/services/documentService.ts",
     "src/services/formService.ts",
     "src/services/pageService.ts",
+    "src/services/printService.ts",
+    "src/services/scanService.ts",
     "src/services/securityService.ts",
     "src/components/viewer/RecentFilesPanel.tsx",
   ];

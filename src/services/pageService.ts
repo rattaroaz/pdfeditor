@@ -135,6 +135,31 @@ export async function insertBlankPages(afterPage: number, count = 1): Promise<vo
   );
 }
 
+export async function insertImagePages(
+  afterPage: number,
+  images: Array<{ dataBase64: string; mimeType: string }>,
+  dpi = 300,
+  paperSize = "auto",
+): Promise<void> {
+  if (images.length === 0) return;
+  await applyPdfMutation(
+    (pdfBase64) =>
+      invokeLogged<PdfBytesResult>("insert_image_pages", {
+        pdfBase64,
+        images,
+        afterPage,
+        dpi,
+        paperSize,
+      }),
+    ({ annotations, textEdits, imageEdits, newFields }) => ({
+      annotations: remapAnnotationsAfterInsert(annotations, afterPage, images.length),
+      textEdits: remapPageIndexedAfterInsert(textEdits, afterPage, images.length),
+      imageEdits: remapPageIndexedAfterInsert(imageEdits, afterPage, images.length),
+      newFields: remapPageIndexedAfterInsert(newFields, afterPage, images.length),
+    }),
+  );
+}
+
 export async function reorderPages(newOrder: number[]): Promise<void> {
   await applyPdfMutation(
     (pdfBase64) =>

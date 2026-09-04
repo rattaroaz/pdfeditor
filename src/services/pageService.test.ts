@@ -24,7 +24,7 @@ vi.mock("@/lib/pdf/pdfEngine", () => ({
   loadPdfFromBytes: mockLoadPdf,
 }));
 
-import { deletePages, insertBlankPages, reorderPages } from "./pageService";
+import { deletePages, insertBlankPages, insertImagePages, reorderPages } from "./pageService";
 
 const mockPdfDoc = { numPages: 2 };
 
@@ -56,6 +56,18 @@ describe("pageService", () => {
       pdfBase64: PDF_BASE64,
       afterPage: 1,
       count: 2,
+    });
+  });
+
+  it("insertImagePages invokes insert_image_pages", async () => {
+    const images = [{ dataBase64: "abc", mimeType: "image/jpeg" }];
+    await insertImagePages(1, images, 200, "letter");
+    expect(mockInvokeLogged).toHaveBeenCalledWith("insert_image_pages", {
+      pdfBase64: PDF_BASE64,
+      images,
+      afterPage: 1,
+      dpi: 200,
+      paperSize: "letter",
     });
   });
 

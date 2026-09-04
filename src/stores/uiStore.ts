@@ -47,6 +47,12 @@ interface UiStore {
 
   showSplitDialog: boolean;
 
+  showScanDialog: boolean;
+
+  scanDialogMode: "new" | "insert";
+
+  showPrintDialog: boolean;
+
   showHelpGuide: boolean;
 
   helpSectionId: string;
@@ -90,6 +96,14 @@ interface UiStore {
   openSplitDialog: () => void;
 
   closeSplitDialog: () => void;
+
+  openScanDialog: (mode?: "new" | "insert") => void;
+
+  closeScanDialog: () => void;
+
+  openPrintDialog: () => void;
+
+  closePrintDialog: () => void;
 
   openHelpGuide: (sectionId?: string) => void;
 
@@ -143,6 +157,12 @@ export const useUiStore = create<UiStore>((set) => ({
 
   showSplitDialog: false,
 
+  showScanDialog: false,
+
+  scanDialogMode: "new",
+
+  showPrintDialog: false,
+
   showHelpGuide: false,
 
   helpSectionId: "overview",
@@ -188,6 +208,14 @@ export const useUiStore = create<UiStore>((set) => ({
   openSplitDialog: () => set({ showSplitDialog: true }),
 
   closeSplitDialog: () => set({ showSplitDialog: false }),
+
+  openScanDialog: (mode = "new") => set({ showScanDialog: true, scanDialogMode: mode }),
+
+  closeScanDialog: () => set({ showScanDialog: false }),
+
+  openPrintDialog: () => set({ showPrintDialog: true }),
+
+  closePrintDialog: () => set({ showPrintDialog: false }),
 
   openHelpGuide: (sectionId = "overview") =>
 

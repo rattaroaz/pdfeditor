@@ -31,10 +31,10 @@ export const HELP_SECTIONS: HelpSection[] = [
       {
         type: "list",
         items: [
-          "Open a PDF (File → Open, Ctrl+O, or drag a file onto the window).",
+          "Open a PDF (File → Open, Ctrl+O, or drag a file onto the window), or scan a paper form (File → Scan to PDF).",
           "Choose a mode on the toolbar that matches your task.",
           "Make changes; use Undo (Ctrl+Z) if needed.",
-          "Save (Ctrl+S) or Save As (Ctrl+Shift+S). Content edits, form values, page changes, and annotations are written when you save.",
+          "Save (Ctrl+S) or Save As (Ctrl+Shift+S). Print with File → Print or Ctrl+P. Content edits, form values, page changes, and annotations are written when you save.",
         ],
       },
       {
@@ -222,6 +222,14 @@ export const HELP_SECTIONS: HelpSection[] = [
       },
       {
         type: "heading",
+        text: "Paper forms",
+      },
+      {
+        type: "paragraph",
+        text: "Scan a paper form with File → Scan to PDF (or Document → Insert from scanner). After the pages open, switch to Forms mode to draw fillable fields, or Edit → Add text to type directly on the scan. Print the completed form with File → Print (Ctrl+P).",
+      },
+      {
+        type: "heading",
         text: "Tools menu (forms)",
       },
       {
@@ -257,6 +265,44 @@ export const HELP_SECTIONS: HelpSection[] = [
     ],
   },
   {
+    id: "scan-print",
+    title: "Scan & print",
+    blocks: [
+      {
+        type: "heading",
+        text: "Scan a form to PDF",
+      },
+      {
+        type: "list",
+        items: [
+          "File → Scan to PDF… opens the scan dialog. Choose a scanner, color, DPI (300 is good for forms), and paper size.",
+          "Preview scan captures the full bed at low resolution. Drag or resize the box to choose the area and size, then Scan selected area at your chosen DPI.",
+          "After each scan, pages appear under Pages to import. Click a page to review it, check the pages you want, then Create PDF (or Insert selected).",
+          "Scan feeder captures multiple pages from an ADF if the device supports it (no preview crop). Select which feeder pages to keep before importing.",
+          "Import images… opens each photo so you can crop it and set the PDF page size (Letter, A4, custom inches, or scale) before adding it to Pages to import.",
+          "Create PDF from N selected opens only the checked pages as an unsaved document. Save it when you are ready.",
+          "Document → Insert from scanner… or Pages → + Scan adds pages to the open file after the current page.",
+        ],
+      },
+      {
+        type: "heading",
+        text: "Fill and print",
+      },
+      {
+        type: "list",
+        items: [
+          "Use Forms mode to draw fields on a scanned form, or Edit → Add text to type on the page.",
+          "File → Print… (Ctrl+P) opens a page-range dialog, then the system printer dialog.",
+          "Annotations print only if you flatten markup on save first (File → Flatten markup on save, then Save).",
+        ],
+      },
+      {
+        type: "tip",
+        text: "If no scanner is listed, use Import images. On Linux, install SANE (scanimage). On Windows, preview and the final crop use WIA; a progress dialog appears only if the driver requires it.",
+      },
+    ],
+  },
+  {
     id: "file-menu",
     title: "File menu",
     blocks: [
@@ -264,8 +310,10 @@ export const HELP_SECTIONS: HelpSection[] = [
         type: "list",
         items: [
           "Open… — pick a PDF; password-protected files prompt for a password.",
+          "Scan to PDF… — capture a paper form with a scanner or imported images and open it as a new PDF.",
           "Save — write all pending edits to the current file.",
           "Save As… — save to a new path.",
+          "Print… (Ctrl+P) — send pages to the system printer. Flatten markup first if annotations should appear on paper.",
           "Close — close the document (prompts if unsaved).",
           "Flatten markup on save — when checked, annotations merge into page content on the next save.",
           "Protect with Password… — encrypt the PDF on next save (open password).",
@@ -286,6 +334,7 @@ export const HELP_SECTIONS: HelpSection[] = [
       {
         type: "list",
         items: [
+          "Insert from scanner… — add scanned or imported form pages after the current page.",
           "Merge PDFs — combine the open document with other PDFs into one new document.",
           "Append to current… — add another PDF’s pages to the end of the open file.",
           "Split PDF… — save page ranges as new files (also in sidebar Document tab).",
@@ -302,6 +351,7 @@ export const HELP_SECTIONS: HelpSection[] = [
           "Ctrl+click to multi-select; Shift+click for a range.",
           "Drag the grip (⋮⋮) to reorder pages.",
           "+ Blank — insert a blank page after the selection.",
+          "+ Scan — insert pages from a scanner or imported images after the selection.",
           "Extract — save selected pages as a new PDF.",
           "PNG — export one page as an image.",
           "Delete — remove selected pages (at least one page must remain).",
@@ -394,6 +444,7 @@ export const HELP_SECTIONS: HelpSection[] = [
           "Ctrl+O — Open",
           "Ctrl+S — Save",
           "Ctrl+Shift+S — Save As",
+          "Ctrl+P — Print",
           "Ctrl+Z — Undo",
           "Ctrl+Y or Ctrl+Shift+Z — Redo",
           "Ctrl+F — Find",
@@ -417,6 +468,7 @@ export const HELP_MENU_LINKS: { sectionId: string; label: string }[] = [
   { sectionId: "markup-tools", label: "Markup tools" },
   { sectionId: "edit-mode", label: "Edit mode" },
   { sectionId: "forms-mode", label: "Forms mode" },
+  { sectionId: "scan-print", label: "Scan & print" },
   { sectionId: "shortcuts", label: "Keyboard shortcuts" },
 ];
 

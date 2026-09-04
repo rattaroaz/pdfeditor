@@ -96,11 +96,19 @@ export async function handleInvoke<T>(
       return { dataBase64: String(args?.pdfBase64 ?? MINIMAL_PDF_BASE64) } as T;
     case "delete_pdf_pages":
     case "insert_blank_pages":
+    case "insert_image_pages":
+    case "images_to_pdf":
     case "reorder_pdf_pages":
     case "rotate_pdf_pages":
     case "extract_pdf_pages":
     case "merge_pdfs":
       return { dataBase64: MINIMAL_PDF_BASE64 } as T;
+    case "list_scanners":
+      return { scanners: [], backend: "e2e" } as T;
+    case "scan_pages":
+      return { images: [], cancelled: true } as T;
+    case "read_image_file":
+      return { dataBase64: "", mimeType: "image/png", path: String(args?.path ?? "") } as T;
     case "create_form_fields":
     case "apply_form_values":
     case "flatten_pdf_forms":

@@ -5,6 +5,7 @@ import { useDocumentStore } from "@/stores/documentStore";
 import { showAlert, showConfirm } from "@/lib/appDialog";
 import { deletePages, insertBlankPages, reorderPages } from "@/services/pageService";
 import { extractPagesToFile, exportPageAsPng } from "@/services/assemblyService";
+import { useUiStore } from "@/stores/uiStore";
 
 export function ThumbnailPanelContent() {
   const metadata = useDocumentStore((s) => s.metadata);
@@ -124,6 +125,14 @@ export function ThumbnailPanelContent() {
           className="rounded bg-zinc-800 px-2 py-1 text-[10px] text-zinc-300 hover:bg-zinc-700 disabled:opacity-40"
         >
           + Blank
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => useUiStore.getState().openScanDialog("insert")}
+          className="rounded bg-zinc-800 px-2 py-1 text-[10px] text-zinc-300 hover:bg-zinc-700 disabled:opacity-40"
+        >
+          + Scan
         </button>
         <button
           type="button"

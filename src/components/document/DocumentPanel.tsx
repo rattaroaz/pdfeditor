@@ -1,6 +1,7 @@
 import { logUserAction, reportError } from "@/lib/logging";
 import { mergeIntoCurrentDocument, mergePdfFromDialog } from "@/services/assemblyService";
 import { useDocumentStore } from "@/stores/documentStore";
+import { useUiStore } from "@/stores/uiStore";
 import { SplitPdfControls } from "./SplitPdfControls";
 
 export function DocumentPanel() {
@@ -20,11 +21,27 @@ export function DocumentPanel() {
   return (
     <div className="flex flex-1 flex-col overflow-y-auto p-2 text-sm">
       <p className="mb-3 text-xs text-zinc-500">
-        Combine or divide PDF files. Merged and appended documents open in the editor; split
-        results are saved as new files.
+        Scan paper forms, then combine or divide PDF files. Merged and appended documents open
+        in the editor; split results are saved as new files.
       </p>
 
       <section className="mb-4 space-y-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Scan</h3>
+        <p className="text-xs text-zinc-500">
+          Capture a paper form with a scanner or imported images, then fill and print it.
+        </p>
+        <ActionButton
+          disabled={busy}
+          onClick={() => {
+            logUserAction("scan_to_pdf", "Scan to PDF", "info", { metadata: { panel: "document" } });
+            useUiStore.getState().openScanDialog(hasDocument ? "insert" : "new");
+          }}
+        >
+          {hasDocument ? "Insert from scanner…" : "Scan to PDF…"}
+        </ActionButton>
+      </section>
+
+      <section className="mb-4 space-y-2 border-t border-zinc-800 pt-4">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Merge</h3>
         <p className="text-xs text-zinc-500">
           Select two or more PDFs, or one PDF while a document is open, to combine into a new

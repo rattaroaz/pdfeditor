@@ -199,9 +199,9 @@ Document assembly and format conversion.
 [x] Split by page range, bookmarks, or every N pages
 [x] Export pages to PNG/JPEG/TIFF (dpi setting)
 [ ] Export to HTML (basic layout preservation)
-[ ] Create PDF from images (drag folder → single PDF)
+[x] Create PDF from images (scan dialog import, or File → Scan to PDF)
 [ ] Create PDF from Office docs (LibreOffice headless or cloud API — document choice)
-[ ] Print to PDF (system print dialog)
+[x] Print to PDF (system print dialog)
 [ ] Reduce file size / optimize (compress images, remove unused objects)
 
 
@@ -225,11 +225,12 @@ Protect documents and remove sensitive content.
 ================================================================================
 PHASE 13 — SCANNER & IMPORT INTEGRATION
 ================================================================================
-[ ] TWAIN/WIA scanner support on Windows (Rust or sidecar)
-[ ] SANE support on Linux
+[x] TWAIN/WIA scanner support on Windows (Rust or sidecar)
+[x] SANE support on Linux
 [ ] ICA support on macOS
-[ ] Scan to PDF multipage workflow
-[ ] Scan settings: DPI, color/grayscale, duplex
+[x] Scan to PDF multipage workflow
+[x] Scan settings: DPI, color/grayscale, feeder
+[ ] Duplex scan option
 
 
 ================================================================================
@@ -333,3 +334,8 @@ OUT OF SCOPE (EXPLICIT NON-GOALS FOR v1)
 - 3D PDF and CAD viewer
 - DRM / RMS enterprise rights management
 - Mobile iOS/Android native apps (desktop Tauri only for v1)
+ 
+
+ scan page.  preview scan so can adjust.
+ when import images, be able to adjust size
+scan not work

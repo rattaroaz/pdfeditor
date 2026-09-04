@@ -1,14 +1,14 @@
 {
   "name": "pdfeditor",
   "private": true,
-  "version": "1.4.8",
+  "version": "1.5.0",
   "type": "module",
   "scripts": {
     "dev": "node ./node_modules/vite/bin/vite.js",
-    "dev:app": "node ./node_modules/@tauri-apps/cli/tauri.js dev",
+    "dev:app": "node ./scripts/tauri-cli.mjs dev",
     "build": "tsc --noEmit && node ./node_modules/vite/bin/vite.js build",
     "preview": "node ./node_modules/vite/bin/vite.js preview",
-    "tauri": "node ./node_modules/@tauri-apps/cli/tauri.js",
+    "tauri": "node ./scripts/tauri-cli.mjs",
     "build:win": "node scripts/tauri-build.mjs",
     "build:win:signed": "node scripts/tauri-build.mjs --signed",
     "build:installer": "node scripts/tauri-build.mjs --bundles nsis",

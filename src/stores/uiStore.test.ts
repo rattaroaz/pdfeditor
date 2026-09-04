@@ -49,6 +49,15 @@ describe("uiStore", () => {
     expect(useUiStore.getState().showSplitDialog).toBe(true);
     useUiStore.getState().closeSplitDialog();
     expect(useUiStore.getState().showSplitDialog).toBe(false);
+    useUiStore.getState().openScanDialog("insert");
+    expect(useUiStore.getState().showScanDialog).toBe(true);
+    expect(useUiStore.getState().scanDialogMode).toBe("insert");
+    useUiStore.getState().closeScanDialog();
+    expect(useUiStore.getState().showScanDialog).toBe(false);
+    useUiStore.getState().openPrintDialog();
+    expect(useUiStore.getState().showPrintDialog).toBe(true);
+    useUiStore.getState().closePrintDialog();
+    expect(useUiStore.getState().showPrintDialog).toBe(false);
     useUiStore.getState().setFlattenOnSave(true);
     expect(useUiStore.getState().flattenOnSave).toBe(true);
   });

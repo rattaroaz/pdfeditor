@@ -18,4 +18,10 @@ describe("helpGuide", () => {
       expect(getHelpSection(link.sectionId)).toBeDefined();
     }
   });
+
+  it("documents scan and print", () => {
+    const section = getHelpSection("scan-print");
+    expect(section?.title).toBe("Scan & print");
+    expect(HELP_MENU_LINKS.some((link) => link.sectionId === "scan-print")).toBe(true);
+  });
 });

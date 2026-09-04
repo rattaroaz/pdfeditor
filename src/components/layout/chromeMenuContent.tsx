@@ -106,6 +106,12 @@ export function useMenuContent(onAction: () => void) {
               Open…
             </MenuItem>
             <MenuItem
+              testId="menu-scan"
+              onClick={() => run(() => useUiStore.getState().openScanDialog("new"))}
+            >
+              Scan to PDF…
+            </MenuItem>
+            <MenuItem
               testId="menu-save"
               disabled={!hasDocument}
               onClick={() => run(() => void savePdf(false))}
@@ -114,6 +120,13 @@ export function useMenuContent(onAction: () => void) {
             </MenuItem>
             <MenuItem disabled={!hasDocument} onClick={() => run(() => void savePdf(true))}>
               Save As…
+            </MenuItem>
+            <MenuItem
+              testId="menu-print"
+              disabled={!hasDocument}
+              onClick={() => run(() => useUiStore.getState().openPrintDialog())}
+            >
+              Print…
             </MenuItem>
             <MenuItem
               testId="menu-close"
@@ -153,6 +166,13 @@ export function useMenuContent(onAction: () => void) {
       case "document":
         return (
           <>
+            <MenuItem
+              testId="menu-insert-scan"
+              disabled={!hasDocument}
+              onClick={() => run(() => useUiStore.getState().openScanDialog("insert"))}
+            >
+              Insert from scanner…
+            </MenuItem>
             <MenuItem
               disabled={!hasDocument}
               onClick={() => run(() => void mergePdfFromDialog())}

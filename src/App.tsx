@@ -3,6 +3,8 @@ import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { ErrorDialog } from "@/components/common/ErrorDialog";
 import { PasswordDialog } from "@/components/common/PasswordDialog";
 import { SplitPdfDialog } from "@/components/document/SplitPdfDialog";
+import { ScanDialog } from "@/components/document/ScanDialog";
+import { PrintDialog } from "@/components/document/PrintDialog";
 import { HelpGuideDialog } from "@/components/help/HelpGuideDialog";
 import { UpdateDialog } from "@/components/help/UpdateDialog";
 import { useUiStore } from "@/stores/uiStore";
@@ -29,6 +31,8 @@ function App() {
       <ErrorDialog />
       <PasswordDialog />
       <SplitPdfDialog />
+      <ScanDialog />
+      <PrintDialog />
       <HelpGuideDialog />
       <UpdateDialog />
     </ErrorBoundary>
