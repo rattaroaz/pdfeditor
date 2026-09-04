@@ -18,6 +18,11 @@ const extraArgs = process.argv.slice(2).filter((arg) => arg !== "--signed");
 
 const env = { ...process.env };
 
+// Clean up empty CARGO_TARGET_DIR (empty string is not unset, so delete it).
+if (env.CARGO_TARGET_DIR === "") {
+  delete env.CARGO_TARGET_DIR;
+}
+
 if (signedFlag) {
   if (!env.TAURI_SIGNING_PRIVATE_KEY && existsSync(keyPath)) {
     env.TAURI_SIGNING_PRIVATE_KEY = readFileSync(keyPath, "utf8").trim();

@@ -12,12 +12,17 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const tauriCli = join(root, "node_modules", "@tauri-apps", "cli", "tauri.js");
 
 const env = { ...process.env };
-if (process.platform === "win32") {
+if (process.platform === "win32" && process.env.CI !== "true") {
   env.CARGO_INCREMENTAL ??= "0";
   env.CARGO_TARGET_DIR ??= join(
     process.env.LOCALAPPDATA || homedir(),
     "pdfeditor-cargo-target",
   );
+}
+
+// Clean up empty CARGO_TARGET_DIR (empty string is not unset, so delete it).
+if (env.CARGO_TARGET_DIR === "") {
+  delete env.CARGO_TARGET_DIR;
 }
 
 const child = spawn(process.execPath, [tauriCli, ...process.argv.slice(2)], {
