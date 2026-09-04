@@ -85,6 +85,7 @@ jobs:
           GIT_COMMIT_SHA: ${{ github.sha }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          CARGO_TARGET_DIR: ''
         with:
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: ${{ env.RELEASE_NAME }}
@@ -100,9 +101,6 @@ jobs:
         shell: pwsh
         run: |
           $msi = Get-ChildItem -Path src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi -Filter *.msi -Recurse -ErrorAction SilentlyContinue
-          if (-not $msi) {
-            $msi = Get-ChildItem -Path src-tauri/target/release/bundle/msi -Filter *.msi -Recurse -ErrorAction SilentlyContinue
-          }
           if (-not $msi) {
             throw 'MSI bundle was not produced. Check the WiX/VBScript build step above.'
           }
@@ -147,6 +145,7 @@ jobs:
           GIT_COMMIT_SHA: ${{ github.sha }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          CARGO_TARGET_DIR: ''
         with:
           releaseId: ${{ needs.release-windows-x64.outputs.releaseId }}
           tagName: ${{ env.RELEASE_TAG }}
@@ -163,9 +162,6 @@ jobs:
         shell: pwsh
         run: |
           $nsis = Get-ChildItem -Path src-tauri/target/aarch64-pc-windows-msvc/release/bundle/nsis -Filter *.exe -Recurse -ErrorAction SilentlyContinue
-          if (-not $nsis) {
-            $nsis = Get-ChildItem -Path src-tauri/target/release/bundle/nsis -Filter *.exe -Recurse -ErrorAction SilentlyContinue
-          }
           if (-not $nsis) {
             throw 'NSIS bundle was not produced for ARM64.'
           }
