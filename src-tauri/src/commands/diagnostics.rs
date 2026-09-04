@@ -35,8 +35,7 @@ fn count_files_and_size(dir: &std::path::Path) -> (usize, u64) {
   (count, total_size)
 }
 
-#[tauri::command]
-pub fn get_diagnostics() -> CommandResult<DiagnosticsResult> {
+pub fn get_diagnostics_impl() -> CommandResult<DiagnosticsResult> {
   let span = tracing::info_span!("get_diagnostics");
   let _guard = span.enter();
 
@@ -76,7 +75,7 @@ mod tests {
 
   #[test]
   fn diagnostics_returns_valid_data() {
-    let result = get_diagnostics().expect("diagnostics should succeed");
+    let result = get_diagnostics_impl().expect("diagnostics should succeed");
     assert!(!result.app_version.is_empty());
     assert!(!result.platform.is_empty());
     assert!(!result.arch.is_empty());

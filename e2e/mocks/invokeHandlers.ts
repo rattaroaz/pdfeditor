@@ -83,6 +83,19 @@ export async function handleInvoke<T>(
       } as T;
     case "read_recent_log_lines":
       return [...e2eLogLines].slice(-Number(args?.maxLines ?? 200)) as T;
+    case "get_diagnostics":
+      return {
+        appVersion: `${pkg.version}-e2e`,
+        tauriVersion: "2",
+        rustVersion: "1.98",
+        logDirectory: "/tmp/pdfeditor-e2e-logs",
+        dataDirectory: "/tmp/pdfeditor-e2e-data",
+        logFilesCount: 5,
+        totalLogSizeBytes: 1024000,
+        annotationsCount: 10,
+        platform: "linux",
+        arch: "x64",
+      } as T;
     case "save_pdf_with_annotations":
       return {
         dataBase64: String(args?.pdfBase64 ?? MINIMAL_PDF_BASE64),

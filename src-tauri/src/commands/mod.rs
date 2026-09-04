@@ -621,7 +621,10 @@ pub fn read_recent_log_lines(max_lines: u32) -> CommandResult<Vec<String>> {
   crate::logging::read_recent_log_lines(cap).map_err(crate::error::map_err)
 }
 
-pub use diagnostics::get_diagnostics;
+#[tauri::command]
+pub fn get_diagnostics() -> CommandResult<diagnostics::DiagnosticsResult> {
+  diagnostics::get_diagnostics_impl()
+}
 
 #[cfg(test)]
 mod tests {
