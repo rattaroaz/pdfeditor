@@ -177,7 +177,8 @@ export async function insertScannedImages(
       metadata: { pages: images.length, afterPage },
     });
     return true;
-  } catch {
+  } catch (err) {
+    showError(err);
     return false;
   }
 }

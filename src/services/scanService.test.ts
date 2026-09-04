@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { encodeBase64Pdf } from "@/lib/pdf/pdfBinary";
 import { useDocumentStore } from "@/stores/documentStore";
+import { useUiStore } from "@/stores/uiStore";
 
 const PDF_BYTES = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34]);
 const PDF_BASE64 = encodeBase64Pdf(PDF_BYTES);
@@ -118,5 +119,17 @@ describe("scanService", () => {
     const ok = await insertScannedImages(images, 2, { dpi: 300, paperSize: "auto" });
     expect(ok).toBe(true);
     expect(mockInsertImagePages).toHaveBeenCalledWith(2, images, 300, "auto");
+  });
+
+  it("insertScannedImages reports an error when insert fails", async () => {
+    useDocumentStore.setState({
+      pdfBytes: PDF_BYTES,
+      basePdfBytes: PDF_BYTES,
+    });
+    useUiStore.setState({ lastError: null, showErrorDialog: false });
+    mockInsertImagePages.mockRejectedValueOnce(new Error("insert failed"));
+    const ok = await insertScannedImages(images, 2, { dpi: 300, paperSize: "auto" });
+    expect(ok).toBe(false);
+    expect(useUiStore.getState().showErrorDialog).toBe(true);
   });
 });

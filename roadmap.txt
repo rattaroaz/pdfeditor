@@ -334,8 +334,3 @@ OUT OF SCOPE (EXPLICIT NON-GOALS FOR v1)
 - 3D PDF and CAD viewer
 - DRM / RMS enterprise rights management
 - Mobile iOS/Android native apps (desktop Tauri only for v1)
- 
-
- scan page.  preview scan so can adjust.
- when import images, be able to adjust size
-scan not work
