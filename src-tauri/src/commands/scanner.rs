@@ -6,7 +6,7 @@ use std::fs;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -46,6 +46,7 @@ pub struct ReadImageFileResult {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(not(windows), allow(dead_code))]
 pub struct ScanPagesPayload {
   #[serde(default = "default_dpi")]
   pub dpi: u32,
@@ -198,6 +199,7 @@ fn scan_temp_dir() -> Result<PathBuf, AppError> {
   Ok(dir)
 }
 
+#[cfg(any(windows, test))]
 fn collect_scan_jpegs(dir: &Path) -> Vec<PathBuf> {
   let mut entries: Vec<PathBuf> = fs::read_dir(dir)
     .ok()
@@ -218,6 +220,7 @@ fn collect_scan_jpegs(dir: &Path) -> Vec<PathBuf> {
   entries
 }
 
+#[cfg(any(windows, test))]
 fn parse_trailing_json<T: for<'de> Deserialize<'de>>(text: &str) -> Result<T, String> {
   let trimmed = text.trim().trim_start_matches('\u{feff}');
   if let Ok(value) = serde_json::from_str(trimmed) {
@@ -231,6 +234,7 @@ fn parse_trailing_json<T: for<'de> Deserialize<'de>>(text: &str) -> Result<T, St
   serde_json::from_str(&trimmed[start..=end]).map_err(|err| err.to_string())
 }
 
+#[cfg(any(windows, test))]
 fn arg_value<'a>(args: &'a [&str], name: &str) -> Option<&'a str> {
   args.windows(2).find(|pair| pair[0] == name).map(|pair| pair[1])
 }
@@ -247,6 +251,7 @@ fn normalize_color_mode(value: &str) -> &'static str {
   }
 }
 
+#[cfg(any(windows, test))]
 fn normalize_source(value: &str) -> &'static str {
   match value.trim().to_ascii_lowercase().as_str() {
     "feeder" | "adf" => "feeder",
@@ -255,6 +260,7 @@ fn normalize_source(value: &str) -> &'static str {
   }
 }
 
+#[cfg(any(windows, test))]
 fn one_or_many<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
 where
   D: serde::Deserializer<'de>,
@@ -663,6 +669,7 @@ mod tests {
   }
 
   #[test]
+  #[cfg(any(windows, target_os = "linux"))]
   fn mime_from_common_extensions() {
     assert_eq!(mime_from_path(Path::new("a.JPG")), "image/jpeg");
     assert_eq!(mime_from_path(Path::new("a.png")), "image/png");
@@ -696,8 +703,10 @@ mod tests {
   }
 
   #[test]
+  #[cfg(any(windows, target_os = "linux"))]
   fn crops_normalized_region_from_image() {
     use image::{ImageBuffer, Rgb};
+    use std::time::{SystemTime, UNIX_EPOCH};
     let img: ImageBuffer<Rgb<u8>, _> = ImageBuffer::from_pixel(10, 10, Rgb([255, 0, 0]));
     let dir = std::env::temp_dir().join(format!(
       "pdfeditor-crop-test-{}",
@@ -718,6 +727,7 @@ mod tests {
   }
 
   #[test]
+  #[cfg(any(windows, target_os = "linux"))]
   fn parses_json_even_when_wia_writes_com_objects() {
     let stdout =
       "System.__ComObject\r\n{\"ok\":true,\"cancelled\":false,\"images\":\"C:\\\\scan.jpg\"}";
@@ -727,6 +737,7 @@ mod tests {
   }
 
   #[test]
+  #[cfg(any(windows, target_os = "linux"))]
   fn collects_scan_jpegs_and_ignores_other_files() {
     let dir = std::env::temp_dir().join(format!("pdfeditor-scan-jpegs-{}", uuid::Uuid::new_v4()));
     fs::create_dir_all(&dir).unwrap();

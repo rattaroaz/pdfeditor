@@ -45,6 +45,7 @@ pub fn run() {
             commands::log_frontend_event,
             commands::get_logging_info,
             commands::read_recent_log_lines,
+            commands::get_diagnostics,
         ])
         .setup(|app| {
             tracing::info!(app_version = env!("CARGO_PKG_VERSION"), "PDF Editor started");

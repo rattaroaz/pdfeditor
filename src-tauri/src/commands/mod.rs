@@ -1,3 +1,4 @@
+mod diagnostics;
 mod pdf_annotations;
 mod pdf_assembly;
 mod pdf_common;
@@ -431,6 +432,7 @@ pub async fn list_scanners() -> CommandResult<scanner::ListScannersResult> {
     .map_err(|e| crate::error::map_err(AppError::Pdf(format!("Failed to list scanners: {e}"))))?
 }
 
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn scan_pages(
   dpi: Option<u32>,
@@ -619,6 +621,11 @@ pub fn read_recent_log_lines(max_lines: u32) -> CommandResult<Vec<String>> {
   crate::logging::read_recent_log_lines(cap).map_err(crate::error::map_err)
 }
 
+#[tauri::command]
+pub fn get_diagnostics() -> CommandResult<diagnostics::DiagnosticsResult> {
+  diagnostics::get_diagnostics_impl()
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -656,5 +663,43 @@ mod tests {
     let info = crate::logging::logging_info();
     assert!(!info.log_directory.is_empty());
     assert!(!info.app_version.is_empty());
+  }
+
+  #[test]
+  fn validate_user_file_path_rejects_empty() {
+    let err = validate_user_file_path("").unwrap_err();
+    assert!(matches!(err, AppError::InvalidInput(_)));
+  }
+
+  #[test]
+  fn validate_user_file_path_rejects_relative() {
+    let err = validate_user_file_path("../../../etc/passwd").unwrap_err();
+    assert!(matches!(err, AppError::InvalidInput(_)));
+  }
+
+  #[test]
+  fn validate_user_file_path_rejects_parent_traversal() {
+    #[cfg(unix)]
+    let path = "/home/user/../../../etc/passwd";
+    #[cfg(windows)]
+    let path = "C:\\Users\\user\\..\\..\\..\\Windows\\System32\\config\\SAM";
+    let err = validate_user_file_path(path).unwrap_err();
+    assert!(matches!(err, AppError::InvalidInput(_)));
+  }
+
+  #[test]
+  fn validate_user_file_path_rejects_null_byte() {
+    let err = validate_user_file_path("/path/with\0null").unwrap_err();
+    assert!(matches!(err, AppError::InvalidInput(_)));
+  }
+
+  #[test]
+  fn validate_user_file_path_accepts_valid_absolute() {
+    #[cfg(unix)]
+    let path = "/home/user/documents/file.pdf";
+    #[cfg(windows)]
+    let path = "C:\\Users\\user\\documents\\file.pdf";
+    let result = validate_user_file_path(path);
+    assert!(result.is_ok());
   }
 }
