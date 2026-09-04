@@ -178,6 +178,7 @@ fn add_image_xobject(doc: &mut Document, prepared: &PreparedImage) -> Result<Obj
   Ok(doc.add_object(Object::Stream(Stream::new(img_dict, prepared.stream.clone()))))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn create_image_page(
   doc: &mut Document,
   pages_id: ObjectId,

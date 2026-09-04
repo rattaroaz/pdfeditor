@@ -431,6 +431,7 @@ pub async fn list_scanners() -> CommandResult<scanner::ListScannersResult> {
     .map_err(|e| crate::error::map_err(AppError::Pdf(format!("Failed to list scanners: {e}"))))?
 }
 
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn scan_pages(
   dpi: Option<u32>,
