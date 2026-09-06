@@ -51,6 +51,25 @@ describe("ScanDialog", () => {
     expect(useUiStore.getState().showScanDialog).toBe(false);
   });
 
+  it("scans without requiring a preview first", async () => {
+    mockAcquire.mockReset();
+    mockAcquire.mockResolvedValue([pageA]);
+    render(<ScanDialog />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    expect(screen.getByTestId("scan-official")).not.toBeDisabled();
+    fireEvent.click(screen.getByTestId("scan-official"));
+    await waitFor(() =>
+      expect(mockAcquire).toHaveBeenCalledWith(
+        expect.objectContaining({
+          preview: false,
+          region: { x: 0, y: 0, width: 1, height: 1 },
+        }),
+      ),
+    );
+    await waitFor(() => expect(screen.getByTestId("scan-page-picker")).toBeInTheDocument());
+    expect(screen.queryByTestId("scan-preview-image")).not.toBeInTheDocument();
+  });
+
   it("disables import until a page is selected", async () => {
     render(<ScanDialog />);
     await waitFor(() => expect(mockList).toHaveBeenCalled());

@@ -9,7 +9,7 @@ import {
   listScanners,
 } from "@/services/scanService";
 import { reportError } from "@/lib/logging";
-import { FULL_SCAN_REGION, PREVIEW_DPI } from "@/lib/scanRegion";
+import { FULL_SCAN_REGION, PREVIEW_DPI, isFullScanRegion } from "@/lib/scanRegion";
 import {
   queueScanPages,
   removeQueuedPage,
@@ -129,12 +129,17 @@ export function ScanDialog() {
 
   const handleOfficial = () =>
     void run(async () => {
-      setStatus(`Scanning selected area at ${dpi} DPI…`);
+      const scanRegion = preview ? region : FULL_SCAN_REGION;
+      setStatus(
+        preview && !isFullScanRegion(scanRegion)
+          ? `Scanning selected area at ${dpi} DPI…`
+          : `Scanning at ${dpi} DPI…`,
+      );
       try {
         const images = await acquireScanPages({
           ...options,
           preview: false,
-          region,
+          region: scanRegion,
           maxPages: 1,
         });
         if (images.length === 0) {
@@ -238,8 +243,8 @@ export function ScanDialog() {
           {mode === "insert" ? "Insert scanned pages" : "Scan form to PDF"}
         </h2>
         <p className="mt-1 text-xs text-zinc-500">
-          Preview and crop a scan, or import a photo and set its PDF page size. Then select which
-          pages to include and create the file.
+          Scan directly, optionally preview and crop first, or import a photo and set its PDF page
+          size. Then select which pages to include and create the file.
         </p>
 
         <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
@@ -319,7 +324,7 @@ export function ScanDialog() {
               }}
               className="rounded-md border border-zinc-600 bg-zinc-800 px-2 py-1.5 text-zinc-200"
             >
-              <option value="auto">Auto (flatbed preview)</option>
+              <option value="auto">Auto</option>
               <option value="flatbed">Flatbed</option>
               <option value="feeder">Document feeder</option>
             </select>
@@ -374,21 +379,21 @@ export function ScanDialog() {
             <>
               <button
                 type="button"
-                data-testid="scan-preview"
+                data-testid="scan-official"
                 disabled={busy}
-                onClick={handlePreview}
+                onClick={handleOfficial}
                 className="rounded-md bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-500 disabled:opacity-40"
               >
-                {preview ? "Retake preview" : "Preview scan"}
+                {preview ? "Scan selected area" : "Scan"}
               </button>
               <button
                 type="button"
-                data-testid="scan-official"
-                disabled={busy || !preview}
-                onClick={handleOfficial}
-                className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm text-white hover:bg-emerald-600 disabled:opacity-40"
+                data-testid="scan-preview"
+                disabled={busy}
+                onClick={handlePreview}
+                className="rounded-md border border-zinc-600 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800 disabled:opacity-40"
               >
-                Scan selected area
+                {preview ? "Retake preview" : "Preview (optional)"}
               </button>
             </>
           )}

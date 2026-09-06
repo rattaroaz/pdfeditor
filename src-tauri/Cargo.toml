@@ -1,6 +1,6 @@
 [package]
 name = "pdfeditor"
-version = "1.6.0"
+version = "1.6.1",
 description = "Production PDF editor — Adobe Acrobat clone"
 authors = ["pdfeditor"]
 edition = "2021"

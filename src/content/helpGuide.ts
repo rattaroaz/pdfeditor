@@ -276,7 +276,7 @@ export const HELP_SECTIONS: HelpSection[] = [
         type: "list",
         items: [
           "File → Scan to PDF… opens the scan dialog. Choose a scanner, color, DPI (300 is good for forms), and paper size.",
-          "Preview scan captures the full bed at low resolution. Drag or resize the box to choose the area and size, then Scan selected area at your chosen DPI.",
+          "Scan captures the page at your chosen DPI. Preview is optional — use it to crop the bed before scanning, or skip it and scan the full page.",
           "After each scan, pages appear under Pages to import. Click a page to review it, check the pages you want, then Create PDF (or Insert selected).",
           "Scan feeder captures multiple pages from an ADF if the device supports it (no preview crop). Select which feeder pages to keep before importing.",
           "Import images… opens each photo so you can crop it and set the PDF page size (Letter, A4, custom inches, or scale) before adding it to Pages to import.",
@@ -298,7 +298,7 @@ export const HELP_SECTIONS: HelpSection[] = [
       },
       {
         type: "tip",
-        text: "If no scanner is listed, use Import images. On Linux, install SANE (scanimage). On Windows, preview and the final crop use WIA; a progress dialog appears only if the driver requires it.",
+        text: "If no scanner is listed, use Import images. On Linux, install SANE (scanimage). On Windows, scans use WIA; a progress dialog appears only if the driver requires it.",
       },
     ],
   },
