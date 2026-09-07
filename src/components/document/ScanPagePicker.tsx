@@ -1,7 +1,54 @@
+import { useEffect, useState } from "react";
+import type { ScannedImage } from "@shared/types";
 import type { QueuedScanPage } from "@/lib/scanQueue";
+import { createScannedImageObjectUrl, scannedImageSrc } from "@/lib/scannedImageUrl";
 
-function pageSrc(page: QueuedScanPage): string {
-  return `data:${page.image.mimeType};base64,${page.image.dataBase64}`;
+function ScanImage({
+  image,
+  alt,
+  className,
+  testId,
+}: {
+  image: ScannedImage;
+  alt: string;
+  className?: string;
+  testId?: string;
+}) {
+  const [src, setSrc] = useState(() => scannedImageSrc(image));
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    const objectUrl = createScannedImageObjectUrl(image);
+    if (objectUrl) {
+      setSrc(objectUrl);
+      setFailed(false);
+      return () => URL.revokeObjectURL(objectUrl);
+    }
+    setSrc(scannedImageSrc(image));
+    setFailed(false);
+    return undefined;
+  }, [image.dataBase64, image.mimeType]);
+
+  if (failed) {
+    return (
+      <div
+        data-testid={testId}
+        className="flex h-28 items-center justify-center bg-zinc-800 px-2 text-center text-[11px] text-zinc-400"
+      >
+        Could not display this scan
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      data-testid={testId}
+      onError={() => setFailed(true)}
+      className={className}
+    />
+  );
 }
 
 export function ScanPagePicker({
@@ -53,10 +100,10 @@ export function ScanPagePicker({
 
       {active && (
         <div className="overflow-hidden rounded border border-zinc-700 bg-zinc-950">
-          <img
-            src={pageSrc(active)}
+          <ScanImage
+            image={active.image}
             alt="Selected scan"
-            data-testid="scan-page-active"
+            testId="scan-page-active"
             className="mx-auto max-h-64 w-auto bg-white object-contain"
           />
         </div>
@@ -82,8 +129,8 @@ export function ScanPagePicker({
                   }}
                   className="block w-full"
                 >
-                  <img
-                    src={pageSrc(page)}
+                  <ScanImage
+                    image={page.image}
                     alt={`Scanned page ${index + 1}`}
                     className="h-28 w-full rounded bg-white object-contain"
                   />

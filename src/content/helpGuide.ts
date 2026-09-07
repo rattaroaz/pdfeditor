@@ -298,7 +298,7 @@ export const HELP_SECTIONS: HelpSection[] = [
       },
       {
         type: "tip",
-        text: "If no scanner is listed, use Import images. On Linux, install SANE (scanimage). On Windows, scans use WIA; a progress dialog appears only if the driver requires it.",
+        text: "If no scanner is listed, use Import images. On Linux, install SANE (scanimage). On Windows, scans use WIA. Epson feeders often need paper loaded in the ADF; if Windows shows a scan dialog, choose the feeder (not the glass).",
       },
     ],
   },

@@ -22,6 +22,7 @@ import { ScanPreviewCrop } from "@/components/document/ScanPreviewCrop";
 import { ScanPagePicker } from "@/components/document/ScanPagePicker";
 import { ImportImageAdjust, type ImportDraft } from "@/components/document/ImportImageAdjust";
 import { clampPageInches, IMPORT_SIZE_PRESETS, presetSize } from "@/lib/importImageSize";
+import { preferFeederDevice } from "@/lib/scanFeeder";
 import type {
   ScanColorMode,
   ScanPaperSize,
@@ -155,22 +156,33 @@ export function ScanDialog() {
 
   const handleFeeder = () =>
     void run(async () => {
-      setStatus("Scanning pages from the feeder…");
+      const feederId = preferFeederDevice(scanners, deviceId);
+      if (feederId && feederId !== deviceId) setDeviceId(feederId);
+      const feederName = scanners.find((scanner) => scanner.id === feederId)?.name;
+      setStatus(
+        feederName ? `Scanning pages from ${feederName}…` : "Scanning pages from the feeder…",
+      );
       try {
         const images = await acquireScanPages({
           ...options,
+          deviceId: feederId,
           source: "feeder",
           preview: false,
           maxPages: 20,
         });
         if (images.length === 0) {
-          setStatus("Scan cancelled — no page was captured.");
+          setStatus("Feeder did not capture a page. Load paper in the ADF and try again, or use Scan page for the glass.");
           return;
         }
         appendPages(images, `Added ${images.length} page(s). Select the page(s) to import, then create the PDF.`);
       } catch (err) {
-        setStatus("Scan failed. Check that the scanner is on and try again.");
-        reportError(err, { category: "assembly", userAction: "scan_pages" });
+        const message = err instanceof Error ? err.message : String(err);
+        setStatus(
+          /feeder|ADF|paper|RR-600|Epson/i.test(message)
+            ? message
+            : "Feeder scan failed. Load paper, pick the Epson feeder if Windows asks, and try again.",
+        );
+        reportError(err, { category: "assembly", userAction: "scan_feeder" });
       }
     });
 
@@ -245,8 +257,10 @@ export function ScanDialog() {
         </h2>
         <p className="mt-1 text-xs text-zinc-500">
           Scan now without a preview, or use Preview only when you need to crop a flatbed page.
-          Document feeders skip preview and scan every loaded sheet. You can also import a photo and
-          set its PDF page size, then select which pages to include.
+          Document feeders skip preview and scan every loaded sheet. Scan feeder uses a dedicated
+          feeder such as the Epson RR-600W when one is listed. A Windows scan dialog may appear —
+          pick that Epson, not the Brother glass. You can also import a photo and set its PDF page
+          size, then select which pages to include.
         </p>
 
         <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
@@ -320,6 +334,8 @@ export function ScanDialog() {
                 const next = e.target.value as ScanSource;
                 setSource(next);
                 if (next === "feeder") {
+                  const preferred = preferFeederDevice(scanners, deviceId);
+                  if (preferred) setDeviceId(preferred);
                   setPreview(null);
                   setRegion(FULL_SCAN_REGION);
                 }

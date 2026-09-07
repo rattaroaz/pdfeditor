@@ -135,6 +135,25 @@ fn crop_image_to_region(
   })
 }
 
+fn encode_scan_jpeg(path: &Path) -> Result<ScannedImage, AppError> {
+  let bytes = read_image_bytes_retry(path)?;
+  let img = image::load_from_memory(&bytes)
+    .map_err(|e| AppError::Pdf(format!("Could not read scanned image: {e}")))?;
+  let rgb = img.to_rgb8();
+  if rgb.width() == 0 || rgb.height() == 0 {
+    return Err(AppError::InvalidInput("scanned image has no pixels".into()));
+  }
+  let encoded = image::DynamicImage::ImageRgb8(rgb);
+  let mut out = Vec::new();
+  encoded
+    .write_to(&mut Cursor::new(&mut out), image::ImageFormat::Jpeg)
+    .map_err(|e| AppError::Pdf(format!("Could not encode scanned image: {e}")))?;
+  Ok(ScannedImage {
+    data_base64: STANDARD.encode(out),
+    mime_type: "image/jpeg".into(),
+  })
+}
+
 fn encode_or_crop_image(
   path: &Path,
   preview: bool,
@@ -143,7 +162,7 @@ fn encode_or_crop_image(
 ) -> Result<ScannedImage, AppError> {
   let (x, y, width, height) = region;
   if preview || region_applied || is_full_region(x, y, width, height) {
-    return encode_image_file(path);
+    return encode_scan_jpeg(path);
   }
   crop_image_to_region(path, x, y, width, height)
 }
@@ -313,11 +332,14 @@ fn run_wia_script(args: &[&str]) -> Result<WiaJson, AppError> {
   let mut cmd = Command::new("powershell");
   // Do not use CREATE_NO_WINDOW — WIA common dialogs need a message loop
   // and will fail or return cancelled if the host process has no window.
+  // Scan must not be Minimized: Epson's WIA dialog is parented to this
+  // console and never appears when the host is minimized.
+  let is_scan = arg_value(args, "-Action") == Some("scan");
   cmd.args([
     "-NoProfile",
     "-STA",
     "-WindowStyle",
-    "Minimized",
+    if is_scan { "Normal" } else { "Minimized" },
     "-ExecutionPolicy",
     "Bypass",
     "-File",
@@ -570,6 +592,10 @@ pub fn scan_pages_impl(payload: ScanPagesPayload) -> CommandResult<ScanPagesResu
     if let Some(id) = payload.device_id.as_deref().filter(|s| !s.is_empty()) {
       cmd.args(["-d", id]);
     }
+    let source = payload.source.trim().to_ascii_lowercase();
+    if source == "feeder" || source == "adf" {
+      cmd.arg("--source=ADF");
+    }
     if max_pages > 1 {
       let pattern = out_dir.join("scan_%d.jpg");
       cmd.arg(format!("--batch={}", pattern.display()));
@@ -700,6 +726,22 @@ mod tests {
     assert!((height - 0.5).abs() < f64::EPSILON);
     assert!(is_full_region(0.0, 0.0, 1.0, 1.0));
     assert!(!is_full_region(0.1, 0.1, 0.5, 0.5));
+  }
+
+  #[test]
+  #[cfg(any(windows, target_os = "linux"))]
+  fn reencodes_scanned_bmp_as_browser_jpeg() {
+    use image::{ImageBuffer, Rgb};
+    let img: ImageBuffer<Rgb<u8>, _> = ImageBuffer::from_pixel(4, 4, Rgb([10, 20, 30]));
+    let dir = std::env::temp_dir().join(format!("pdfeditor-scan-jpeg-{}", uuid::Uuid::new_v4()));
+    fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("scan_001.bmp");
+    img.save(&path).unwrap();
+    let encoded = encode_scan_jpeg(&path).unwrap();
+    assert_eq!(encoded.mime_type, "image/jpeg");
+    let bytes = STANDARD.decode(&encoded.data_base64).unwrap();
+    assert_eq!(&bytes[0..2], &[0xFF, 0xD8]);
+    let _ = fs::remove_dir_all(dir);
   }
 
   #[test]

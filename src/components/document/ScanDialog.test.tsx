@@ -117,6 +117,57 @@ describe("ScanDialog", () => {
     await waitFor(() => expect(screen.getByTestId("scan-page-picker")).toBeInTheDocument());
   });
 
+  it("shows a feeder-specific error when the ADF capture fails", async () => {
+    mockAcquire.mockReset();
+    mockAcquire.mockRejectedValue(new Error("Document feeder did not capture a page. Load paper in the ADF."));
+    render(<ScanDialog />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId("scan-page"));
+    await waitFor(() =>
+      expect(screen.getByText(/Document feeder did not capture a page/i)).toBeInTheDocument(),
+    );
+  });
+
+  it("sends the Epson RR-600W when Scan feeder is used with a Brother selected", async () => {
+    mockList.mockResolvedValue({
+      scanners: [
+        { id: "brother", name: "Brother MFC-9340CDW [30055c6b12e3]" },
+        { id: "epson", name: "EPSOND686BA (RR-600W)" },
+      ],
+      backend: "wia",
+    });
+    mockAcquire.mockReset();
+    mockAcquire.mockResolvedValue([pageA]);
+    render(<ScanDialog />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId("scan-page"));
+    await waitFor(() =>
+      expect(mockAcquire).toHaveBeenCalledWith(
+        expect.objectContaining({ source: "feeder", deviceId: "epson" }),
+      ),
+    );
+  });
+
+  it("sends the sibling ADF device when Scan feeder is used on an Epson pair", async () => {
+    mockList.mockResolvedValue({
+      scanners: [
+        { id: "flat", name: "Epson WF-2860 Series" },
+        { id: "adf", name: "Epson WF-2860 Series ADF" },
+      ],
+      backend: "wia",
+    });
+    mockAcquire.mockReset();
+    mockAcquire.mockResolvedValue([pageA]);
+    render(<ScanDialog />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId("scan-page"));
+    await waitFor(() =>
+      expect(mockAcquire).toHaveBeenCalledWith(
+        expect.objectContaining({ source: "feeder", deviceId: "adf", preview: false, maxPages: 20 }),
+      ),
+    );
+  });
+
   it("offers scan feeder from Auto without a preview", async () => {
     mockAcquire.mockReset();
     mockAcquire.mockResolvedValue([pageA, pageB]);
