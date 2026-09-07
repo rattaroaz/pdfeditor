@@ -159,6 +159,7 @@ export function ScanDialog() {
       try {
         const images = await acquireScanPages({
           ...options,
+          source: "feeder",
           preview: false,
           maxPages: 20,
         });
@@ -243,8 +244,9 @@ export function ScanDialog() {
           {mode === "insert" ? "Insert scanned pages" : "Scan form to PDF"}
         </h2>
         <p className="mt-1 text-xs text-zinc-500">
-          Scan directly, optionally preview and crop first, or import a photo and set its PDF page
-          size. Then select which pages to include and create the file.
+          Scan now without a preview, or use Preview only when you need to crop a flatbed page.
+          Document feeders skip preview and scan every loaded sheet. You can also import a photo and
+          set its PDF page size, then select which pages to include.
         </p>
 
         <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
@@ -324,9 +326,9 @@ export function ScanDialog() {
               }}
               className="rounded-md border border-zinc-600 bg-zinc-800 px-2 py-1.5 text-zinc-200"
             >
-              <option value="auto">Auto</option>
+              <option value="auto">Auto (scan now)</option>
               <option value="flatbed">Flatbed</option>
-              <option value="feeder">Document feeder</option>
+              <option value="feeder">Document feeder (no preview)</option>
             </select>
           </label>
 
@@ -365,7 +367,18 @@ export function ScanDialog() {
         )}
 
         <div className="mt-4 flex flex-wrap gap-2">
-          {source === "feeder" ? (
+          {source !== "feeder" && (
+            <button
+              type="button"
+              data-testid="scan-official"
+              disabled={busy}
+              onClick={handleOfficial}
+              className="rounded-md bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-500 disabled:opacity-40"
+            >
+              {preview ? "Scan selected area" : "Scan page"}
+            </button>
+          )}
+          {source !== "flatbed" && (
             <button
               type="button"
               data-testid="scan-page"
@@ -375,27 +388,17 @@ export function ScanDialog() {
             >
               Scan feeder
             </button>
-          ) : (
-            <>
-              <button
-                type="button"
-                data-testid="scan-official"
-                disabled={busy}
-                onClick={handleOfficial}
-                className="rounded-md bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-500 disabled:opacity-40"
-              >
-                {preview ? "Scan selected area" : "Scan"}
-              </button>
-              <button
-                type="button"
-                data-testid="scan-preview"
-                disabled={busy}
-                onClick={handlePreview}
-                className="rounded-md border border-zinc-600 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800 disabled:opacity-40"
-              >
-                {preview ? "Retake preview" : "Preview (optional)"}
-              </button>
-            </>
+          )}
+          {source !== "feeder" && (
+            <button
+              type="button"
+              data-testid="scan-preview"
+              disabled={busy}
+              onClick={handlePreview}
+              className="rounded-md border border-zinc-600 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800 disabled:opacity-40"
+            >
+              {preview ? "Retake preview" : "Preview (optional)"}
+            </button>
           )}
           <button
             type="button"

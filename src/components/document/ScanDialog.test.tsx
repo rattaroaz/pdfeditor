@@ -106,6 +106,8 @@ describe("ScanDialog", () => {
     render(<ScanDialog />);
     await waitFor(() => expect(mockList).toHaveBeenCalled());
     fireEvent.change(screen.getByTestId("scan-source"), { target: { value: "feeder" } });
+    expect(screen.queryByTestId("scan-preview")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("scan-official")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("scan-page"));
     await waitFor(() =>
       expect(mockAcquire).toHaveBeenCalledWith(
@@ -113,5 +115,20 @@ describe("ScanDialog", () => {
       ),
     );
     await waitFor(() => expect(screen.getByTestId("scan-page-picker")).toBeInTheDocument());
+  });
+
+  it("offers scan feeder from Auto without a preview", async () => {
+    mockAcquire.mockReset();
+    mockAcquire.mockResolvedValue([pageA, pageB]);
+    render(<ScanDialog />);
+    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    expect(screen.getByTestId("scan-official")).toHaveTextContent("Scan page");
+    expect(screen.getByTestId("scan-page")).toHaveTextContent("Scan feeder");
+    fireEvent.click(screen.getByTestId("scan-page"));
+    await waitFor(() =>
+      expect(mockAcquire).toHaveBeenCalledWith(
+        expect.objectContaining({ source: "feeder", preview: false, maxPages: 20 }),
+      ),
+    );
   });
 });

@@ -276,9 +276,9 @@ export const HELP_SECTIONS: HelpSection[] = [
         type: "list",
         items: [
           "File → Scan to PDF… opens the scan dialog. Choose a scanner, color, DPI (300 is good for forms), and paper size.",
-          "Scan captures the page at your chosen DPI. Preview is optional — use it to crop the bed before scanning, or skip it and scan the full page.",
+          "Scan page captures the full bed at your chosen DPI with no preview. Preview is optional — use it only when you want to crop the bed first.",
           "After each scan, pages appear under Pages to import. Click a page to review it, check the pages you want, then Create PDF (or Insert selected).",
-          "Scan feeder captures multiple pages from an ADF if the device supports it (no preview crop). Select which feeder pages to keep before importing.",
+          "Scan feeder reads the ADF with no preview crop (preview is hidden for feeders). Select which feeder pages to keep before importing.",
           "Import images… opens each photo so you can crop it and set the PDF page size (Letter, A4, custom inches, or scale) before adding it to Pages to import.",
           "Create PDF from N selected opens only the checked pages as an unsaved document. Save it when you are ready.",
           "Document → Insert from scanner… or Pages → + Scan adds pages to the open file after the current page.",
