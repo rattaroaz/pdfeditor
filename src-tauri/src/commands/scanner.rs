@@ -346,6 +346,14 @@ fn run_wia_script(args: &[&str]) -> Result<WiaJson, AppError> {
   ]);
   cmd.arg(&script_path);
   cmd.args(args);
+  #[cfg(windows)]
+  {
+    use std::os::windows::process::CommandExt;
+    // A GUI parent does not give PowerShell a console, so WIA dialogs never show.
+    if is_scan {
+      cmd.creation_flags(0x00000010);
+    }
+  }
 
   let output = cmd.output().map_err(|e| {
     AppError::Pdf(format!("Could not start Windows scanner (PowerShell): {e}"))

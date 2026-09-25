@@ -87,9 +87,20 @@ function Get-Scanners {
   return @($items)
 }
 
+function Get-WiaProperty($obj, $propId) {
+  foreach ($prop in @($obj.Properties)) {
+    try {
+      if ([int]$prop.PropertyID -eq [int]$propId) { return $prop }
+    } catch { }
+  }
+  return $null
+}
+
 function Set-WiaProp($obj, $propId, $value) {
+  $prop = Get-WiaProperty $obj $propId
+  if (-not $prop) { return $false }
   try {
-    $obj.Properties.Item($propId).Value = $value
+    $prop.Value = $value
     return $true
   } catch {
     return $false
@@ -220,8 +231,10 @@ function Name-LooksLikeDedicatedFeeder([string]$name) {
 
 function Device-IsFeederOnly($device, [string]$name) {
   if (Name-LooksLikeDedicatedFeeder $name) { return $true }
+  $capsProp = Get-WiaProperty $device 3086
+  if (-not $capsProp) { return $false }
   try {
-    $caps = [int]$device.Properties.Item(3086).Value
+    $caps = [int]$capsProp.Value
     return ((($caps -band 1) -ne 0) -and (($caps -band 2) -eq 0))
   } catch {
     return $false
@@ -298,11 +311,7 @@ function Connect-Scanner([string]$id, [bool]$wantFeeder) {
 }
 
 function Get-WiaProp($obj, $propId) {
-  try {
-    return $obj.Properties.Item($propId)
-  } catch {
-    return $null
-  }
+  return Get-WiaProperty $obj $propId
 }
 
 function Reset-WiaExtents($item) {
@@ -353,7 +362,9 @@ function Get-ItemName($item) {
 }
 
 function Get-ItemCategory($item) {
-  try { return ([string]$item.Properties.Item(4123).Value).ToUpper() } catch { return '' }
+  $prop = Get-WiaProperty $item 4125
+  if (-not $prop) { return '' }
+  try { return ([string]$prop.Value).ToUpper() } catch { return '' }
 }
 
 function Item-LooksLikeFeeder($item) {
@@ -393,11 +404,11 @@ function Get-DeviceName($device) {
 }
 
 function Prepare-FeederItem($device, $item, $intent, $dpi) {
-  $name = Get-DeviceName $device
-  if (-not (Device-IsFeederOnly $device $name)) {
-    Set-FeederHandling $device | Out-Null
-    Set-FeederHandling $item | Out-Null
-  }
+  Set-FeederHandling $device | Out-Null
+  Set-FeederHandling $item | Out-Null
+  # 0 = scan every sheet still in the ADF. 1 stops after the first page.
+  Set-WiaProp $device 3096 0 | Out-Null
+  Set-WiaProp $item 3096 0 | Out-Null
   Set-WiaProp $item 6146 $intent | Out-Null
   Set-WiaProp $item 6147 $dpi | Out-Null
   Set-WiaProp $item 6148 $dpi | Out-Null
@@ -440,15 +451,14 @@ function Is-FeederFinished($err) {
 }
 
 function Transfer-FeederPage($item) {
-  Show-HostWindow
-  $dialog = New-Object -ComObject WIA.CommonDialog
   try {
-    $script:wiaTransfer = $dialog.ShowTransfer($item)
+    return $item.Transfer()
   } catch {
     if (Is-FeederFinished $_) { throw }
-    $script:wiaTransfer = $item.Transfer()
+    Show-HostWindow
+    $dialog = New-Object -ComObject WIA.CommonDialog
+    return $dialog.ShowTransfer($item)
   }
-  return $script:wiaTransfer
 }
 
 function Transfer-Image($item) {
@@ -552,6 +562,10 @@ try {
       $n = 0
       $limit = if ($useFeeder) { $MaxPages } else { 1 }
       while ($n -lt $limit) {
+        if ($useFeeder -and $n -gt 0) {
+          Set-FeederHandling $device | Out-Null
+          Set-WiaProp $device 3096 0 | Out-Null
+        }
         $image = $null
         try {
           if ($useFeeder) {
@@ -601,7 +615,7 @@ try {
     }
     if ($null -eq $image) {
       if ($useFeeder) {
-        throw 'Document feeder dialog returned no page. Select EPSOND686BA (RR-600W) in the Windows scan dialog if it appears.'
+        throw 'Document feeder dialog returned no page. Load paper in the ADF and choose the feeder in the Windows scan dialog if it appears.'
       }
       Write-ScanJson -Ok $true -Cancelled $true
       exit 0
@@ -634,7 +648,7 @@ try {
       }
     } catch { }
     $detail = if ($msg) { $msg } else { 'the Windows scan dialog did not return an image' }
-    Write-ScanJson -Ok $false -ErrorText ("Document feeder did not capture a page ($detail). Load paper in the Epson RR-600W, pick that scanner in the Windows dialog, and try again.")
+    Write-ScanJson -Ok $false -ErrorText ("Document feeder did not capture a page ($detail). Load paper in the ADF and try Scan feeder again.")
     exit 1
   }
   if ($msg -match 'cancelled by the user|0x80210064') {
